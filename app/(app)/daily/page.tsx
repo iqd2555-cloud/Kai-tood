@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { DailyForm } from "./daily-form";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { todayISO } from "@/lib/format";
@@ -7,6 +8,8 @@ import type { Branch, DailyReport } from "@/lib/types";
 export default async function DailyPage() {
   const profile = await getCurrentProfile();
   const supabase = await createSupabaseServerClient();
+  if (!supabase) redirect("/login?setup=supabase");
+
   const today = todayISO();
 
   const branchesQuery = supabase.from("branches").select("*").order("name");

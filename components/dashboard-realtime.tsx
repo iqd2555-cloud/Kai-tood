@@ -9,6 +9,8 @@ export function DashboardRealtime() {
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
+    if (!supabase) return;
+
     const channel = supabase
       .channel("daily_reports_realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "daily_reports" }, () => router.refresh())

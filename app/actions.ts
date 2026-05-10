@@ -37,6 +37,10 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
   }
 
   const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์" };
+  }
+
   const { error } = await supabase.from("daily_reports").upsert(
     {
       ...payload,
@@ -57,6 +61,6 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
 
 export async function signOut() {
   const supabase = await createSupabaseServerClient();
-  await supabase.auth.signOut();
+  await supabase?.auth.signOut();
   redirect("/login");
 }

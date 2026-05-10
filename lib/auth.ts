@@ -36,6 +36,8 @@ function normalizeProfile(profile: ProfileResponse): Profile | null {
 
 export async function getCurrentProfile(): Promise<Profile> {
   const supabase = await createSupabaseServerClient();
+  if (!supabase) redirect("/login?setup=supabase");
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
