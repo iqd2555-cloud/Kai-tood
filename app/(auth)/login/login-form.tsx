@@ -6,7 +6,6 @@ import { createSupabaseBrowserClient } from "@/lib/supabase-client";
 
 export function LoginForm() {
   const router = useRouter();
-  const supabase = createSupabaseBrowserClient();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -15,6 +14,7 @@ export function LoginForm() {
     setError("");
     const email = String(formData.get("email") ?? "");
     const password = String(formData.get("password") ?? "");
+    const supabase = createSupabaseBrowserClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) {
