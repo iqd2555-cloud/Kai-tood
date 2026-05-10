@@ -9,6 +9,8 @@ export default async function OrdersPage() {
   if (!isOwner(profile)) redirect("/dashboard");
 
   const supabase = await createSupabaseServerClient();
+  if (!supabase) redirect("/login?setup=supabase");
+
   const { data: reportsData } = await supabase
     .from("daily_reports")
     .select("*, branches(name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold)")

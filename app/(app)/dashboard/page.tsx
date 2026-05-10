@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { DashboardRealtime } from "@/components/dashboard-realtime";
 import { StatCard } from "@/components/stat-card";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
@@ -9,6 +10,8 @@ import type { Branch, DailyReport } from "@/lib/types";
 export default async function DashboardPage() {
   const profile = await getCurrentProfile();
   const supabase = await createSupabaseServerClient();
+  if (!supabase) redirect("/login?setup=supabase");
+
   const today = todayISO();
 
   const reportsQuery = supabase
