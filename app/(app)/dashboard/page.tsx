@@ -18,11 +18,13 @@ export default async function DashboardPage() {
     .order("updated_at", { ascending: false });
 
   if (!isOwner(profile) && profile.branch_id) reportsQuery.eq("branch_id", profile.branch_id);
-  const { data: reports = [] } = await reportsQuery.returns<DailyReport[]>();
+  const { data: reportsData } = await reportsQuery.returns<DailyReport[]>();
+  const reports = reportsData ?? [];
 
   const branchesQuery = supabase.from("branches").select("*").order("name");
   if (!isOwner(profile) && profile.branch_id) branchesQuery.eq("id", profile.branch_id);
-  const { data: branches = [] } = await branchesQuery.returns<Branch[]>();
+  const { data: branchesData } = await branchesQuery.returns<Branch[]>();
+  const branches = branchesData ?? [];
 
   const todaySales = reports.reduce((sum, report) => sum + Number(report.total_sales), 0);
   const cashSales = reports.reduce((sum, report) => sum + Number(report.cash_sales), 0);
