@@ -20,6 +20,7 @@ components/             UI components และ PWA registrar
 lib/                    Supabase clients, auth helper, formatter, types
 public/                 manifest, service worker, icons
 supabase/schema.sql     ตาราง, indexes, policies, realtime setup
+supabase/migrations/     SQL migration เพิ่มเติมสำหรับอัปเดตฐานข้อมูลที่ใช้งานอยู่
 ```
 
 ## วิธีติดตั้งสำหรับมือใหม่
@@ -59,15 +60,11 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 1. ใน Supabase ไปที่ **Authentication > Users** แล้วกด Add user
 2. สร้างอีเมล/รหัสผ่านของเจ้าของร้านและพนักงาน
-3. เปิดตาราง `branches` เพื่อดู `id` ของสาขา
-4. เพิ่มข้อมูลในตาราง `profiles` โดยใช้ `id` จาก Auth user:
+3. Login ครั้งแรก ระบบจะเรียก `public.ensure_login_profile` เพื่อสร้าง `profiles` ให้อัตโนมัติ
+4. ผู้ใช้คนแรกที่ Login จะเป็น `owner`; ผู้ใช้ถัดไปจะเป็น `staff` และจะถูกผูกกับสาขาเริ่มต้น `MAIN` อัตโนมัติ
+5. หากต้องการเปลี่ยนสิทธิ์หรือสาขา ให้แก้ในตาราง `profiles` หลังจาก Login ครั้งแรกแล้ว
 
-```sql
-insert into public.profiles (id, full_name, role, branch_id)
-values
-  ('OWNER_AUTH_USER_ID', 'เจ้าของร้าน', 'owner', null),
-  ('STAFF_AUTH_USER_ID', 'พนักงานสาขาหลัก', 'staff', 'BRANCH_ID');
-```
+> ถ้าฐานข้อมูลเดิมแจ้ง error ว่าไม่พบ `public.ensure_login_profile(user_email, user_full_name, user_id)` ให้เปิด Supabase SQL Editor แล้วรันไฟล์ `supabase/migrations/202605110001_ensure_login_profile.sql` ทั้งไฟล์ จากนั้นลอง Login อีกครั้ง
 
 ### 5) รันในเครื่อง
 
