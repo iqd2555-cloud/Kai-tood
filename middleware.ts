@@ -2,17 +2,33 @@ import { createServerClient, type SetAllCookies } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabasePublicEnv } from "@/lib/supabase-env";
 
+function redirectToLogin(request: NextRequest, setup?: "supabase", error?: "auth") {
+  const url = request.nextUrl.clone();
+  url.pathname = "/login";
+  url.search = "";
+  if (setup) url.searchParams.set("setup", setup);
+  if (error) url.searchParams.set("error", error);
+  if (request.nextUrl.pathname !== "/") {
+    url.searchParams.set("next", `${request.nextUrl.pathname}${request.nextUrl.search}`);
+  }
+  return NextResponse.redirect(url);
+}
+
+function redirectWithSessionCookies(url: URL, response: NextResponse) {
+  const redirectResponse = NextResponse.redirect(url);
+  response.cookies.getAll().forEach((cookie) => {
+    redirectResponse.cookies.set(cookie);
+  });
+  return redirectResponse;
+}
+
 export async function middleware(request: NextRequest) {
   const isLogin = request.nextUrl.pathname.startsWith("/login");
   const supabaseEnv = getSupabasePublicEnv();
 
   if (!supabaseEnv) {
     if (isLogin) return NextResponse.next();
-
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("setup", "supabase");
-    return NextResponse.redirect(url);
+    return redirectToLogin(request, "supabase");
   }
 
   let response = NextResponse.next({
@@ -44,24 +60,20 @@ export async function middleware(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (!user && !isLogin) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      return NextResponse.redirect(url);
+      return redirectToLogin(request);
     }
 
     if (user && isLogin) {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";
-      return NextResponse.redirect(url);
+      url.search = "";
+      return redirectWithSessionCookies(url, response);
     }
   } catch (error) {
     console.error("Supabase middleware auth check failed", error);
 
     if (!isLogin) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      url.searchParams.set("error", "auth");
-      return NextResponse.redirect(url);
+      return redirectToLogin(request, undefined, "auth");
     }
   }
 
