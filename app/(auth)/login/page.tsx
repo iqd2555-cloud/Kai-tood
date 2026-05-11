@@ -1,6 +1,23 @@
 import { LoginForm } from "./login-form";
 
-export default function LoginPage() {
+function getSafeNext(next: string | string[] | undefined) {
+  const nextPath = Array.isArray(next) ? next[0] : next;
+  if (!nextPath || !nextPath.startsWith("/") || nextPath.startsWith("//") || nextPath.startsWith("/login")) {
+    return "/dashboard";
+  }
+
+  return nextPath;
+}
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ next?: string | string[]; setup?: string; error?: string }>;
+}) {
+  const params = await searchParams;
+  const setupMissing = params?.setup === "supabase";
+  const authError = params?.error === "auth";
+
   return (
     <main className="app-shell flex min-h-dvh items-center justify-center px-4 py-8">
       <div className="w-full max-w-md rounded-[2rem] border border-black/10 bg-white p-6 shadow-2xl">
@@ -9,7 +26,17 @@ export default function LoginPage() {
           <h1 className="mt-2 text-4xl font-black leading-tight">เข้าสู่ระบบ</h1>
           <p className="mt-2 text-white/70">สำหรับพนักงานและเจ้าของร้าน รองรับมือถือและติดตั้งเป็น PWA</p>
         </div>
-        <LoginForm />
+        {setupMissing && (
+          <div className="mb-5 rounded-2xl bg-yellow-50 p-3 font-bold text-yellow-900">
+            ยังไม่ได้ตั้งค่า Supabase บนระบบนี้ กรุณาตรวจสอบ Environment Variables
+          </div>
+        )}
+        {authError && (
+          <div className="mb-5 rounded-2xl bg-red-50 p-3 font-bold text-red-700">
+            เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง
+          </div>
+        )}
+        <LoginForm next={getSafeNext(params?.next)} />
       </div>
     </main>
   );
