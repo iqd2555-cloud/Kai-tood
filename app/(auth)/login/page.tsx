@@ -17,6 +17,7 @@ export default async function LoginPage({
   const params = await searchParams;
   const setupMissing = params?.setup === "supabase";
   const authError = params?.error === "auth";
+  const profileError = params?.error === "profile";
 
   return (
     <main className="app-shell flex min-h-dvh items-center justify-center px-4 py-8">
@@ -34,6 +35,11 @@ export default async function LoginPage({
         {authError && (
           <div className="mb-5 rounded-2xl bg-red-50 p-3 font-bold text-red-700">
             เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง
+          </div>
+        )}
+        {profileError && (
+          <div className="mb-5 rounded-2xl bg-red-50 p-3 font-bold text-red-700">
+            ไม่พบหรือสร้างโปรไฟล์ผู้ใช้ไม่ได้ กรุณาตรวจสอบว่าได้รัน SQL ล่าสุดใน Supabase แล้ว
           </div>
         )}
         <LoginForm next={getSafeNext(params?.next)} />
