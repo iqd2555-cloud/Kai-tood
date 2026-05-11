@@ -13,6 +13,15 @@ type ProfileResponse = {
   branch: Branch | Branch[] | null;
 };
 
+type AuthUserForProvisioning = {
+  id: string;
+  email?: string | null;
+  user_metadata?: {
+    full_name?: unknown;
+    name?: unknown;
+  };
+};
+
 function isUserRole(role: string): role is UserRole {
   return role === "owner" || role === "staff";
 }
@@ -34,7 +43,33 @@ function normalizeProfile(profile: ProfileResponse): Profile | null {
   };
 }
 
-export async function getCurrentProfile(): Promise<Profile> {
+function getUserFullName(user: AuthUserForProvisioning) {
+  const metadataName = user.user_metadata?.full_name ?? user.user_metadata?.name;
+  if (typeof metadataName === "string" && metadataName.trim()) return metadataName.trim();
+  return user.email?.split("@")[0]?.trim() || "ผู้ใช้งาน";
+}
+
+export async function ensureProfileForUser(user: AuthUserForProvisioning) {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase URL หรือ Anon Key" };
+
+  const { error } = await supabase.rpc("ensure_login_profile", {
+    user_full_name: getUserFullName(user),
+    user_id: user.id,
+    user_email: user.email ?? null,
+  });
+
+  if (error) {
+    return {
+      ok: false,
+      message: `เข้าสู่ระบบสำเร็จ แต่เตรียมโปรไฟล์ไม่สำเร็จ: ${error.message}`,
+    };
+  }
+
+  return { ok: true, message: "" };
+}
+
+async function fetchCurrentProfile(): Promise<Profile | null> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) redirect("/login?setup=supabase");
 
@@ -44,19 +79,30 @@ export async function getCurrentProfile(): Promise<Profile> {
 
   if (!user) redirect("/login");
 
+  const ensureResult = await ensureProfileForUser(user);
+  if (!ensureResult.ok) {
+    console.error(ensureResult.message);
+  }
+
   const { data: profile, error } = await supabase
     .from("profiles")
     .select(PROFILE_SELECT)
     .eq("id", user.id)
     .returns<ProfileResponse>()
-    .single();
+    .maybeSingle();
 
-  if (error || !profile) return redirect("/login?error=profile");
+  if (error || !profile) {
+    if (error) console.error("Load profile failed", error.message);
+    return null;
+  }
 
-  const normalizedProfile = normalizeProfile(profile);
-  if (!normalizedProfile) return redirect("/login?error=profile");
+  return normalizeProfile(profile);
+}
 
-  return normalizedProfile;
+export async function getCurrentProfile(): Promise<Profile> {
+  const profile = await fetchCurrentProfile();
+  if (!profile) return redirect("/login?error=profile");
+  return profile;
 }
 
 export function isOwner(profile: Profile) {

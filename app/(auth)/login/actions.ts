@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { ensureProfileForUser } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 export type LoginState = {
@@ -37,13 +38,27 @@ export async function login(_: LoginState, formData: FormData): Promise<LoginSta
   }
 
   const { email, password, next } = parsed.data;
-  const { error } = await supabase.auth.signInWithPassword({
-    email: email.toLowerCase(),
+  const normalizedEmail = email.toLowerCase();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.signInWithPassword({
+    email: normalizedEmail,
     password,
   });
 
   if (error) {
-    return { message: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" };
+    return { message: `Supabase: ${error.message}` };
+  }
+
+  if (!user) {
+    return { message: "Supabase: เข้าสู่ระบบสำเร็จแต่ไม่พบข้อมูลผู้ใช้ใน session" };
+  }
+
+  const profileResult = await ensureProfileForUser(user);
+  if (!profileResult.ok) {
+    await supabase.auth.signOut();
+    return { message: profileResult.message };
   }
 
   redirect(normalizeRedirectPath(next));

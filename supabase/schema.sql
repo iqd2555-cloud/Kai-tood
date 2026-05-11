@@ -87,3 +87,84 @@ alter publication supabase_realtime add table public.daily_reports;
 insert into public.branches (name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold)
 values ('สาขาหลัก', 'MAIN', 5, 5, 2)
 on conflict (code) do nothing;
+
+create or replace function public.ensure_default_branch()
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  default_branch_id uuid;
+begin
+  insert into public.branches (name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold)
+  values ('สาขาหลัก', 'MAIN', 5, 5, 2)
+  on conflict (code) do nothing
+  returning id into default_branch_id;
+
+  if default_branch_id is null then
+    select id into default_branch_id from public.branches where code = 'MAIN' limit 1;
+  end if;
+
+  return default_branch_id;
+end;
+$$;
+
+create or replace function public.ensure_login_profile(
+  user_id uuid,
+  user_email text default null,
+  user_full_name text default null
+)
+returns public.profiles
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  default_branch_id uuid;
+  selected_role public.user_role;
+  profile_row public.profiles;
+  display_name text;
+begin
+  if auth.uid() is null or auth.uid() <> user_id then
+    raise exception 'Cannot create profile for another user';
+  end if;
+
+  default_branch_id := public.ensure_default_branch();
+  display_name := nullif(trim(coalesce(user_full_name, split_part(coalesce(user_email, ''), '@', 1), '')), '');
+
+  if display_name is null then
+    display_name := 'ผู้ใช้งาน';
+  end if;
+
+  select p.* into profile_row from public.profiles p where p.id = user_id;
+
+  if found then
+    if profile_row.role = 'staff' and profile_row.branch_id is null then
+      update public.profiles
+      set branch_id = default_branch_id
+      where id = user_id
+      returning * into profile_row;
+    end if;
+
+    return profile_row;
+  end if;
+
+  if exists (select 1 from public.profiles) then
+    selected_role := 'staff';
+  else
+    selected_role := 'owner';
+  end if;
+
+  insert into public.profiles (id, full_name, role, branch_id)
+  values (
+    user_id,
+    display_name,
+    selected_role,
+    case when selected_role = 'staff' then default_branch_id else null end
+  )
+  returning * into profile_row;
+
+  return profile_row;
+end;
+$$;
