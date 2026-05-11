@@ -3,14 +3,15 @@ import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch, Profile, UserRole } from "@/lib/types";
 
 const PROFILE_SELECT =
-  "id, full_name, role, branch_id, branch:branches(id, name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold)";
+  "id, email, full_name, role, branch_id, branch:branches(id, name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold)";
 
 type ProfileResponse = {
   id: string;
+  email: string | null;
   full_name: string;
   role: string;
   branch_id: string | null;
-  branch: Branch | Branch[] | null;
+  branch?: Branch | Branch[] | null;
 };
 
 type AuthUserForProvisioning = {
@@ -28,14 +29,16 @@ function isUserRole(role: string): role is UserRole {
 
 function normalizeProfileBranch(branch: ProfileResponse["branch"]): Branch | null {
   if (Array.isArray(branch)) return branch[0] ?? null;
-  return branch;
+  return branch ?? null;
 }
 
 function normalizeProfile(profile: ProfileResponse): Profile | null {
   if (!isUserRole(profile.role)) return null;
+  if (profile.role === "staff" && !profile.branch_id) return null;
 
   return {
     id: profile.id,
+    email: profile.email,
     full_name: profile.full_name,
     role: profile.role,
     branch_id: profile.branch_id,
@@ -53,16 +56,26 @@ export async function ensureProfileForUser(user: AuthUserForProvisioning) {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase URL หรือ Anon Key" };
 
-  const { error } = await supabase.rpc("ensure_login_profile", {
-    user_full_name: getUserFullName(user),
-    user_id: user.id,
-    user_email: user.email ?? null,
-  });
+  const { data: profile, error } = await supabase
+    .rpc("ensure_login_profile", {
+      user_full_name: getUserFullName(user),
+      user_id: user.id,
+      user_email: user.email ?? null,
+    })
+    .returns<ProfileResponse>()
+    .single();
 
   if (error) {
     return {
       ok: false,
       message: `เข้าสู่ระบบสำเร็จ แต่เตรียมโปรไฟล์ไม่สำเร็จ: ${error.message}`,
+    };
+  }
+
+  if (!profile || !normalizeProfile(profile)) {
+    return {
+      ok: false,
+      message: "เข้าสู่ระบบสำเร็จ แต่โปรไฟล์ที่สร้างไม่สมบูรณ์",
     };
   }
 

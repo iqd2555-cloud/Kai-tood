@@ -15,6 +15,7 @@ create table public.branches (
 
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
+  email text,
   full_name text not null,
   role public.user_role not null default 'staff',
   branch_id uuid references public.branches(id),
@@ -99,12 +100,9 @@ declare
 begin
   insert into public.branches (name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold)
   values ('สาขาหลัก', 'MAIN', 5, 5, 2)
-  on conflict (code) do nothing
+  on conflict (code) do update
+  set name = excluded.name
   returning id into default_branch_id;
-
-  if default_branch_id is null then
-    select id into default_branch_id from public.branches where code = 'MAIN' limit 1;
-  end if;
 
   return default_branch_id;
 end;
@@ -125,13 +123,15 @@ declare
   selected_role public.user_role;
   profile_row public.profiles;
   display_name text;
+  normalized_email text;
 begin
   if auth.uid() is null or auth.uid() <> user_id then
     raise exception 'Cannot create profile for another user';
   end if;
 
   default_branch_id := public.ensure_default_branch();
-  display_name := nullif(trim(coalesce(user_full_name, split_part(coalesce(user_email, ''), '@', 1), '')), '');
+  normalized_email := nullif(lower(trim(coalesce(user_email, ''))), '');
+  display_name := nullif(trim(coalesce(user_full_name, split_part(coalesce(normalized_email, ''), '@', 1), '')), '');
 
   if display_name is null then
     display_name := 'ผู้ใช้งาน';
@@ -140,12 +140,16 @@ begin
   select p.* into profile_row from public.profiles p where p.id = user_id;
 
   if found then
-    if profile_row.role = 'staff' and profile_row.branch_id is null then
-      update public.profiles
-      set branch_id = default_branch_id
-      where id = user_id
-      returning * into profile_row;
-    end if;
+    update public.profiles
+    set
+      full_name = coalesce(nullif(profile_row.full_name, ''), display_name),
+      email = coalesce(profile_row.email, normalized_email),
+      branch_id = case
+        when profile_row.role = 'staff' and profile_row.branch_id is null then default_branch_id
+        else profile_row.branch_id
+      end
+    where id = user_id
+    returning * into profile_row;
 
     return profile_row;
   end if;
@@ -156,9 +160,10 @@ begin
     selected_role := 'owner';
   end if;
 
-  insert into public.profiles (id, full_name, role, branch_id)
+  insert into public.profiles (id, email, full_name, role, branch_id)
   values (
     user_id,
+    normalized_email,
     display_name,
     selected_role,
     case when selected_role = 'staff' then default_branch_id else null end
@@ -168,3 +173,7 @@ begin
   return profile_row;
 end;
 $$;
+
+
+grant execute on function public.ensure_default_branch() to authenticated;
+grant execute on function public.ensure_login_profile(uuid, text, text) to authenticated;
