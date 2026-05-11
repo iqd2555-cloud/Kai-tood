@@ -58,9 +58,9 @@ export async function ensureProfileForUser(user: AuthUserForProvisioning) {
 
   const { data: profile, error } = await supabase
     .rpc("ensure_login_profile", {
+      user_email: user.email ?? null,
       user_full_name: getUserFullName(user),
       user_id: user.id,
-      user_email: user.email ?? null,
     })
     .returns<ProfileResponse>()
     .single();

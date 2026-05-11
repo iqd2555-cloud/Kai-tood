@@ -25,10 +25,12 @@ begin
 end;
 $$;
 
+drop function if exists public.ensure_login_profile(uuid, text, text);
+
 create or replace function public.ensure_login_profile(
-  user_id uuid,
   user_email text default null,
-  user_full_name text default null
+  user_full_name text default null,
+  user_id uuid default auth.uid()
 )
 returns public.profiles
 language plpgsql
@@ -92,6 +94,6 @@ end;
 $$;
 
 grant execute on function public.ensure_default_branch() to authenticated;
-grant execute on function public.ensure_login_profile(uuid, text, text) to authenticated;
+grant execute on function public.ensure_login_profile(text, text, uuid) to authenticated;
 
 notify pgrst, 'reload schema';
