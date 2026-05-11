@@ -2,15 +2,39 @@ import { createServerClient, type SetAllCookies } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabasePublicEnv } from "@/lib/supabase-env";
 
+const LOGIN_PATH = "/login";
+const DEFAULT_AUTHENTICATED_PATH = "/dashboard";
+const LOGIN_PASSTHROUGH_ERRORS = new Set(["auth", "profile"]);
+
+function isLoginPath(pathname: string) {
+  return pathname === LOGIN_PATH || pathname.startsWith(`${LOGIN_PATH}/`);
+}
+
+function getReturnPath(request: NextRequest) {
+  return `${request.nextUrl.pathname}${request.nextUrl.search}`;
+}
+
+function isSafeInternalPath(path: string | null) {
+  return Boolean(path && path.startsWith("/") && !path.startsWith("//") && !isLoginPath(path));
+}
+
+function getSafeRedirectPath(path: string | null) {
+  return isSafeInternalPath(path) ? path! : DEFAULT_AUTHENTICATED_PATH;
+}
+
 function redirectToLogin(request: NextRequest, setup?: "supabase", error?: "auth") {
   const url = request.nextUrl.clone();
-  url.pathname = "/login";
+  url.pathname = LOGIN_PATH;
   url.search = "";
+
   if (setup) url.searchParams.set("setup", setup);
   if (error) url.searchParams.set("error", error);
-  if (request.nextUrl.pathname !== "/") {
-    url.searchParams.set("next", `${request.nextUrl.pathname}${request.nextUrl.search}`);
+
+  const returnPath = getReturnPath(request);
+  if (returnPath !== "/" && !isLoginPath(request.nextUrl.pathname)) {
+    url.searchParams.set("next", returnPath);
   }
+
   return NextResponse.redirect(url);
 }
 
@@ -22,8 +46,15 @@ function redirectWithSessionCookies(url: URL, response: NextResponse) {
   return redirectResponse;
 }
 
+function loginCanRenderForAuthenticatedUser(request: NextRequest) {
+  const setup = request.nextUrl.searchParams.get("setup");
+  const error = request.nextUrl.searchParams.get("error");
+
+  return setup === "supabase" || (error !== null && LOGIN_PASSTHROUGH_ERRORS.has(error));
+}
+
 export async function middleware(request: NextRequest) {
-  const isLogin = request.nextUrl.pathname.startsWith("/login");
+  const isLogin = isLoginPath(request.nextUrl.pathname);
   const supabaseEnv = getSupabasePublicEnv();
 
   if (!supabaseEnv) {
@@ -59,14 +90,13 @@ export async function middleware(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user && !isLogin) {
+    if (!user) {
+      if (isLogin) return response;
       return redirectToLogin(request);
     }
 
-    if (user && isLogin) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
-      url.search = "";
+    if (isLogin && request.method === "GET" && !loginCanRenderForAuthenticatedUser(request)) {
+      const url = new URL(getSafeRedirectPath(request.nextUrl.searchParams.get("next")), request.url);
       return redirectWithSessionCookies(url, response);
     }
   } catch (error) {
@@ -81,5 +111,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api/health|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|icons).*)"],
+  matcher: ["/((?!api(?:/|$)|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|icons(?:/|$)|.*\\..*).*)"],
 };
