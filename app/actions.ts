@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getCurrentProfile } from "@/lib/auth";
+import { ORDER_REQUEST_ITEMS } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 const dailyReportSchema = z.object({
@@ -16,9 +17,18 @@ const dailyReportSchema = z.object({
   used_chicken_skin: z.coerce.number().min(0),
   used_oil: z.coerce.number().min(0),
   used_sticky_rice: z.coerce.number().min(0),
+  used_chopped_chicken: z.coerce.number().min(0),
+  used_drumstick: z.coerce.number().min(0),
   remaining_chicken: z.coerce.number().min(0),
   remaining_sticky_rice: z.coerce.number().min(0),
   remaining_oil: z.coerce.number().min(0),
+  order_wrapping_paper: z.coerce.number().min(0),
+  order_plastic_bag: z.coerce.number().min(0),
+  order_tom_yum_powder: z.coerce.number().min(0),
+  order_cheese_powder: z.coerce.number().min(0),
+  order_paprika_powder: z.coerce.number().min(0),
+  order_wing_zabb_powder: z.coerce.number().min(0),
+  order_hot_spicy_powder: z.coerce.number().min(0),
   requested_items: z.string().max(3000).optional().default(""),
   note: z.string().max(3000).optional().default(""),
 });
@@ -32,6 +42,15 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
   }
 
   const payload = parsed.data;
+  const requestedItems = ORDER_REQUEST_ITEMS
+    .map((item) => {
+      const amount = Number(payload[item.name] ?? 0);
+      if (amount <= 0) return null;
+      return `${item.label}: ${amount.toLocaleString("th-TH")} ${item.unit}`;
+    })
+    .filter(Boolean)
+    .join("\n");
+
   if (profile.role === "staff" && profile.branch_id !== payload.branch_id) {
     return { ok: false, message: "คุณไม่มีสิทธิ์บันทึกข้อมูลสาขานี้" };
   }
@@ -44,6 +63,7 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
   const { error } = await supabase.from("daily_reports").upsert(
     {
       ...payload,
+      requested_items: requestedItems,
       submitted_by: profile.id,
       updated_at: new Date().toISOString(),
     },
@@ -56,6 +76,7 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
   revalidatePath("/daily");
   revalidatePath("/history");
   revalidatePath("/orders");
+  revalidatePath("/reports");
   return { ok: true, message: "บันทึกข้อมูลเรียบร้อย" };
 }
 

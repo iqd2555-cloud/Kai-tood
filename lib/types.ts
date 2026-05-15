@@ -30,9 +30,18 @@ export type DailyReport = {
   used_chicken_skin: number;
   used_oil: number;
   used_sticky_rice: number;
+  used_chopped_chicken: number;
+  used_drumstick: number;
   remaining_chicken: number;
   remaining_sticky_rice: number;
   remaining_oil: number;
+  order_wrapping_paper: number;
+  order_plastic_bag: number;
+  order_tom_yum_powder: number;
+  order_cheese_powder: number;
+  order_paprika_powder: number;
+  order_wing_zabb_powder: number;
+  order_hot_spicy_powder: number;
   requested_items: string;
   note: string;
   submitted_by: string | null;
@@ -46,4 +55,26 @@ export type DashboardSummary = {
   cashSales: number;
   transferSales: number;
   lowStockCount: number;
+};
+
+export type ReportTotals = {
+  cash_sales: number;
+  transfer_sales: number;
+  total_sales: number;
+  used_bl: number;
+  used_bb: number;
+  used_chicken_skin: number;
+  used_oil: number;
+  used_sticky_rice: number;
+  used_chopped_chicken: number;
+  used_drumstick: number;
+  order_wrapping_paper: number;
+  order_plastic_bag: number;
+  order_tom_yum_powder: number;
+  order_cheese_powder: number;
+  order_paprika_powder: number;
+  order_wing_zabb_powder: number;
+  order_hot_spicy_powder: number;
+  branch_count: number;
+  report_count: number;
 };

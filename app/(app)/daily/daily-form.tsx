@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { saveDailyReport } from "@/app/actions";
 import { NumberField, TextAreaField } from "@/components/field";
+import { ORDER_REQUEST_ITEMS, USED_INGREDIENT_ITEMS } from "@/lib/report-items";
 import { moneyFormatter } from "@/lib/format";
 import { SubmitButton } from "./submit-button";
 import type { Branch, DailyReport } from "@/lib/types";
@@ -68,14 +69,17 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
       </section>
 
       <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
-        <h2 className="text-2xl font-black">2. วัตถุดิบที่ใช้ไป</h2>
-        <p className="mt-1 text-sm font-bold text-black/50">กรอกเป็นกิโลกรัมหรือหน่วยที่ร้านกำหนด</p>
+        <h2 className="text-2xl font-black">2. วัตถุดิบใช้ไป</h2>
+        <p className="mt-1 text-sm font-bold text-black/50">กรอกเฉพาะตัวเลขจำนวนกิโลกรัมที่ใช้ไปในวันนี้หรือรอบนี้</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <NumberField label="BL" name="used_bl" defaultValue={existingReport?.used_bl ?? 0} />
-          <NumberField label="BB" name="used_bb" defaultValue={existingReport?.used_bb ?? 0} />
-          <NumberField label="หนังไก่" name="used_chicken_skin" defaultValue={existingReport?.used_chicken_skin ?? 0} />
-          <NumberField label="น้ำมัน" name="used_oil" defaultValue={existingReport?.used_oil ?? 0} />
-          <NumberField label="ข้าวเหนียว" name="used_sticky_rice" defaultValue={existingReport?.used_sticky_rice ?? 0} />
+          {USED_INGREDIENT_ITEMS.map((item) => (
+            <NumberField
+              key={item.name}
+              label={`${item.label} (${item.unit})`}
+              name={item.name}
+              defaultValue={Number(existingReport?.[item.name] ?? 0)}
+            />
+          ))}
         </div>
       </section>
 
@@ -89,8 +93,26 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
       </section>
 
       <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
-        <h2 className="text-2xl font-black">4. สั่งวัตถุดิบพรุ่งนี้</h2>
-        <div className="mt-4"><TextAreaField label="รายการที่ต้องการ" name="requested_items" defaultValue={existingReport?.requested_items ?? ""} placeholder="เช่น BL 10 กก., น้ำมัน 2 ปี๊บ" /></div>
+        <h2 className="text-2xl font-black">4. สั่งวัตถุดิบเพิ่ม</h2>
+        <p className="mt-1 text-sm font-bold text-black/50">เลือกรายการไว้ให้แล้ว พนักงานกรอกเฉพาะจำนวนที่ต้องการสั่ง</p>
+        <div className="mt-4 space-y-3">
+          {ORDER_REQUEST_ITEMS.map((item) => (
+            <label key={item.name} className="flex items-center gap-3 rounded-2xl border-2 border-black/10 bg-black/[0.02] p-3">
+              <span className="min-w-0 flex-1 text-base font-black text-black">{item.label}</span>
+              <input
+                className="focus-ring min-h-14 w-28 rounded-2xl border-2 border-black/10 bg-white px-3 text-center text-xl font-bold shadow-sm"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                name={item.name}
+                defaultValue={Number(existingReport?.[item.name] ?? 0)}
+                aria-label={`จำนวน${item.label}`}
+              />
+              <span className="w-12 text-sm font-black text-black/60">{item.unit}</span>
+            </label>
+          ))}
+        </div>
       </section>
 
       <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">

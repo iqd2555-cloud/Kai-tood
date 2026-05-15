@@ -13,7 +13,7 @@ export function AppNav({ profile }: { profile: Profile }) {
         </Link>
         <nav className="flex items-center gap-2 text-sm font-bold">
           <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/daily">กรอกข้อมูล</Link>
-          {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/history">ย้อนหลัง</Link>}
+          {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/reports">รายงาน</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/orders">สั่งของ</Link>}
           <form action={signOut}>
             <button className="focus-ring rounded-full bg-[#ffc400] px-3 py-2 font-black text-black">ออก</button>
