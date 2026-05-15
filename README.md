@@ -8,7 +8,7 @@
 - UI ภาษาไทย โทนดำ/เหลือง/ขาว ปุ่มใหญ่ เหมาะกับมือถือ
 - Login ด้วย Supabase Auth และ Row Level Security
 - Staff เห็นและบันทึกเฉพาะสาขาของตนเอง
-- Owner เห็น Dashboard รวมทุกสาขา ยอดขายย้อนหลัง รายการสั่งของ และแจ้งเตือนสต็อกใกล้หมด
+- Owner เห็น Dashboard รวมทุกสาขา ยอดขายวันนี้ ยอดขายย้อนหลัง 7 วัน สรุปวัตถุดิบ รายการสั่งของ และแจ้งเตือนสต็อกใกล้หมด
 - ข้อมูล Dashboard อัปเดตแบบ Real-time เมื่อมีการบันทึก daily report
 - รองรับ Deploy บน Vercel
 
@@ -65,6 +65,8 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 5. หากต้องการเปลี่ยนสิทธิ์หรือสาขา ให้แก้ในตาราง `profiles` หลังจาก Login ครั้งแรกแล้ว
 
 > ถ้าฐานข้อมูลเดิมแจ้ง error ว่าไม่พบ `public.ensure_login_profile(user_email, user_full_name, user_id)` ให้เปิด Supabase SQL Editor แล้วรันไฟล์ `supabase/migrations/202605110001_ensure_login_profile.sql` ทั้งไฟล์ จากนั้นลอง Login อีกครั้ง ไฟล์นี้จะลบ signature เก่า `ensure_login_profile(uuid, text, text)` และสร้าง signature ที่ Supabase RPC หาอยู่คือ `ensure_login_profile(text, text, uuid)` พร้อม `notify pgrst, 'reload schema'`
+>
+> ถ้าอัปเดตจากฐานข้อมูลที่สร้างไว้ก่อนหน้า ให้รัน `supabase/migrations/202605150001_reporting_hardening.sql` เพิ่มด้วย เพื่อเพิ่ม index สำหรับ dashboard, view `daily_report_rollups`, และ RPC `owner_dashboard_totals` สำหรับรายงาน production
 
 ### 5) รันในเครื่อง
 
@@ -88,14 +90,14 @@ npm run dev
 
 1. Login ด้วยบัญชีพนักงาน
 2. เข้าเมนู **กรอกข้อมูล**
-3. กรอกยอดขาย เงินสด/โอน ระบบคำนวณยอดรวมให้จากฐานข้อมูล
+3. เลือกวันที่บันทึก แล้วกรอกยอดขาย เงินสด/โอน ระบบจะแสดงยอดรวมอัตโนมัติก่อนกดบันทึก และฐานข้อมูลจะคำนวณ `total_sales` อีกชั้น
 4. กรอกวัตถุดิบที่ใช้ไป สินค้าคงเหลือ รายการสั่งของ และหมายเหตุ
 5. กด **บันทึกข้อมูลวันนี้**
 
 ### Owner
 
 1. Login ด้วยบัญชีเจ้าของร้าน
-2. ดู Dashboard รวมทุกสาขาและสถานะส่งข้อมูลวันนี้
+2. ดู Dashboard รวมทุกสาขา สถานะส่งข้อมูลวันนี้ ยอดขาย 7 วัน สรุปวัตถุดิบ และแจ้งเตือนวัตถุดิบใกล้หมด
 3. เข้า **ย้อนหลัง** เพื่อดูยอดขายและสต็อกล่าสุด
 4. เข้า **สั่งของ** เพื่อรวบรวมวัตถุดิบที่พนักงานต้องการสำหรับวันถัดไป
 
@@ -103,5 +105,6 @@ npm run dev
 
 - ใช้ Supabase RLS เพื่อกัน Staff เข้าถึงสาขาอื่น
 - เปิด Supabase Realtime สำหรับ `daily_reports` แล้วใน schema
+- ใช้ `daily_report_rollups` view แบบ `security_invoker = true` และ `owner_dashboard_totals()` RPC สำหรับต่อยอดรายงานโดยยังอยู่ภายใต้ RLS
 - ควรตั้งรหัสผ่านผู้ใช้ให้แข็งแรง และเพิ่ม MFA ใน Supabase หากใช้จริงในร้านหลายสาขา
 - Service worker cache เฉพาะ GET request เพื่อช่วยโหลดเร็วขึ้น แต่ข้อมูลการบันทึกยังต้องออนไลน์เพื่อส่งเข้า Supabase
