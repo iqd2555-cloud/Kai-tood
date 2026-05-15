@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { formatThaiDate } from "@/lib/format";
+import { formatStructuredOrderItems } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { DailyReport } from "@/lib/types";
 
@@ -14,7 +15,7 @@ export default async function OrdersPage() {
   const { data: reportsData } = await supabase
     .from("daily_reports")
     .select("*, branches(name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold)")
-    .neq("requested_items", "")
+    .or("requested_items.neq.,order_wrapping_paper.gt.0,order_plastic_bag.gt.0,order_tom_yum_powder.gt.0,order_cheese_powder.gt.0,order_paprika_powder.gt.0,order_wing_zabb_powder.gt.0,order_hot_spicy_powder.gt.0")
     .order("report_date", { ascending: false })
     .limit(50)
     .returns<DailyReport[]>();
@@ -37,7 +38,7 @@ export default async function OrdersPage() {
               </div>
               <span className="rounded-full bg-[#ffc400] px-3 py-1 text-sm font-black">สั่งพรุ่งนี้</span>
             </div>
-            <p className="whitespace-pre-wrap rounded-2xl bg-black/5 p-4 text-lg font-bold">{report.requested_items}</p>
+            <p className="whitespace-pre-wrap rounded-2xl bg-black/5 p-4 text-lg font-bold">{formatStructuredOrderItems(report)}</p>
           </article>
         ))}
       </div>

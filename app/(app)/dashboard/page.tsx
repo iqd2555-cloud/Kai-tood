@@ -4,10 +4,11 @@ import { DashboardRealtime } from "@/components/dashboard-realtime";
 import { StatCard } from "@/components/stat-card";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { formatThaiDate, moneyFormatter, numberFormatter, todayISO, daysAgoISO } from "@/lib/format";
+import { USED_INGREDIENT_ITEMS } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch, DailyReport } from "@/lib/types";
 
-function sumReports(reports: DailyReport[], field: keyof Pick<DailyReport, "total_sales" | "cash_sales" | "transfer_sales" | "used_bl" | "used_bb" | "used_chicken_skin" | "used_oil" | "used_sticky_rice">) {
+function sumReports(reports: DailyReport[], field: keyof Pick<DailyReport, "total_sales" | "cash_sales" | "transfer_sales" | "used_bl" | "used_bb" | "used_chicken_skin" | "used_oil" | "used_sticky_rice" | "used_chopped_chicken" | "used_drumstick">) {
   return reports.reduce((sum, report) => sum + Number(report[field] ?? 0), 0);
 }
 
@@ -59,13 +60,11 @@ export default async function DashboardPage() {
     );
   });
 
-  const ingredientTotals = [
-    { label: "BL", value: sumReports(historyReports, "used_bl"), unit: "กก." },
-    { label: "BB", value: sumReports(historyReports, "used_bb"), unit: "กก." },
-    { label: "หนังไก่", value: sumReports(historyReports, "used_chicken_skin"), unit: "กก." },
-    { label: "น้ำมัน", value: sumReports(historyReports, "used_oil"), unit: "หน่วย" },
-    { label: "ข้าวเหนียว", value: sumReports(historyReports, "used_sticky_rice"), unit: "กก." },
-  ];
+  const ingredientTotals = USED_INGREDIENT_ITEMS.map((item) => ({
+    label: item.label,
+    value: sumReports(historyReports, item.name),
+    unit: "กก.",
+  }));
 
   return (
     <div className="space-y-5">
@@ -89,9 +88,9 @@ export default async function DashboardPage() {
             <p className="text-sm font-bold text-black/50">สรุปวัตถุดิบย้อนหลัง</p>
             <h2 className="text-2xl font-black">{formatThaiDate(sevenDaysAgo)} - {formatThaiDate(today)}</h2>
           </div>
-          <Link href="/history" className="focus-ring rounded-full bg-black px-4 py-2 text-sm font-black text-white">ดูย้อนหลัง</Link>
+          <Link href="/reports" className="focus-ring rounded-full bg-black px-4 py-2 text-sm font-black text-white">ดูรายงาน</Link>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
           {ingredientTotals.map((item) => (
             <div key={item.label} className="rounded-2xl bg-[#ffc400]/20 p-3 text-center">
               <div className="text-sm font-black">{item.label}</div>
