@@ -7,7 +7,7 @@ import { getCurrentProfile } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 const dailyReportSchema = z.object({
-  report_date: z.string().min(10).max(10),
+  report_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "วันที่ไม่ถูกต้อง"),
   branch_id: z.string().uuid(),
   cash_sales: z.coerce.number().min(0),
   transfer_sales: z.coerce.number().min(0),
