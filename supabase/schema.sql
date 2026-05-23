@@ -167,11 +167,7 @@ begin
     return profile_row;
   end if;
 
-  if exists (select 1 from public.profiles) then
-    selected_role := 'staff';
-  else
-    selected_role := 'owner';
-  end if;
+  selected_role := 'staff';
 
   insert into public.profiles (id, email, full_name, role, branch_id)
   values (
