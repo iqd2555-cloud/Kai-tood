@@ -10,6 +10,7 @@ import { createSupabaseServerClient } from "@/lib/supabase-server";
 const dailyReportSchema = z.object({
   report_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "วันที่ไม่ถูกต้อง"),
   branch_id: z.string().uuid(),
+  branch_name: z.string().min(1),
   cash_sales: z.coerce.number().min(0),
   transfer_sales: z.coerce.number().min(0),
   used_bl: z.coerce.number().min(0),
@@ -60,9 +61,16 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
     return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์" };
   }
 
+  const { data: branchData } = await supabase
+    .from("branches")
+    .select("name")
+    .eq("id", payload.branch_id)
+    .maybeSingle();
+
   const { error } = await supabase.from("daily_reports").upsert(
     {
       ...payload,
+      branch_name: branchData?.name ?? payload.branch_name,
       requested_items: requestedItems,
       submitted_by: profile.id,
       updated_at: new Date().toISOString(),

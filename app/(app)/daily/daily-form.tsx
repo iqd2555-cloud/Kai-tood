@@ -12,6 +12,8 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
   const [state, formAction] = useActionState(saveDailyReport, null);
   const [cashSales, setCashSales] = useState(Number(existingReport?.cash_sales ?? 0));
   const [transferSales, setTransferSales] = useState(Number(existingReport?.transfer_sales ?? 0));
+  const [selectedBranchId, setSelectedBranchId] = useState(existingReport?.branch_id ?? defaultBranchId);
+  const selectedBranchName = branches.find((branch) => branch.id === selectedBranchId)?.name ?? "";
   const totalSales = useMemo(() => cashSales + transferSales, [cashSales, transferSales]);
 
   return (
@@ -21,9 +23,10 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="mb-2 block font-black">สาขา</span>
-            <select name="branch_id" defaultValue={existingReport?.branch_id ?? defaultBranchId} className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold">
+            <select name="branch_id" value={selectedBranchId} onChange={(event) => setSelectedBranchId(event.target.value)} className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold">
               {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
             </select>
+            <input type="hidden" name="branch_name" value={selectedBranchName} />
           </label>
           <label className="block">
             <span className="mb-2 block font-black">วันที่บันทึก</span>

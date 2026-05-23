@@ -12,7 +12,11 @@ export default async function DailyPage() {
 
   const today = todayISO();
 
-  const branchesQuery = supabase.from("branches").select("*").order("name");
+  const branchesQuery = supabase
+    .from("branches")
+    .select("*")
+    .in("name", ["สาขาที่ 1 ร.ร.นวมินทร์", "สาขาที่ 2 โลตัสป้อม 1"])
+    .order("name");
   if (!isOwner(profile) && profile.branch_id) branchesQuery.eq("id", profile.branch_id);
   const { data: branchesData } = await branchesQuery.returns<Branch[]>();
   const branches = branchesData ?? [];
