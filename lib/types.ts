@@ -15,6 +15,7 @@ export type Profile = {
   full_name: string;
   role: UserRole;
   branch_id: string | null;
+  branch_name: string | null;
   branch?: Branch | null;
 };
 
@@ -22,6 +23,7 @@ export type DailyReport = {
   id: string;
   report_date: string;
   branch_id: string;
+  branch_name: string;
   cash_sales: number;
   transfer_sales: number;
   total_sales: number;

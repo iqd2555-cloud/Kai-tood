@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch, Profile, UserRole } from "@/lib/types";
 
 const PROFILE_SELECT =
-  "id, email, full_name, role, branch_id, branch:branches(id, name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold)";
+  "id, email, full_name, role, branch_id, branch_name, branch:branches(id, name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold)";
 
 type ProfileResponse = {
   id: string;
@@ -11,6 +11,7 @@ type ProfileResponse = {
   full_name: string;
   role: string;
   branch_id: string | null;
+  branch_name: string | null;
   branch?: Branch | Branch[] | null;
 };
 
@@ -42,6 +43,7 @@ function normalizeProfile(profile: ProfileResponse): Profile | null {
     full_name: profile.full_name,
     role: profile.role,
     branch_id: profile.branch_id,
+    branch_name: profile.branch_name,
     branch: normalizeProfileBranch(profile.branch),
   };
 }
