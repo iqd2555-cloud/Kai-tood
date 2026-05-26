@@ -33,7 +33,7 @@ function pctChange(current: number, previous: number) {
   return ((current - previous) / Math.abs(previous)) * 100;
 }
 
-function rangeSum<T extends { date: string } & Record<string, number>>(rows: T[], start: string, end: string, field: keyof T) {
+function rangeSum<T extends { date: string } & Record<string, string | number>>(rows: T[], start: string, end: string, field: keyof T) {
   return rows
     .filter((row) => row.date >= start && row.date <= end)
     .reduce((sum, row) => sum + (typeof row[field] === "number" ? (row[field] as number) : 0), 0);
@@ -88,7 +88,8 @@ export default async function OwnerDashboardPage() {
   const dayOfMonth = Number(today.slice(8, 10));
   const prevMonthMtd = prevMonthRows.filter((row) => Number(row.date.slice(8, 10)) <= dayOfMonth);
 
-  const sumMetric = (items: typeof rows, key: MetricKey | "grossProfit" | "chickenKg") => items.reduce((acc, item) => acc + item[key], 0);
+  const sumMetric = (items: typeof rows, key: MetricKey | "grossProfit" | "chickenKg") =>
+    items.reduce((acc, item) => acc + (typeof item[key] === "number" ? item[key] : 0), 0);
 
   const salesToday = rangeSum(rows, today, today, "totalSales");
   const sales7 = rangeSum(rows, sevenStart, today, "totalSales");
