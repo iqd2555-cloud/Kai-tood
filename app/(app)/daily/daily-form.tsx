@@ -16,6 +16,12 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
   const selectedBranchName = branches.find((branch) => branch.id === selectedBranchId)?.name ?? "";
   const totalSales = useMemo(() => cashSales + transferSales, [cashSales, transferSales]);
 
+  const [otherOrderItems, setOtherOrderItems] = useState<{ name: string; amount: number }[]>(
+    Array.isArray(existingReport?.order_other_items) && existingReport?.order_other_items.length > 0
+      ? existingReport.order_other_items
+      : [{ name: "", amount: 0 }],
+  );
+
   return (
     <form action={formAction} className="space-y-5">
       <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
@@ -102,19 +108,22 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
           {ORDER_REQUEST_ITEMS.map((item) => (
             <label key={item.name} className="flex items-center gap-3 rounded-2xl border-2 border-black/10 bg-black/[0.02] p-3">
               <span className="min-w-0 flex-1 text-base font-black text-black">{item.label}</span>
-              <input
-                className="focus-ring min-h-14 w-28 rounded-2xl border-2 border-black/10 bg-white px-3 text-center text-xl font-bold shadow-sm"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
-                name={item.name}
-                defaultValue={Number(existingReport?.[item.name] ?? 0)}
-                aria-label={`จำนวน${item.label}`}
-              />
-              <span className="w-12 text-sm font-black text-black/60">{item.unit}</span>
+              <input className="focus-ring min-h-14 w-28 rounded-2xl border-2 border-black/10 bg-white px-3 text-center text-xl font-bold shadow-sm" type="number" inputMode="decimal" min="0" step="0.01" name={item.name} defaultValue={Number(existingReport?.[item.name] ?? 0)} aria-label={`จำนวน${item.label}`} />
+              <span className="w-20 text-sm font-black text-black/60">{item.unit}</span>
             </label>
           ))}
+          <div className="space-y-2 rounded-2xl border-2 border-dashed border-black/20 p-3">
+            <p className="text-sm font-black text-black/60">รายการอื่นๆ (ระบุชื่อและจำนวนเอง)</p>
+            {otherOrderItems.map((entry, index) => (
+              <div key={index} className="grid gap-2 sm:grid-cols-[1fr_180px_auto]">
+                <input className="focus-ring min-h-12 rounded-xl border-2 border-black/10 px-3 font-bold" placeholder="เช่น ถุงร้อน" value={entry.name} onChange={(event) => setOtherOrderItems((prev) => prev.map((item, i) => i === index ? { ...item, name: event.target.value } : item))} />
+                <input className="focus-ring min-h-12 rounded-xl border-2 border-black/10 px-3 text-center font-bold" type="number" inputMode="decimal" min="0" step="0.01" placeholder="จำนวน" value={entry.amount || ""} onChange={(event) => setOtherOrderItems((prev) => prev.map((item, i) => i === index ? { ...item, amount: Number(event.target.value || 0) } : item))} />
+                <button type="button" className="focus-ring rounded-xl bg-black px-4 text-sm font-black text-white" onClick={() => setOtherOrderItems((prev) => prev.filter((_, i) => i !== index || prev.length === 1))}>ลบ</button>
+              </div>
+            ))}
+            <input type="hidden" name="order_other_items" value={JSON.stringify(otherOrderItems.filter((item) => item.name.trim() && item.amount > 0))} />
+            <button type="button" className="focus-ring rounded-xl bg-[#ffc400] px-4 py-2 text-sm font-black" onClick={() => setOtherOrderItems((prev) => [...prev, { name: "", amount: 0 }])}>+ เพิ่มรายการอื่นๆ</button>
+          </div>
         </div>
       </section>
 

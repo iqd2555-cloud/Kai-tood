@@ -15,7 +15,7 @@ export default async function OrdersPage() {
   const { data: reportsData } = await supabase
     .from("daily_reports")
     .select("*, branches(name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold)")
-    .or("requested_items.neq.,order_wrapping_paper.gt.0,order_plastic_bag.gt.0,order_tom_yum_powder.gt.0,order_cheese_powder.gt.0,order_paprika_powder.gt.0,order_wing_zabb_powder.gt.0,order_hot_spicy_powder.gt.0")
+    .or("requested_items.neq.,order_original_chicken.gt.0,order_spicy_chicken.gt.0,order_offal.gt.0,order_chopped_chicken.gt.0,order_drumstick.gt.0,order_chicken_skin.gt.0,order_sticky_rice.gt.0,order_oil.gt.0,order_palm_sugar.gt.0")
     .order("report_date", { ascending: false })
     .limit(50)
     .returns<DailyReport[]>();

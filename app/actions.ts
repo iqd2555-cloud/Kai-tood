@@ -23,13 +23,16 @@ const dailyReportSchema = z.object({
   remaining_chicken: z.coerce.number().min(0),
   remaining_sticky_rice: z.coerce.number().min(0),
   remaining_oil: z.coerce.number().min(0),
-  order_wrapping_paper: z.coerce.number().min(0),
-  order_plastic_bag: z.coerce.number().min(0),
-  order_tom_yum_powder: z.coerce.number().min(0),
-  order_cheese_powder: z.coerce.number().min(0),
-  order_paprika_powder: z.coerce.number().min(0),
-  order_wing_zabb_powder: z.coerce.number().min(0),
-  order_hot_spicy_powder: z.coerce.number().min(0),
+  order_original_chicken: z.coerce.number().min(0),
+  order_spicy_chicken: z.coerce.number().min(0),
+  order_offal: z.coerce.number().min(0),
+  order_chopped_chicken: z.coerce.number().min(0),
+  order_drumstick: z.coerce.number().min(0),
+  order_chicken_skin: z.coerce.number().min(0),
+  order_sticky_rice: z.coerce.number().min(0),
+  order_oil: z.coerce.number().min(0),
+  order_palm_sugar: z.coerce.number().min(0),
+  order_other_items: z.string().optional().default("[]"),
   requested_items: z.string().max(3000).optional().default(""),
   note: z.string().max(3000).optional().default(""),
 });
@@ -43,6 +46,15 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
   }
 
   const payload = parsed.data;
+  const parsedOtherItems = (() => {
+    try {
+      return JSON.parse(payload.order_other_items || "[]");
+    } catch {
+      return [];
+    }
+  })();
+  const otherItems = z.array(z.object({ name: z.string(), amount: z.coerce.number().min(0) })).safeParse(parsedOtherItems);
+
   const requestedItems = ORDER_REQUEST_ITEMS
     .map((item) => {
       const amount = Number(payload[item.name] ?? 0);
@@ -51,6 +63,10 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
     })
     .filter(Boolean)
     .join("\n");
+  const requestedItemLines = otherItems.success
+    ? otherItems.data.filter((item) => item.name.trim() && item.amount > 0).map((item) => `${item.name.trim()}: ${item.amount.toLocaleString("th-TH")}`)
+    : [];
+  const allRequestedItems = [requestedItems, ...requestedItemLines].filter(Boolean).join("\n");
 
   if (profile.role === "staff" && profile.branch_id !== payload.branch_id) {
     return { ok: false, message: "คุณไม่มีสิทธิ์บันทึกข้อมูลสาขานี้" };
@@ -71,7 +87,8 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
     {
       ...payload,
       branch_name: branchData?.name ?? payload.branch_name,
-      requested_items: requestedItems,
+      requested_items: allRequestedItems,
+      order_other_items: otherItems.success ? otherItems.data.filter((item) => item.name.trim() && item.amount > 0) : [],
       submitted_by: profile.id,
       updated_at: new Date().toISOString(),
     },
