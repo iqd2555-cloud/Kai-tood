@@ -11,19 +11,21 @@ export const USED_INGREDIENT_ITEMS = [
 ] as const;
 
 export const ORDER_REQUEST_ITEMS = [
-  { label: "กระดาษห่อ", name: "order_wrapping_paper", unit: "ปึก" },
-  { label: "ถุงหูหิ้ว", name: "order_plastic_bag", unit: "แพ็ค" },
-  { label: "ผงเขย่ารสต้มยำ", name: "order_tom_yum_powder", unit: "ห่อ" },
-  { label: "ผงเขย่ารสชีส", name: "order_cheese_powder", unit: "ห่อ" },
-  { label: "ผงเขย่ารสปาปริก้า", name: "order_paprika_powder", unit: "ห่อ" },
-  { label: "ผงเขย่ารสวิงส์แซ่บ", name: "order_wing_zabb_powder", unit: "ห่อ" },
-  { label: "ผงเขย่ารสฮอตแอนด์สไปซี่", name: "order_hot_spicy_powder", unit: "ห่อ" },
+  { label: "ไก่ดั้งเดิม", name: "order_original_chicken", unit: "กิโลกรัม" },
+  { label: "ไก่เผ็ด", name: "order_spicy_chicken", unit: "กิโลกรัม" },
+  { label: "เครื่องในไก่", name: "order_offal", unit: "กิโลกรัม" },
+  { label: "ไก่สับ", name: "order_chopped_chicken", unit: "กิโลกรัม" },
+  { label: "น่องไก่", name: "order_drumstick", unit: "กิโลกรัม" },
+  { label: "หนังไก่", name: "order_chicken_skin", unit: "กิโลกรัม" },
+  { label: "ข้าวเหนียว", name: "order_sticky_rice", unit: "กิโลกรัม" },
+  { label: "น้ำมัน", name: "order_oil", unit: "กิโลกรัม" },
+  { label: "น้ำตาลปี๊บ", name: "order_palm_sugar", unit: "กิโลกรัม" },
 ] as const;
 
 export type UsedIngredientField = (typeof USED_INGREDIENT_ITEMS)[number]["name"];
 export type OrderRequestField = (typeof ORDER_REQUEST_ITEMS)[number]["name"];
 
-export function formatStructuredOrderItems(report: Pick<DailyReport, OrderRequestField | "requested_items">) {
+export function formatStructuredOrderItems(report: Pick<DailyReport, OrderRequestField | "requested_items" | "order_other_items">) {
   const lines = ORDER_REQUEST_ITEMS
     .map((item) => {
       const value = Number(report[item.name] ?? 0);
@@ -32,5 +34,17 @@ export function formatStructuredOrderItems(report: Pick<DailyReport, OrderReques
     })
     .filter(Boolean);
 
-  return lines.length > 0 ? lines.join("\n") : report.requested_items ?? "";
+  const otherItems = Array.isArray(report.order_other_items)
+    ? report.order_other_items
+        .map((item) => {
+          const name = String(item?.name ?? "").trim();
+          const amount = Number(item?.amount ?? 0);
+          if (!name || amount <= 0) return null;
+          return `${name}: ${amount.toLocaleString("th-TH")}`;
+        })
+        .filter(Boolean)
+    : [];
+
+  const allLines = [...lines, ...otherItems];
+  return allLines.length > 0 ? allLines.join("\n") : report.requested_items ?? "";
 }

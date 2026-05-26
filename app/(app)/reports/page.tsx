@@ -28,13 +28,15 @@ type NumericReportField = keyof Pick<
   | "used_sticky_rice"
   | "used_chopped_chicken"
   | "used_drumstick"
-  | "order_wrapping_paper"
-  | "order_plastic_bag"
-  | "order_tom_yum_powder"
-  | "order_cheese_powder"
-  | "order_paprika_powder"
-  | "order_wing_zabb_powder"
-  | "order_hot_spicy_powder"
+  | "order_original_chicken"
+  | "order_spicy_chicken"
+  | "order_offal"
+  | "order_chopped_chicken"
+  | "order_drumstick"
+  | "order_chicken_skin"
+  | "order_sticky_rice"
+  | "order_oil"
+  | "order_palm_sugar"
 >;
 
 function isIsoDate(value: string | undefined) {
