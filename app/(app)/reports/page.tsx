@@ -10,6 +10,8 @@ type SearchParams = {
   from?: string;
   to?: string;
   branch_id?: string;
+  note_range?: string;
+  note_limit?: string;
 };
 
 type ReportsPageProps = {
@@ -38,6 +40,31 @@ type NumericReportField = keyof Pick<
   | "order_oil"
   | "order_palm_sugar"
 >;
+
+
+
+type NoteTimeFilter = "today" | "7days" | "month";
+
+type NoteReport = Pick<DailyReport, "report_date" | "branch_name" | "submitted_by" | "note">;
+
+const NOTE_HIGHLIGHT_WORDS = ["ด่วน", "เสีย", "หมด", "ขาด", "ลูกค้า"] as const;
+
+function resolveNoteRange(range: string | undefined) {
+  const now = new Date();
+  const today = todayISO();
+
+  if (range === "today") return { noteRange: "today" as NoteTimeFilter, from: today, to: today };
+  if (range === "month") {
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    return { noteRange: "month" as NoteTimeFilter, from: startOfMonth, to: today };
+  }
+
+  return { noteRange: "7days" as NoteTimeFilter, from: daysAgoISO(6), to: today };
+}
+
+function hasHighlightWord(note: string) {
+  return NOTE_HIGHLIGHT_WORDS.some((word) => note.includes(word));
+}
 
 function isIsoDate(value: string | undefined) {
   return Boolean(value?.match(/^\d{4}-\d{2}-\d{2}$/));
@@ -85,6 +112,9 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const from = isIsoDate(params.from) ? params.from! : defaultFrom;
   const to = isIsoDate(params.to) ? params.to! : today;
 
+  const { noteRange, from: noteFrom, to: noteTo } = resolveNoteRange(params.note_range);
+  const noteLimit = Math.min(Math.max(Number(params.note_limit ?? 5) || 5, 5), 50);
+
   const { data: branchesData } = await supabase.from("branches").select("*").order("name").returns<Branch[]>();
   const branches = branchesData ?? [];
   const selectedBranchId = branches.some((branch) => branch.id === params.branch_id) ? params.branch_id : branches[0]?.id;
@@ -97,6 +127,19 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     .order("report_date", { ascending: false })
     .returns<DailyReport[]>();
   const allReports = allReportsData ?? [];
+
+  const { data: noteReportsData } = await supabase
+    .from("daily_reports")
+    .select("report_date, branch_name, submitted_by, note")
+    .gte("report_date", noteFrom)
+    .lte("report_date", noteTo)
+    .not("note", "is", null)
+    .neq("note", "")
+    .order("report_date", { ascending: false })
+    .limit(noteLimit)
+    .returns<NoteReport[]>();
+  const noteReports = (noteReportsData ?? []).filter((report) => report.note.trim().length > 0);
+
   const branchReports = selectedBranchId ? allReports.filter((report) => report.branch_id === selectedBranchId) : [];
   const selectedBranch = branches.find((branch) => branch.id === selectedBranchId);
 
@@ -190,6 +233,58 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
 
       <QuantityGrid title={`วัตถุดิบใช้ไปของ${selectedBranch?.name ?? "สาขา"}`} items={USED_INGREDIENT_ITEMS} reports={branchReports} />
       <QuantityGrid title={`รายการสั่งวัตถุดิบเพิ่มของ${selectedBranch?.name ?? "สาขา"}`} items={ORDER_REQUEST_ITEMS} reports={branchReports} />
+
+      <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-2xl font-black">📝 หมายเหตุจากสาขา</h2>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { value: "today", label: "วันนี้" },
+              { value: "7days", label: "7 วัน" },
+              { value: "month", label: "เดือนนี้" },
+            ].map((option) => (
+              <a
+                key={option.value}
+                href={`/reports?from=${from}&to=${to}&branch_id=${selectedBranchId ?? ""}&note_range=${option.value}&note_limit=5`}
+                className={`rounded-xl px-3 py-2 text-sm font-black ${
+                  noteRange === option.value ? "bg-[#ffc400] text-black" : "bg-black/[0.06] text-black/70"
+                }`}
+              >
+                {option.label}
+              </a>
+            ))}
+          </div>
+        </div>
+
+        {noteReports.length === 0 ? (
+          <p className="mt-4 rounded-2xl bg-black/[0.04] p-4 text-sm font-bold text-black/60">ไม่พบหมายเหตุในช่วงเวลาที่เลือก</p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {noteReports.map((report, index) => (
+              <article key={`${report.report_date}-${report.branch_name}-${index}`} className="rounded-2xl border border-black/10 bg-black/[0.02] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-bold text-black/50">{formatThaiDate(report.report_date)}</p>
+                    <h3 className="text-lg font-black">{report.branch_name}</h3>
+                    <p className="text-sm font-bold text-black/60">ผู้กรอก: {report.submitted_by || "ไม่ระบุ"}</p>
+                  </div>
+                  {hasHighlightWord(report.note) && <span className="rounded-full bg-yellow-300 px-3 py-1 text-xs font-black text-black">ต้องติดตาม</span>}
+                </div>
+                <p className="mt-3 whitespace-pre-line rounded-xl bg-white p-3 text-base font-bold">{report.note}</p>
+              </article>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-4">
+          <a
+            href={`/reports?from=${from}&to=${to}&branch_id=${selectedBranchId ?? ""}&note_range=${noteRange}&note_limit=${noteLimit + 5}`}
+            className="inline-flex rounded-2xl bg-[#111111] px-4 py-3 text-sm font-black text-white"
+          >
+            ดูเพิ่มเติม
+          </a>
+        </div>
+      </section>
     </div>
   );
 }
