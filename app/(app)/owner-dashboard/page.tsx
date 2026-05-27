@@ -5,6 +5,11 @@ import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 type ProfitRow = Record<string, string | number | null>;
 type MetricKey = "totalSales" | "chickenCost" | "otherExpenses";
+type BranchNoteRow = {
+  report_date: string;
+  branch_name: string | null;
+  note: string | null;
+};
 
 const CHICKEN_COST_PER_KG = 65;
 
@@ -53,6 +58,24 @@ export default async function OwnerDashboardPage() {
 
   const { data, error } = await supabase.from("owner_profit_dashboard").select("*").returns<ProfitRow[]>();
   if (error) return <div className="rounded-2xl bg-red-50 p-4 font-bold text-red-900">โหลดข้อมูล owner_profit_dashboard ไม่สำเร็จ: {error.message}</div>;
+
+  const { data: rawBranchNotes, error: branchNotesError } = await supabase
+    .from("daily_reports")
+    .select("report_date,branch_name,note")
+    .not("note", "is", null)
+    .returns<BranchNoteRow[]>();
+  if (branchNotesError) {
+    return <div className="rounded-2xl bg-red-50 p-4 font-bold text-red-900">โหลดหมายเหตุสาขาไม่สำเร็จ: {branchNotesError.message}</div>;
+  }
+
+  const branchNotes = (rawBranchNotes ?? [])
+    .map((item) => ({
+      reportDate: item.report_date,
+      branchName: item.branch_name?.trim() || "ไม่ระบุสาขา",
+      note: item.note?.trim() ?? "",
+    }))
+    .filter((item) => item.note.length > 0)
+    .sort((a, b) => b.reportDate.localeCompare(a.reportDate));
 
   const rows = (data ?? []).map((row) => {
     const totalSales = pickNumber(row, ["total_sales", "sales_total", "total_revenue", "revenue"]);
@@ -209,6 +232,19 @@ export default async function OwnerDashboardPage() {
             </div>
           ))}
         </div>
+
+        {branchNotes.length > 0 ? (
+          <div className="mt-4 space-y-3">
+            <h3 className="text-base font-black">📝 หมายเหตุจากสาขา</h3>
+            {branchNotes.map((item) => (
+              <article key={`${item.reportDate}-${item.branchName}-${item.note}`} className="rounded-2xl border border-black/10 bg-black/[0.03] p-3">
+                <p className="text-xs font-bold text-black/70">{formatThaiDate(item.reportDate)}</p>
+                <p className="text-sm font-black">{item.branchName}</p>
+                <p className="mt-2 whitespace-pre-wrap text-sm font-medium text-black/90">{item.note}</p>
+              </article>
+            ))}
+          </div>
+        ) : null}
       </section>
     </div>
   );
