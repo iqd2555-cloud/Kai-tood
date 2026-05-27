@@ -1,11 +1,12 @@
 {
   "name": "Kai Tood Manager",
   "short_name": "Kai Tood",
-  "description": "ระบบบริหารร้านไก่ทอดและข้าวเหนียว",
-  "start_url": "/dashboard",
+  "description": "ระบบจัดการร้านเหนียวไก่เยอะโคตร",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#fffdf5",
-  "theme_color": "#111111",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
   "orientation": "portrait",
   "icons": [
     { "src": "/icons/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any maskable" },

@@ -108,3 +108,33 @@ npm run dev
 - ใช้ `daily_report_rollups` view แบบ `security_invoker = true` และ `owner_dashboard_totals()` RPC สำหรับต่อยอดรายงานโดยยังอยู่ภายใต้ RLS
 - ควรตั้งรหัสผ่านผู้ใช้ให้แข็งแรง และเพิ่ม MFA ใน Supabase หากใช้จริงในร้านหลายสาขา
 - Service worker cache เฉพาะ GET request เพื่อช่วยโหลดเร็วขึ้น แต่ข้อมูลการบันทึกยังต้องออนไลน์เพื่อส่งเข้า Supabase
+
+
+## การติดตั้ง PWA บนมือถือ
+
+### Android (Chrome)
+
+1. เปิด URL ของระบบผ่าน Chrome
+2. Login ให้เรียบร้อย
+3. กดปุ่ม **ติดตั้งแอป Kai Tood Manager** ที่ด้านล่างหน้าจอ (Add to Home Screen)
+4. กดยืนยัน Install
+5. เปิดจากไอคอนบนหน้า Home จะใช้งานแบบเต็มจอ ไม่มี URL bar และมี splash screen จากค่า manifest
+
+### iPhone (Safari)
+
+1. เปิด URL ของระบบผ่าน Safari
+2. Login ให้เรียบร้อย
+3. กดปุ่ม **วิธีเพิ่มลงหน้าจอหลัก (iPhone)** หรือกดปุ่ม Share ของ Safari
+4. เลือก **Add to Home Screen** แล้วกด Add
+5. เปิดจากไอคอนบนหน้า Home จะเป็นโหมด app เต็มจอ
+
+## Deploy Production (Vercel)
+
+1. Push โค้ดขึ้น GitHub
+2. Import repo ใน Vercel
+3. ตั้ง Environment Variables:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_APP_URL` (URL production จริง เช่น `https://your-app.vercel.app`)
+4. Deploy
+5. ทดสอบ `/api/health` และทดสอบติดตั้ง PWA บน Android + iPhone หลัง deploy
