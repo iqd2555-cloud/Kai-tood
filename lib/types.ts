@@ -27,6 +27,9 @@ export type DailyReport = {
   cash_sales: number;
   transfer_sales: number;
   total_sales: number;
+  received_chicken: number;
+  received_sticky_rice: number;
+  received_oil: number;
   used_bl: number;
   used_bb: number;
   used_chicken_skin: number;
@@ -66,6 +69,9 @@ export type ReportTotals = {
   cash_sales: number;
   transfer_sales: number;
   total_sales: number;
+  received_chicken: number;
+  received_sticky_rice: number;
+  received_oil: number;
   used_bl: number;
   used_bb: number;
   used_chicken_skin: number;
@@ -80,6 +86,8 @@ export type ReportTotals = {
   order_drumstick: number;
   order_chicken_skin: number;
   order_sticky_rice: number;
+  order_oil: number;
+  order_palm_sugar: number;
   branch_count: number;
   report_count: number;
 };

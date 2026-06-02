@@ -3,7 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { saveDailyReport } from "@/app/actions";
 import { NumberField, TextAreaField } from "@/components/field";
-import { ORDER_REQUEST_ITEMS, USED_INGREDIENT_ITEMS } from "@/lib/report-items";
+import { ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, USED_INGREDIENT_ITEMS } from "@/lib/report-items";
 import { moneyFormatter } from "@/lib/format";
 import { SubmitButton } from "./submit-button";
 import type { Branch, DailyReport } from "@/lib/types";
@@ -42,7 +42,22 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
       </section>
 
       <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
-        <h2 className="text-2xl font-black">1. ยอดขายประจำวัน</h2>
+        <h2 className="text-2xl font-black">1. วัตถุดิบรับเข้า</h2>
+        <p className="mt-1 text-sm font-bold text-black/50">กรอกตอนเช้าหรือตอนของมาส่ง เพื่อให้รายงานคำนวณรับเข้า เหลือ ใช้ไป และควรสั่งเพิ่มได้ครบ</p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          {RECEIVED_INGREDIENT_ITEMS.map((item) => (
+            <NumberField
+              key={item.name}
+              label={`${item.label} (${item.unit})`}
+              name={item.name}
+              defaultValue={Number(existingReport?.[item.name] ?? 0)}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
+        <h2 className="text-2xl font-black">2. ยอดขายประจำวัน</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="mb-2 block text-base font-black text-black">เงินสด</span>
@@ -78,7 +93,7 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
       </section>
 
       <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
-        <h2 className="text-2xl font-black">2. วัตถุดิบใช้ไป</h2>
+        <h2 className="text-2xl font-black">3. วัตถุดิบใช้ไป</h2>
         <p className="mt-1 text-sm font-bold text-black/50">กรอกเฉพาะตัวเลขจำนวนกิโลกรัมที่ใช้ไปในวันนี้หรือรอบนี้</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           {USED_INGREDIENT_ITEMS.map((item) => (
@@ -93,7 +108,7 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
       </section>
 
       <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
-        <h2 className="text-2xl font-black">3. สินค้าคงเหลือ</h2>
+        <h2 className="text-2xl font-black">4. สินค้าคงเหลือ</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <NumberField label="ไก่คงเหลือ" name="remaining_chicken" defaultValue={existingReport?.remaining_chicken ?? 0} />
           <NumberField label="ข้าวเหนียวคงเหลือ" name="remaining_sticky_rice" defaultValue={existingReport?.remaining_sticky_rice ?? 0} />
@@ -102,7 +117,12 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
       </section>
 
       <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
-        <h2 className="text-2xl font-black">4. สั่งวัตถุดิบเพิ่ม</h2>
+        <h2 className="text-2xl font-black">5. หมายเหตุ</h2>
+        <div className="mt-4"><TextAreaField label="หมายเหตุประจำวัน" name="note" defaultValue={existingReport?.note ?? ""} placeholder="ปัญหา ลูกค้าเยอะ ของขาด ฯลฯ" /></div>
+      </section>
+
+      <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
+        <h2 className="text-2xl font-black">6. สั่งของพรุ่งนี้</h2>
         <p className="mt-1 text-sm font-bold text-black/50">เลือกรายการไว้ให้แล้ว พนักงานกรอกเฉพาะจำนวนที่ต้องการสั่ง</p>
         <div className="mt-4 space-y-3">
           {ORDER_REQUEST_ITEMS.map((item) => (
@@ -127,10 +147,7 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
         </div>
       </section>
 
-      <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
-        <h2 className="text-2xl font-black">5. หมายเหตุ</h2>
-        <div className="mt-4"><TextAreaField label="หมายเหตุประจำวัน" name="note" defaultValue={existingReport?.note ?? ""} placeholder="ปัญหา ลูกค้าเยอะ ของขาด ฯลฯ" /></div>
-      </section>
+
 
       {state?.message && <div className={`rounded-2xl p-4 text-center font-black ${state.ok ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>{state.message}</div>}
       <SubmitButton />
