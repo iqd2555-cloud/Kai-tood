@@ -13,7 +13,6 @@ export function AppNav({ profile }: { profile: Profile }) {
         </Link>
         <nav className="flex items-center gap-2 text-sm font-bold">
           <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/daily">กรอกข้อมูล</Link>
-          <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/daily#received-inventory">วัตถุดิบรับเข้า</Link>
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/owner-dashboard">สรุปภาพรวม</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/reports">รายงาน</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/orders">สั่งของ</Link>}
