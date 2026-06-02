@@ -22,8 +22,9 @@ type NumericReportField = keyof Pick<
   | "transfer_sales"
   | "total_sales"
   | "received_chicken"
-  | "received_sticky_rice"
+  | "received_rice"
   | "received_oil"
+  | "received_sugar"
   | "used_bl"
   | "used_bb"
   | "used_chicken_skin"
@@ -74,8 +75,9 @@ function sumLatestRemaining(reports: DailyReport[], field: "remaining_chicken" |
 function InventoryFlowSummary({ title, reports }: { title: string; reports: DailyReport[] }) {
   const rows = [
     { label: "ไก่", received: sumReports(reports, "received_chicken"), used: sumChickenUsed(reports), remaining: sumLatestRemaining(reports, "remaining_chicken"), order: sumChickenOrder(reports), unit: "กิโลกรัม" },
-    { label: "ข้าวเหนียว", received: sumReports(reports, "received_sticky_rice"), used: sumReports(reports, "used_sticky_rice"), remaining: sumLatestRemaining(reports, "remaining_sticky_rice"), order: sumReports(reports, "order_sticky_rice"), unit: "กิโลกรัม" },
+    { label: "ข้าวเหนียว", received: sumReports(reports, "received_rice"), used: sumReports(reports, "used_sticky_rice"), remaining: sumLatestRemaining(reports, "remaining_sticky_rice"), order: sumReports(reports, "order_sticky_rice"), unit: "กิโลกรัม" },
     { label: "น้ำมัน", received: sumReports(reports, "received_oil"), used: sumReports(reports, "used_oil"), remaining: sumLatestRemaining(reports, "remaining_oil"), order: sumReports(reports, "order_oil"), unit: "กิโลกรัม" },
+    { label: "น้ำตาล", received: sumReports(reports, "received_sugar"), used: 0, remaining: 0, order: sumReports(reports, "order_palm_sugar"), unit: "กิโลกรัม" },
   ];
 
   return (
