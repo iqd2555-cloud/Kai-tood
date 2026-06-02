@@ -28,10 +28,8 @@ export type DailyReport = {
   transfer_sales: number;
   total_sales: number;
   received_chicken: number;
-  received_rice: number;
+  received_sticky_rice: number;
   received_oil: number;
-  received_sugar: number;
-  received_sticky_rice?: number;
   used_bl: number;
   used_bb: number;
   used_chicken_skin: number;
@@ -72,10 +70,8 @@ export type ReportTotals = {
   transfer_sales: number;
   total_sales: number;
   received_chicken: number;
-  received_rice: number;
+  received_sticky_rice: number;
   received_oil: number;
-  received_sugar: number;
-  received_sticky_rice?: number;
   used_bl: number;
   used_bb: number;
   used_chicken_skin: number;

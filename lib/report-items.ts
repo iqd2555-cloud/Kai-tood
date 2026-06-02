@@ -2,9 +2,8 @@ import type { DailyReport } from "@/lib/types";
 
 export const RECEIVED_INGREDIENT_ITEMS = [
   { label: "ไก่รับเข้า", name: "received_chicken", unit: "กิโลกรัม" },
-  { label: "ข้าวเหนียวรับเข้า", name: "received_rice", unit: "กิโลกรัม" },
+  { label: "ข้าวเหนียวรับเข้า", name: "received_sticky_rice", unit: "กิโลกรัม" },
   { label: "น้ำมันรับเข้า", name: "received_oil", unit: "กิโลกรัม" },
-  { label: "น้ำตาลรับเข้า", name: "received_sugar", unit: "กิโลกรัม" },
 ] as const;
 
 export const USED_INGREDIENT_ITEMS = [
