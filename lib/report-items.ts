@@ -1,9 +1,15 @@
 import type { DailyReport } from "@/lib/types";
 
+export const RECEIVED_INGREDIENT_ITEMS = [
+  { label: "ไก่รับเข้า", name: "received_chicken", unit: "กิโลกรัม" },
+  { label: "ข้าวเหนียวรับเข้า", name: "received_sticky_rice", unit: "กิโลกรัม" },
+  { label: "น้ำมันรับเข้า", name: "received_oil", unit: "กิโลกรัม" },
+] as const;
+
 export const USED_INGREDIENT_ITEMS = [
   { label: "ไก่ทอดดั้งเดิม", name: "used_bl", unit: "กิโลกรัม" },
   { label: "ไก่เผ็ด", name: "used_bb", unit: "กิโลกรัม" },
-  { label: "เครื่องในไก่", name: "used_oil", unit: "กิโลกรัม" },
+  { label: "น้ำมัน", name: "used_oil", unit: "กิโลกรัม" },
   { label: "ไก่สับ", name: "used_chopped_chicken", unit: "กิโลกรัม" },
   { label: "น่องไก่", name: "used_drumstick", unit: "กิโลกรัม" },
   { label: "หนังไก่", name: "used_chicken_skin", unit: "กิโลกรัม" },
@@ -22,6 +28,7 @@ export const ORDER_REQUEST_ITEMS = [
   { label: "น้ำตาลปี๊บ", name: "order_palm_sugar", unit: "กิโลกรัม" },
 ] as const;
 
+export type ReceivedIngredientField = (typeof RECEIVED_INGREDIENT_ITEMS)[number]["name"];
 export type UsedIngredientField = (typeof USED_INGREDIENT_ITEMS)[number]["name"];
 export type OrderRequestField = (typeof ORDER_REQUEST_ITEMS)[number]["name"];
 

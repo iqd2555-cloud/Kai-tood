@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { formatThaiDate, moneyFormatter, numberFormatter } from "@/lib/format";
-import { ORDER_REQUEST_ITEMS, USED_INGREDIENT_ITEMS } from "@/lib/report-items";
+import { ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, USED_INGREDIENT_ITEMS } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { DailyReport } from "@/lib/types";
 
@@ -28,6 +28,7 @@ export default async function MyReportsPage() {
       </section>
 
       {reports.map((report) => {
+        const receivedItems = RECEIVED_INGREDIENT_ITEMS.filter((item) => Number(report[item.name] ?? 0) > 0);
         const usedItems = USED_INGREDIENT_ITEMS.filter((item) => Number(report[item.name] ?? 0) > 0);
         const orderItems = ORDER_REQUEST_ITEMS.filter((item) => Number(report[item.name] ?? 0) > 0);
         const otherItems = Array.isArray(report.order_other_items)
@@ -52,7 +53,22 @@ export default async function MyReportsPage() {
               </section>
 
               <section className="rounded-2xl border border-black/10 bg-black/[0.03] p-3">
-                <h3 className="text-base font-black text-black">หมวด 2: วัตถุดิบใช้ไป</h3>
+                <h3 className="text-base font-black text-black">หมวด 2: วัตถุดิบรับเข้า</h3>
+                {receivedItems.length > 0 ? (
+                  <div className="mt-2 grid grid-cols-1 gap-2 text-sm font-bold sm:grid-cols-2">
+                    {receivedItems.map((item) => (
+                      <div key={item.name} className="rounded-xl bg-white p-2">
+                        {item.label} {numberFormatter.format(report[item.name] ?? 0)} {item.unit}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 rounded-xl bg-white p-2 text-sm font-bold text-black/60">ไม่มีข้อมูลวัตถุดิบรับเข้า</p>
+                )}
+              </section>
+
+              <section className="rounded-2xl border border-black/10 bg-black/[0.03] p-3">
+                <h3 className="text-base font-black text-black">หมวด 3: วัตถุดิบใช้ไป</h3>
                 {usedItems.length > 0 ? (
                   <div className="mt-2 grid grid-cols-1 gap-2 text-sm font-bold sm:grid-cols-2">
                     {usedItems.map((item) => (
@@ -67,7 +83,16 @@ export default async function MyReportsPage() {
               </section>
 
               <section className="rounded-2xl border border-black/10 bg-black/[0.03] p-3">
-                <h3 className="text-base font-black text-black">หมวด 3: สั่งวัตถุดิบเพิ่ม (วันพรุ่งนี้)</h3>
+                <h3 className="text-base font-black text-black">หมวด 4: คงเหลือปิดร้าน</h3>
+                <div className="mt-2 grid grid-cols-1 gap-2 text-sm font-bold sm:grid-cols-3">
+                  <div className="rounded-xl bg-white p-2">ไก่ {numberFormatter.format(report.remaining_chicken)} กิโลกรัม</div>
+                  <div className="rounded-xl bg-white p-2">ข้าวเหนียว {numberFormatter.format(report.remaining_sticky_rice)} กิโลกรัม</div>
+                  <div className="rounded-xl bg-white p-2">น้ำมัน {numberFormatter.format(report.remaining_oil)} กิโลกรัม</div>
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-black/10 bg-black/[0.03] p-3">
+                <h3 className="text-base font-black text-black">หมวด 5: สั่งของพรุ่งนี้</h3>
                 {orderItems.length > 0 || otherItems.length > 0 ? (
                   <div className="mt-2 grid grid-cols-1 gap-2 text-sm font-bold sm:grid-cols-2">
                     {orderItems.map((item) => (
