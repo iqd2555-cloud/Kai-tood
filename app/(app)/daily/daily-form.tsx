@@ -8,7 +8,9 @@ import { moneyFormatter } from "@/lib/format";
 import { SubmitButton } from "./submit-button";
 import type { Branch, DailyReport } from "@/lib/types";
 
-export function DailyForm({ branches, defaultBranchId, reportDate, existingReport }: { branches: Branch[]; defaultBranchId: string; reportDate: string; existingReport?: DailyReport | null }) {
+type DailyFormBranch = Pick<Branch, "id" | "name">;
+
+export function DailyForm({ branches, defaultBranchId, reportDate, existingReport, canSelectBranch }: { branches: DailyFormBranch[]; defaultBranchId: string; reportDate: string; existingReport?: DailyReport | null; canSelectBranch: boolean }) {
   const [state, formAction] = useActionState(saveDailyReport, null);
   const [cashSales, setCashSales] = useState(Number(existingReport?.cash_sales ?? 0));
   const [transferSales, setTransferSales] = useState(Number(existingReport?.transfer_sales ?? 0));
@@ -29,9 +31,14 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="mb-2 block font-black">สาขา</span>
-            <select name="branch_id" value={selectedBranchId} onChange={(event) => setSelectedBranchId(event.target.value)} className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold">
-              {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-            </select>
+            {canSelectBranch ? (
+              <select name="branch_id" value={selectedBranchId} onChange={(event) => setSelectedBranchId(event.target.value)} className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold">
+                {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+              </select>
+            ) : (
+              <div className="min-h-14 rounded-2xl border-2 border-black/10 bg-black/[0.03] px-4 py-3 text-lg font-black">{selectedBranchName || "สาขาของคุณ"}</div>
+            )}
+            <input type="hidden" name="branch_id" value={selectedBranchId} />
             <input type="hidden" name="branch_name" value={selectedBranchName} />
           </label>
           <label className="block">
@@ -41,7 +48,7 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
         </div>
       </section>
 
-      <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
+      <section id="received-inventory" className="scroll-mt-24 rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
         <h2 className="text-2xl font-black">1. วัตถุดิบรับเข้า</h2>
         <p className="mt-1 text-sm font-bold text-black/50">กรอกตอนเช้าหรือตอนของมาส่ง เพื่อให้รายงานคำนวณรับเข้า เหลือ ใช้ไป และควรสั่งเพิ่มได้ครบ</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">

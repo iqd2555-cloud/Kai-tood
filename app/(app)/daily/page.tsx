@@ -12,15 +12,24 @@ export default async function DailyPage() {
 
   const today = todayISO();
 
-  const branchesQuery = supabase
-    .from("branches")
-    .select("*")
-    .in("name", ["สาขาที่ 1 ร.ร.นวมินทร์", "สาขาที่ 2 โลตัสป้อม 1"])
-    .order("name");
-  if (!isOwner(profile) && profile.branch_id) branchesQuery.eq("id", profile.branch_id);
+  const profileIsOwner = isOwner(profile);
+  const branchesQuery = supabase.from("branches").select("*").order("name");
+  if (!profileIsOwner && profile.branch_id) branchesQuery.eq("id", profile.branch_id);
   const { data: branchesData } = await branchesQuery.returns<Branch[]>();
-  const branches = branchesData ?? [];
-  const defaultBranchId = profile.branch_id ?? branches[0]?.id ?? "";
+  const staffProfileBranch =
+    !profileIsOwner && profile.branch_id
+      ? { id: profile.branch_id, name: profile.branch_name ?? profile.branch?.name ?? "สาขาของคุณ" }
+      : null;
+  const branches = staffProfileBranch
+    ? [
+        {
+          ...branchesData?.find((branch) => branch.id === staffProfileBranch.id),
+          id: staffProfileBranch.id,
+          name: staffProfileBranch.name,
+        },
+      ]
+    : branchesData ?? [];
+  const defaultBranchId = profileIsOwner ? branches[0]?.id ?? "" : profile.branch_id ?? "";
 
   const { data: existingReport } = await supabase
     .from("daily_reports")
@@ -36,7 +45,7 @@ export default async function DailyPage() {
         <h1 className="mt-2 text-3xl font-black">กรอกข้อมูลประจำวัน</h1>
         <p className="mt-2 text-white/70">ปุ่มและช่องกรอกขนาดใหญ่ ใช้งานง่ายบนมือถือ Android และ iPhone</p>
       </section>
-      <DailyForm branches={branches} defaultBranchId={defaultBranchId} reportDate={today} existingReport={existingReport as DailyReport | null} />
+      <DailyForm branches={branches} defaultBranchId={defaultBranchId} reportDate={today} existingReport={existingReport as DailyReport | null} canSelectBranch={profileIsOwner} />
     </div>
   );
 }

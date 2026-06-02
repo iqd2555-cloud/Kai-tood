@@ -10,7 +10,7 @@ import { createSupabaseServerClient } from "@/lib/supabase-server";
 const dailyReportSchema = z.object({
   report_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "วันที่ไม่ถูกต้อง"),
   branch_id: z.string().uuid(),
-  branch_name: z.string().min(1),
+  branch_name: z.string().optional().default(""),
   cash_sales: z.coerce.number().min(0),
   transfer_sales: z.coerce.number().min(0),
   received_chicken: z.coerce.number().min(0),
@@ -50,6 +50,16 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
   }
 
   const payload = parsed.data;
+
+  if (profile.role === "staff") {
+    if (!profile.branch_id) {
+      return { ok: false, message: "โปรไฟล์พนักงานยังไม่ได้ผูกสาขา" };
+    }
+
+    payload.branch_id = profile.branch_id;
+    payload.branch_name = profile.branch_name ?? payload.branch_name;
+  }
+
   const parsedOtherItems = (() => {
     try {
       return JSON.parse(payload.order_other_items || "[]");
@@ -72,10 +82,6 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
     : [];
   const allRequestedItems = [requestedItems, ...requestedItemLines].filter(Boolean).join("\n");
 
-  if (profile.role === "staff" && profile.branch_id !== payload.branch_id) {
-    return { ok: false, message: "คุณไม่มีสิทธิ์บันทึกข้อมูลสาขานี้" };
-  }
-
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
     return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์" };
@@ -90,7 +96,7 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
   const { error } = await supabase.from("daily_reports").upsert(
     {
       ...payload,
-      branch_name: branchData?.name ?? payload.branch_name,
+      branch_name: profile.role === "staff" ? profile.branch_name ?? branchData?.name ?? payload.branch_name : branchData?.name ?? payload.branch_name,
       requested_items: allRequestedItems,
       order_other_items: otherItems.success ? otherItems.data.filter((item) => item.name.trim() && item.amount > 0) : [],
       submitted_by: profile.id,
