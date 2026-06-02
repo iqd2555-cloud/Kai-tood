@@ -115,7 +115,7 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
       </section>
 
       <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
-        <h2 className="text-2xl font-black">4. สินค้าคงเหลือ</h2>
+        <h2 className="text-2xl font-black">4. วัตถุดิบคงเหลือ</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <NumberField label="ไก่คงเหลือ" name="remaining_chicken" defaultValue={existingReport?.remaining_chicken ?? 0} />
           <NumberField label="ข้าวเหนียวคงเหลือ" name="remaining_sticky_rice" defaultValue={existingReport?.remaining_sticky_rice ?? 0} />
@@ -124,12 +124,7 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
       </section>
 
       <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
-        <h2 className="text-2xl font-black">5. หมายเหตุ</h2>
-        <div className="mt-4"><TextAreaField label="หมายเหตุประจำวัน" name="note" defaultValue={existingReport?.note ?? ""} placeholder="ปัญหา ลูกค้าเยอะ ของขาด ฯลฯ" /></div>
-      </section>
-
-      <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
-        <h2 className="text-2xl font-black">6. สั่งของพรุ่งนี้</h2>
+        <h2 className="text-2xl font-black">5. รายการสั่งของ</h2>
         <p className="mt-1 text-sm font-bold text-black/50">เลือกรายการไว้ให้แล้ว พนักงานกรอกเฉพาะจำนวนที่ต้องการสั่ง</p>
         <div className="mt-4 space-y-3">
           {ORDER_REQUEST_ITEMS.map((item) => (
@@ -154,7 +149,10 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
         </div>
       </section>
 
-
+      <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
+        <h2 className="text-2xl font-black">6. หมายเหตุ</h2>
+        <div className="mt-4"><TextAreaField label="หมายเหตุประจำวัน" name="note" defaultValue={existingReport?.note ?? ""} placeholder="ปัญหา ลูกค้าเยอะ ของขาด ฯลฯ" /></div>
+      </section>
 
       {state?.message && <div className={`rounded-2xl p-4 text-center font-black ${state.ok ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>{state.message}</div>}
       <SubmitButton />
