@@ -31,7 +31,8 @@ export type DailyReport = {
   received_rice: number;
   received_oil: number;
   received_sugar: number;
-  received_sticky_rice?: number;
+  received_sticky_rice: number;
+  received_other_items: { name: string; amount: number }[] | null;
   used_bl: number;
   used_bb: number;
   used_chicken_skin: number;
@@ -75,7 +76,7 @@ export type ReportTotals = {
   received_rice: number;
   received_oil: number;
   received_sugar: number;
-  received_sticky_rice?: number;
+  received_sticky_rice: number;
   used_bl: number;
   used_bb: number;
   used_chicken_skin: number;

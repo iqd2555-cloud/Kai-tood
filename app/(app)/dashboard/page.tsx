@@ -88,7 +88,7 @@ export default async function DashboardPage() {
             <p className="text-sm font-bold text-black/50">สรุปวัตถุดิบย้อนหลัง</p>
             <h2 className="text-2xl font-black">{formatThaiDate(sevenDaysAgo)} - {formatThaiDate(today)}</h2>
           </div>
-          <Link href="/reports" className="focus-ring rounded-full bg-black px-4 py-2 text-sm font-black text-white">ดูรายงาน</Link>
+          <Link href={isOwner(profile) ? "/reports" : "/my-reports"} className="focus-ring rounded-full bg-black px-4 py-2 text-sm font-black text-white">ดูรายงาน</Link>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
           {ingredientTotals.map((item) => (

@@ -31,6 +31,9 @@ export default async function MyReportsPage() {
         const receivedItems = RECEIVED_INGREDIENT_ITEMS.filter((item) => Number(report[item.name] ?? 0) > 0);
         const usedItems = USED_INGREDIENT_ITEMS.filter((item) => Number(report[item.name] ?? 0) > 0);
         const orderItems = ORDER_REQUEST_ITEMS.filter((item) => Number(report[item.name] ?? 0) > 0);
+        const receivedOtherItems = Array.isArray(report.received_other_items)
+          ? report.received_other_items.filter((item) => String(item?.name ?? "").trim() && Number(item?.amount ?? 0) > 0)
+          : [];
         const otherItems = Array.isArray(report.order_other_items)
           ? report.order_other_items.filter((item) => String(item?.name ?? "").trim() && Number(item?.amount ?? 0) > 0)
           : [];
@@ -54,11 +57,16 @@ export default async function MyReportsPage() {
 
               <section className="rounded-2xl border border-black/10 bg-black/[0.03] p-3">
                 <h3 className="text-base font-black text-black">หมวด 2: วัตถุดิบรับเข้า</h3>
-                {receivedItems.length > 0 ? (
+                {receivedItems.length > 0 || receivedOtherItems.length > 0 ? (
                   <div className="mt-2 grid grid-cols-1 gap-2 text-sm font-bold sm:grid-cols-2">
                     {receivedItems.map((item) => (
                       <div key={item.name} className="rounded-xl bg-white p-2">
                         {item.label} {numberFormatter.format(report[item.name] ?? 0)} {item.unit}
+                      </div>
+                    ))}
+                    {receivedOtherItems.map((item, index) => (
+                      <div key={`${item.name}-${index}`} className="rounded-xl bg-white p-2">
+                        {item.name}: {numberFormatter.format(Number(item.amount ?? 0))}
                       </div>
                     ))}
                   </div>

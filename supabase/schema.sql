@@ -35,6 +35,7 @@ create table public.daily_reports (
   received_sticky_rice numeric not null default 0 check (received_sticky_rice >= 0),
   received_oil numeric not null default 0 check (received_oil >= 0),
   received_sugar numeric not null default 0 check (received_sugar >= 0),
+  received_other_items jsonb not null default '[]'::jsonb,
   used_bl numeric not null default 0 check (used_bl >= 0),
   used_bb numeric not null default 0 check (used_bb >= 0),
   used_chicken_skin numeric not null default 0 check (used_chicken_skin >= 0),
@@ -67,6 +68,7 @@ create index daily_reports_report_date_idx on public.daily_reports(report_date d
 create index daily_reports_branch_date_idx on public.daily_reports(branch_id, report_date desc);
 create index daily_reports_submitted_by_date_idx on public.daily_reports(submitted_by, report_date desc);
 create index daily_reports_updated_at_idx on public.daily_reports(updated_at desc);
+create index daily_reports_received_other_items_idx on public.daily_reports using gin (received_other_items);
 
 alter table public.branches enable row level security;
 alter table public.profiles enable row level security;
