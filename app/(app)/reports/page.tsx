@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { StatCard } from "@/components/stat-card";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { daysAgoISO, formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib/format";
-import { ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS } from "@/lib/report-items";
+import { ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, REMAINING_CHICKEN_FIELDS, REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS, getRemainingChickenTotal } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch, DailyReport } from "@/lib/types";
 
@@ -79,9 +79,13 @@ function sumLatestRemaining(reports: DailyReport[], field: NumericReportField) {
   return latestReportsByBranch(reports).reduce((sum, report) => sum + Number(report[field] ?? 0), 0);
 }
 
+function sumLatestRemainingChicken(reports: DailyReport[]) {
+  return latestReportsByBranch(reports).reduce((sum, report) => sum + getRemainingChickenTotal(report), 0);
+}
+
 function InventoryFlowSummary({ title, reports }: { title: string; reports: DailyReport[] }) {
   const rows = [
-    { label: "ไก่", received: sumReports(reports, "received_chicken"), used: sumChickenUsed(reports), remaining: REMAINING_INVENTORY_ITEMS.slice(0, 6).reduce((sum, item) => sum + sumLatestRemaining(reports, item.name), 0), order: sumChickenOrder(reports), unit: "กิโลกรัม" },
+    { label: "ไก่", received: sumReports(reports, "received_chicken"), used: sumChickenUsed(reports), remaining: REMAINING_CHICKEN_FIELDS.reduce((sum, field) => sum + sumLatestRemaining(reports, field), 0), order: sumChickenOrder(reports), unit: "กิโลกรัม" },
     { label: "ข้าวเหนียว", received: sumReports(reports, "received_sticky_rice"), used: sumReports(reports, "used_sticky_rice"), remaining: sumLatestRemaining(reports, "remaining_sticky_rice"), order: sumReports(reports, "order_sticky_rice"), unit: "กิโลกรัม" },
     { label: "น้ำมัน", received: sumReports(reports, "received_oil"), used: sumReports(reports, "used_oil"), remaining: sumLatestRemaining(reports, "remaining_oil"), order: sumReports(reports, "order_oil"), unit: "กิโลกรัม" },
   ];
@@ -124,6 +128,11 @@ function RemainingInventoryGrid({
     <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
       <h2 className="text-2xl font-black">{title}</h2>
       <p className="mt-1 text-sm font-bold text-black/50">คงเหลือใช้ค่าล่าสุดของแต่ละสาขาในช่วงวันที่เลือก</p>
+      <div className="mt-4 rounded-2xl bg-[#ffc400]/30 p-4 text-center">
+        <div className="text-sm font-black">รวมไก่คงเหลือทั้งหมด</div>
+        <div className="text-3xl font-black">{numberFormatter.format(sumLatestRemainingChicken(reports))}</div>
+        <div className="text-xs font-bold text-black/60">กิโลกรัม</div>
+      </div>
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {REMAINING_INVENTORY_ITEMS.map((item) => (
           <div key={item.name} className="rounded-2xl bg-black/[0.04] p-3 text-center">
