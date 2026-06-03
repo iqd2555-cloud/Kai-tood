@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { formatThaiDate, moneyFormatter, numberFormatter } from "@/lib/format";
-import { ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, USED_INGREDIENT_ITEMS } from "@/lib/report-items";
+import { ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { DailyReport } from "@/lib/types";
 
@@ -83,11 +83,13 @@ export default async function MyReportsPage() {
               </section>
 
               <section className="rounded-2xl border border-black/10 bg-black/[0.03] p-3">
-                <h3 className="text-base font-black text-black">หมวด 4: คงเหลือปิดร้าน</h3>
-                <div className="mt-2 grid grid-cols-1 gap-2 text-sm font-bold sm:grid-cols-3">
-                  <div className="rounded-xl bg-white p-2">ไก่ {numberFormatter.format(report.remaining_chicken)} กิโลกรัม</div>
-                  <div className="rounded-xl bg-white p-2">ข้าวเหนียว {numberFormatter.format(report.remaining_sticky_rice)} กิโลกรัม</div>
-                  <div className="rounded-xl bg-white p-2">น้ำมัน {numberFormatter.format(report.remaining_oil)} กิโลกรัม</div>
+                <h3 className="text-base font-black text-black">หมวด 4: สินค้าคงเหลือปิดร้าน</h3>
+                <div className="mt-2 grid grid-cols-1 gap-2 text-sm font-bold sm:grid-cols-2">
+                  {REMAINING_INVENTORY_ITEMS.map((item) => (
+                    <div key={item.name} className="rounded-xl bg-white p-2">
+                      {item.label} {numberFormatter.format(report[item.name] ?? 0)} {item.unit}
+                    </div>
+                  ))}
                 </div>
               </section>
 
