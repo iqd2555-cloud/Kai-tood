@@ -35,7 +35,7 @@ type NumericReportField = keyof Pick<
   | "remaining_spicy_chicken"
   | "remaining_chicken_skin"
   | "remaining_offal"
-  | "remaining_chopped_chicken"
+  | "remaining_ground_chicken"
   | "remaining_drumstick"
   | "remaining_sticky_rice"
   | "remaining_oil"

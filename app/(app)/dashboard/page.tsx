@@ -57,7 +57,7 @@ export default async function DashboardPage() {
       Number(report.remaining_spicy_chicken ?? 0) +
       Number(report.remaining_chicken_skin ?? 0) +
       Number(report.remaining_offal ?? 0) +
-      Number(report.remaining_chopped_chicken ?? 0) +
+      Number(report.remaining_ground_chicken ?? 0) +
       Number(report.remaining_drumstick ?? 0);
     return Boolean(
       branch &&
@@ -114,7 +114,7 @@ export default async function DashboardPage() {
           <div className="mt-3 space-y-2">
             {lowStockReports.map((report) => (
               <div key={report.id} className="rounded-2xl bg-white p-3 font-bold text-red-900">
-                {report.branches?.name}: ไก่รวม {numberFormatter.format(Number(report.remaining_original_chicken ?? 0) + Number(report.remaining_spicy_chicken ?? 0) + Number(report.remaining_chicken_skin ?? 0) + Number(report.remaining_offal ?? 0) + Number(report.remaining_chopped_chicken ?? 0) + Number(report.remaining_drumstick ?? 0))}, ข้าวเหนียว {numberFormatter.format(report.remaining_sticky_rice)}, น้ำมัน {numberFormatter.format(report.remaining_oil)}
+                {report.branches?.name}: ไก่รวม {numberFormatter.format(Number(report.remaining_original_chicken ?? 0) + Number(report.remaining_spicy_chicken ?? 0) + Number(report.remaining_chicken_skin ?? 0) + Number(report.remaining_offal ?? 0) + Number(report.remaining_ground_chicken ?? 0) + Number(report.remaining_drumstick ?? 0))}, ข้าวเหนียว {numberFormatter.format(report.remaining_sticky_rice)}, น้ำมัน {numberFormatter.format(report.remaining_oil)}
               </div>
             ))}
           </div>

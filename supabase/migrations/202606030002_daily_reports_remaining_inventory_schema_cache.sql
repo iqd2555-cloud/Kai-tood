@@ -1,36 +1,52 @@
--- Split end-of-day remaining inventory into product-level columns for manual stock checks.
--- Safe to run in Supabase SQL Editor on an existing project.
+-- Ensure product-level remaining inventory columns exist for daily report submissions.
+-- Safe to run in Supabase SQL Editor on projects that may or may not have older stock columns.
 
 alter table public.daily_reports
   add column if not exists remaining_original_chicken numeric default 0,
   add column if not exists remaining_spicy_chicken numeric default 0,
-  add column if not exists remaining_chicken_skin numeric default 0,
-  add column if not exists remaining_offal numeric default 0,
   add column if not exists remaining_ground_chicken numeric default 0,
-  add column if not exists remaining_drumstick numeric default 0;
+  add column if not exists remaining_drumstick numeric default 0,
+  add column if not exists remaining_offal numeric default 0,
+  add column if not exists remaining_chicken_skin numeric default 0;
+
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'daily_reports'
+      and column_name = 'remaining_chopped_chicken'
+  ) then
+    execute '
+      update public.daily_reports
+      set remaining_ground_chicken = coalesce(nullif(remaining_ground_chicken, 0), remaining_chopped_chicken, 0)
+    ';
+  end if;
+end $$;
 
 update public.daily_reports
 set
   remaining_original_chicken = coalesce(nullif(remaining_original_chicken, 0), remaining_chicken, 0),
   remaining_spicy_chicken = coalesce(remaining_spicy_chicken, 0),
-  remaining_chicken_skin = coalesce(remaining_chicken_skin, 0),
-  remaining_offal = coalesce(remaining_offal, 0),
   remaining_ground_chicken = coalesce(remaining_ground_chicken, 0),
-  remaining_drumstick = coalesce(remaining_drumstick, 0);
+  remaining_drumstick = coalesce(remaining_drumstick, 0),
+  remaining_offal = coalesce(remaining_offal, 0),
+  remaining_chicken_skin = coalesce(remaining_chicken_skin, 0);
 
 alter table public.daily_reports
   alter column remaining_original_chicken set default 0,
   alter column remaining_original_chicken set not null,
   alter column remaining_spicy_chicken set default 0,
   alter column remaining_spicy_chicken set not null,
-  alter column remaining_chicken_skin set default 0,
-  alter column remaining_chicken_skin set not null,
-  alter column remaining_offal set default 0,
-  alter column remaining_offal set not null,
   alter column remaining_ground_chicken set default 0,
   alter column remaining_ground_chicken set not null,
   alter column remaining_drumstick set default 0,
-  alter column remaining_drumstick set not null;
+  alter column remaining_drumstick set not null,
+  alter column remaining_offal set default 0,
+  alter column remaining_offal set not null,
+  alter column remaining_chicken_skin set default 0,
+  alter column remaining_chicken_skin set not null;
 
 do $$
 begin
@@ -40,17 +56,17 @@ begin
   if not exists (select 1 from pg_constraint where conname = 'daily_reports_remaining_spicy_chicken_nonnegative') then
     alter table public.daily_reports add constraint daily_reports_remaining_spicy_chicken_nonnegative check (remaining_spicy_chicken >= 0);
   end if;
-  if not exists (select 1 from pg_constraint where conname = 'daily_reports_remaining_chicken_skin_nonnegative') then
-    alter table public.daily_reports add constraint daily_reports_remaining_chicken_skin_nonnegative check (remaining_chicken_skin >= 0);
-  end if;
-  if not exists (select 1 from pg_constraint where conname = 'daily_reports_remaining_offal_nonnegative') then
-    alter table public.daily_reports add constraint daily_reports_remaining_offal_nonnegative check (remaining_offal >= 0);
-  end if;
   if not exists (select 1 from pg_constraint where conname = 'daily_reports_remaining_ground_chicken_nonnegative') then
     alter table public.daily_reports add constraint daily_reports_remaining_ground_chicken_nonnegative check (remaining_ground_chicken >= 0);
   end if;
   if not exists (select 1 from pg_constraint where conname = 'daily_reports_remaining_drumstick_nonnegative') then
     alter table public.daily_reports add constraint daily_reports_remaining_drumstick_nonnegative check (remaining_drumstick >= 0);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'daily_reports_remaining_offal_nonnegative') then
+    alter table public.daily_reports add constraint daily_reports_remaining_offal_nonnegative check (remaining_offal >= 0);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'daily_reports_remaining_chicken_skin_nonnegative') then
+    alter table public.daily_reports add constraint daily_reports_remaining_chicken_skin_nonnegative check (remaining_chicken_skin >= 0);
   end if;
 end $$;
 
@@ -91,10 +107,10 @@ select
   min(dr.remaining_chicken)::numeric as remaining_chicken,
   min(dr.remaining_original_chicken)::numeric as remaining_original_chicken,
   min(dr.remaining_spicy_chicken)::numeric as remaining_spicy_chicken,
-  min(dr.remaining_chicken_skin)::numeric as remaining_chicken_skin,
-  min(dr.remaining_offal)::numeric as remaining_offal,
   min(dr.remaining_ground_chicken)::numeric as remaining_ground_chicken,
   min(dr.remaining_drumstick)::numeric as remaining_drumstick,
+  min(dr.remaining_offal)::numeric as remaining_offal,
+  min(dr.remaining_chicken_skin)::numeric as remaining_chicken_skin,
   min(dr.remaining_sticky_rice)::numeric as remaining_sticky_rice,
   min(dr.remaining_oil)::numeric as remaining_oil,
   count(*)::integer as report_count

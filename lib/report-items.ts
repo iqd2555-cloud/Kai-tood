@@ -19,10 +19,10 @@ export const USED_INGREDIENT_ITEMS = [
 export const REMAINING_INVENTORY_ITEMS = [
   { label: "ไก่ทอดดั้งเดิมคงเหลือ", name: "remaining_original_chicken", unit: "กิโลกรัม" },
   { label: "ไก่ทอดพริกคงเหลือ", name: "remaining_spicy_chicken", unit: "กิโลกรัม" },
-  { label: "หนังไก่คงเหลือ", name: "remaining_chicken_skin", unit: "กิโลกรัม" },
-  { label: "เครื่องในไก่คงเหลือ", name: "remaining_offal", unit: "กิโลกรัม" },
-  { label: "ไก่สับคงเหลือ", name: "remaining_chopped_chicken", unit: "กิโลกรัม" },
+  { label: "ไก่สับคงเหลือ", name: "remaining_ground_chicken", unit: "กิโลกรัม" },
   { label: "น่องไก่คงเหลือ", name: "remaining_drumstick", unit: "กิโลกรัม" },
+  { label: "เครื่องในไก่คงเหลือ", name: "remaining_offal", unit: "กิโลกรัม" },
+  { label: "หนังไก่คงเหลือ", name: "remaining_chicken_skin", unit: "กิโลกรัม" },
   { label: "ข้าวเหนียวคงเหลือ", name: "remaining_sticky_rice", unit: "กิโลกรัม" },
   { label: "น้ำมันคงเหลือ", name: "remaining_oil", unit: "กิโลกรัม" },
 ] as const;
