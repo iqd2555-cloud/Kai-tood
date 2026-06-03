@@ -40,10 +40,10 @@ export type DailyReport = {
   remaining_chicken: number;
   remaining_original_chicken: number;
   remaining_spicy_chicken: number;
-  remaining_chicken_skin: number;
-  remaining_offal: number;
-  remaining_chopped_chicken: number;
+  remaining_ground_chicken: number;
   remaining_drumstick: number;
+  remaining_offal: number;
+  remaining_chicken_skin: number;
   remaining_sticky_rice: number;
   remaining_oil: number;
   order_original_chicken: number;
