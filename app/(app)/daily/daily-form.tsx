@@ -3,7 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { saveDailyReport } from "@/app/actions";
 import { NumberField, TextAreaField } from "@/components/field";
-import { ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, USED_INGREDIENT_ITEMS } from "@/lib/report-items";
+import { ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS } from "@/lib/report-items";
 import { moneyFormatter } from "@/lib/format";
 import { SubmitButton } from "./submit-button";
 import type { Branch, DailyReport } from "@/lib/types";
@@ -115,11 +115,17 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
       </section>
 
       <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
-        <h2 className="text-2xl font-black">4. วัตถุดิบคงเหลือ</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-3">
-          <NumberField label="ไก่คงเหลือ" name="remaining_chicken" defaultValue={existingReport?.remaining_chicken ?? 0} />
-          <NumberField label="ข้าวเหนียวคงเหลือ" name="remaining_sticky_rice" defaultValue={existingReport?.remaining_sticky_rice ?? 0} />
-          <NumberField label="น้ำมันคงเหลือ" name="remaining_oil" defaultValue={existingReport?.remaining_oil ?? 0} />
+        <h2 className="text-2xl font-black">4. สินค้าคงเหลือ</h2>
+        <p className="mt-1 text-sm font-bold text-black/50">กรอกจำนวนคงเหลือปลายวันด้วยมือเพื่อใช้ตรวจสอบสต๊อกของแต่ละสาขา</p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          {REMAINING_INVENTORY_ITEMS.map((item) => (
+            <NumberField
+              key={item.name}
+              label={`${item.label} (${item.unit})`}
+              name={item.name}
+              defaultValue={Number(existingReport?.[item.name] ?? 0)}
+            />
+          ))}
         </div>
       </section>
 

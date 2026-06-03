@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { formatThaiDate, moneyFormatter, numberFormatter } from "@/lib/format";
+import { REMAINING_INVENTORY_ITEMS } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { DailyReport } from "@/lib/types";
 
@@ -36,10 +37,12 @@ export default async function HistoryPage() {
               </div>
               <div className="text-right text-xl font-black text-green-700">{moneyFormatter.format(report.total_sales)}</div>
             </div>
-            <div className="mt-4 grid grid-cols-3 gap-2 text-center text-sm">
-              <div className="rounded-2xl bg-black/5 p-3"><b>ไก่</b><br />{numberFormatter.format(report.remaining_chicken)}</div>
-              <div className="rounded-2xl bg-black/5 p-3"><b>ข้าว</b><br />{numberFormatter.format(report.remaining_sticky_rice)}</div>
-              <div className="rounded-2xl bg-black/5 p-3"><b>น้ำมัน</b><br />{numberFormatter.format(report.remaining_oil)}</div>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-center text-sm sm:grid-cols-4">
+              {REMAINING_INVENTORY_ITEMS.map((item) => (
+                <div key={item.name} className="rounded-2xl bg-black/5 p-3">
+                  <b>{item.label.replace("คงเหลือ", "")}</b><br />{numberFormatter.format(report[item.name] ?? 0)}
+                </div>
+              ))}
             </div>
           </article>
         ))}

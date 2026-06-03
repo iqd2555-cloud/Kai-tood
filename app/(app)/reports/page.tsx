@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { StatCard } from "@/components/stat-card";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { daysAgoISO, formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib/format";
-import { ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, USED_INGREDIENT_ITEMS } from "@/lib/report-items";
+import { ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch, DailyReport } from "@/lib/types";
 
@@ -31,6 +31,14 @@ type NumericReportField = keyof Pick<
   | "used_sticky_rice"
   | "used_chopped_chicken"
   | "used_drumstick"
+  | "remaining_original_chicken"
+  | "remaining_spicy_chicken"
+  | "remaining_chicken_skin"
+  | "remaining_offal"
+  | "remaining_chopped_chicken"
+  | "remaining_drumstick"
+  | "remaining_sticky_rice"
+  | "remaining_oil"
   | "order_original_chicken"
   | "order_spicy_chicken"
   | "order_offal"
@@ -67,13 +75,13 @@ function latestReportsByBranch(reports: DailyReport[]) {
   return Array.from(latest.values());
 }
 
-function sumLatestRemaining(reports: DailyReport[], field: "remaining_chicken" | "remaining_sticky_rice" | "remaining_oil") {
+function sumLatestRemaining(reports: DailyReport[], field: NumericReportField) {
   return latestReportsByBranch(reports).reduce((sum, report) => sum + Number(report[field] ?? 0), 0);
 }
 
 function InventoryFlowSummary({ title, reports }: { title: string; reports: DailyReport[] }) {
   const rows = [
-    { label: "ไก่", received: sumReports(reports, "received_chicken"), used: sumChickenUsed(reports), remaining: sumLatestRemaining(reports, "remaining_chicken"), order: sumChickenOrder(reports), unit: "กิโลกรัม" },
+    { label: "ไก่", received: sumReports(reports, "received_chicken"), used: sumChickenUsed(reports), remaining: REMAINING_INVENTORY_ITEMS.slice(0, 6).reduce((sum, item) => sum + sumLatestRemaining(reports, item.name), 0), order: sumChickenOrder(reports), unit: "กิโลกรัม" },
     { label: "ข้าวเหนียว", received: sumReports(reports, "received_sticky_rice"), used: sumReports(reports, "used_sticky_rice"), remaining: sumLatestRemaining(reports, "remaining_sticky_rice"), order: sumReports(reports, "order_sticky_rice"), unit: "กิโลกรัม" },
     { label: "น้ำมัน", received: sumReports(reports, "received_oil"), used: sumReports(reports, "used_oil"), remaining: sumLatestRemaining(reports, "remaining_oil"), order: sumReports(reports, "order_oil"), unit: "กิโลกรัม" },
   ];
@@ -101,6 +109,30 @@ function InventoryFlowSummary({ title, reports }: { title: string; reports: Dail
         ))}
       </div>
       <p className="mt-2 text-xs font-bold text-black/50">หน่วย: กิโลกรัม • คงเหลือใช้ค่าล่าสุดของแต่ละสาขาในช่วงวันที่เลือก</p>
+    </section>
+  );
+}
+
+function RemainingInventoryGrid({
+  title,
+  reports,
+}: {
+  title: string;
+  reports: DailyReport[];
+}) {
+  return (
+    <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
+      <h2 className="text-2xl font-black">{title}</h2>
+      <p className="mt-1 text-sm font-bold text-black/50">คงเหลือใช้ค่าล่าสุดของแต่ละสาขาในช่วงวันที่เลือก</p>
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        {REMAINING_INVENTORY_ITEMS.map((item) => (
+          <div key={item.name} className="rounded-2xl bg-black/[0.04] p-3 text-center">
+            <div className="text-sm font-black">{item.label}</div>
+            <div className="text-2xl font-black">{numberFormatter.format(sumLatestRemaining(reports, item.name))}</div>
+            <div className="text-xs font-bold text-black/50">{item.unit}</div>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
@@ -220,6 +252,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
 
       <QuantityGrid title="วัตถุดิบรับเข้ารวมทุกสาขา" items={RECEIVED_INGREDIENT_ITEMS} reports={allReports} />
       <QuantityGrid title="วัตถุดิบใช้ไปรวมทุกสาขา" items={USED_INGREDIENT_ITEMS} reports={allReports} />
+      <RemainingInventoryGrid title="สินค้าคงเหลือรวมทุกสาขา" reports={allReports} />
       <QuantityGrid title="รายการสั่งวัตถุดิบเพิ่มรวมทุกสาขา" items={ORDER_REQUEST_ITEMS} reports={allReports} />
       <InventoryFlowSummary title="ระบบรายงานวัตถุดิบรวมทุกสาขา" reports={allReports} />
 
@@ -259,6 +292,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
 
       <QuantityGrid title={`วัตถุดิบรับเข้าของ${selectedBranch?.name ?? "สาขา"}`} items={RECEIVED_INGREDIENT_ITEMS} reports={branchReports} />
       <QuantityGrid title={`วัตถุดิบใช้ไปของ${selectedBranch?.name ?? "สาขา"}`} items={USED_INGREDIENT_ITEMS} reports={branchReports} />
+      <RemainingInventoryGrid title={`สินค้าคงเหลือของ${selectedBranch?.name ?? "สาขา"}`} reports={branchReports} />
       <QuantityGrid title={`รายการสั่งวัตถุดิบเพิ่มของ${selectedBranch?.name ?? "สาขา"}`} items={ORDER_REQUEST_ITEMS} reports={branchReports} />
       <InventoryFlowSummary title={`ระบบรายงานวัตถุดิบของ${selectedBranch?.name ?? "สาขา"}`} reports={branchReports} />
 

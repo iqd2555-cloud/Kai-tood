@@ -23,7 +23,12 @@ const dailyReportSchema = z.object({
   used_sticky_rice: z.coerce.number().min(0),
   used_chopped_chicken: z.coerce.number().min(0),
   used_drumstick: z.coerce.number().min(0),
-  remaining_chicken: z.coerce.number().min(0),
+  remaining_original_chicken: z.coerce.number().min(0),
+  remaining_spicy_chicken: z.coerce.number().min(0),
+  remaining_chicken_skin: z.coerce.number().min(0),
+  remaining_offal: z.coerce.number().min(0),
+  remaining_chopped_chicken: z.coerce.number().min(0),
+  remaining_drumstick: z.coerce.number().min(0),
   remaining_sticky_rice: z.coerce.number().min(0),
   remaining_oil: z.coerce.number().min(0),
   order_original_chicken: z.coerce.number().min(0),
@@ -95,6 +100,7 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
   const { error } = await supabase.from("daily_reports").upsert(
     {
       ...payload,
+      remaining_chicken: payload.remaining_original_chicken,
       branch_name: profile.role === "staff" ? profile.branch_name ?? branchData?.name ?? payload.branch_name : branchData?.name ?? payload.branch_name,
       requested_items: allRequestedItems,
       order_other_items: otherItems.success ? otherItems.data.filter((item) => item.name.trim() && item.amount > 0) : [],

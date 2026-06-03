@@ -16,6 +16,17 @@ export const USED_INGREDIENT_ITEMS = [
   { label: "ข้าวเหนียว", name: "used_sticky_rice", unit: "กิโลกรัม" },
 ] as const;
 
+export const REMAINING_INVENTORY_ITEMS = [
+  { label: "ไก่ทอดดั้งเดิมคงเหลือ", name: "remaining_original_chicken", unit: "กิโลกรัม" },
+  { label: "ไก่ทอดพริกคงเหลือ", name: "remaining_spicy_chicken", unit: "กิโลกรัม" },
+  { label: "หนังไก่คงเหลือ", name: "remaining_chicken_skin", unit: "กิโลกรัม" },
+  { label: "เครื่องในไก่คงเหลือ", name: "remaining_offal", unit: "กิโลกรัม" },
+  { label: "ไก่สับคงเหลือ", name: "remaining_chopped_chicken", unit: "กิโลกรัม" },
+  { label: "น่องไก่คงเหลือ", name: "remaining_drumstick", unit: "กิโลกรัม" },
+  { label: "ข้าวเหนียวคงเหลือ", name: "remaining_sticky_rice", unit: "กิโลกรัม" },
+  { label: "น้ำมันคงเหลือ", name: "remaining_oil", unit: "กิโลกรัม" },
+] as const;
+
 export const ORDER_REQUEST_ITEMS = [
   { label: "ไก่ดั้งเดิม", name: "order_original_chicken", unit: "กิโลกรัม" },
   { label: "ไก่เผ็ด", name: "order_spicy_chicken", unit: "กิโลกรัม" },
@@ -30,6 +41,7 @@ export const ORDER_REQUEST_ITEMS = [
 
 export type ReceivedIngredientField = (typeof RECEIVED_INGREDIENT_ITEMS)[number]["name"];
 export type UsedIngredientField = (typeof USED_INGREDIENT_ITEMS)[number]["name"];
+export type RemainingInventoryField = (typeof REMAINING_INVENTORY_ITEMS)[number]["name"];
 export type OrderRequestField = (typeof ORDER_REQUEST_ITEMS)[number]["name"];
 
 export function formatStructuredOrderItems(report: Pick<DailyReport, OrderRequestField | "requested_items" | "order_other_items">) {
