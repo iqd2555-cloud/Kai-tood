@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { formatThaiDate, moneyFormatter, numberFormatter } from "@/lib/format";
-import { ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS } from "@/lib/report-items";
+import { ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS, getRemainingChickenTotal } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { DailyReport } from "@/lib/types";
 
@@ -84,6 +84,9 @@ export default async function MyReportsPage() {
 
               <section className="rounded-2xl border border-black/10 bg-black/[0.03] p-3">
                 <h3 className="text-base font-black text-black">หมวด 4: สินค้าคงเหลือปิดร้าน</h3>
+                <div className="mt-2 rounded-xl bg-[#ffc400]/30 p-3 text-sm font-black text-black">
+                  รวมไก่คงเหลือทั้งหมด {numberFormatter.format(getRemainingChickenTotal(report))} กิโลกรัม
+                </div>
                 <div className="mt-2 grid grid-cols-1 gap-2 text-sm font-bold sm:grid-cols-2">
                   {REMAINING_INVENTORY_ITEMS.map((item) => (
                     <div key={item.name} className="rounded-xl bg-white p-2">

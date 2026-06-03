@@ -44,6 +44,21 @@ export type UsedIngredientField = (typeof USED_INGREDIENT_ITEMS)[number]["name"]
 export type RemainingInventoryField = (typeof REMAINING_INVENTORY_ITEMS)[number]["name"];
 export type OrderRequestField = (typeof ORDER_REQUEST_ITEMS)[number]["name"];
 
+export const REMAINING_CHICKEN_FIELDS = [
+  "remaining_original_chicken",
+  "remaining_spicy_chicken",
+  "remaining_ground_chicken",
+  "remaining_drumstick",
+  "remaining_offal",
+  "remaining_chicken_skin",
+] as const satisfies readonly RemainingInventoryField[];
+
+export type RemainingChickenField = (typeof REMAINING_CHICKEN_FIELDS)[number];
+
+export function getRemainingChickenTotal(report: Pick<DailyReport, RemainingChickenField>) {
+  return REMAINING_CHICKEN_FIELDS.reduce((sum, field) => sum + Number(report[field] ?? 0), 0);
+}
+
 export function formatStructuredOrderItems(report: Pick<DailyReport, OrderRequestField | "requested_items" | "order_other_items">) {
   const lines = ORDER_REQUEST_ITEMS
     .map((item) => {

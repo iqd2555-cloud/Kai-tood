@@ -4,7 +4,7 @@ import { DashboardRealtime } from "@/components/dashboard-realtime";
 import { StatCard } from "@/components/stat-card";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { formatThaiDate, moneyFormatter, numberFormatter, todayISO, daysAgoISO } from "@/lib/format";
-import { REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS } from "@/lib/report-items";
+import { REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS, getRemainingChickenTotal } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch, DailyReport } from "@/lib/types";
 
@@ -52,13 +52,7 @@ export default async function DashboardPage() {
   const weekSales = sumReports(historyReports, "total_sales");
   const lowStockReports = reports.filter((report) => {
     const branch = report.branches;
-    const remainingChicken =
-      Number(report.remaining_original_chicken ?? 0) +
-      Number(report.remaining_spicy_chicken ?? 0) +
-      Number(report.remaining_chicken_skin ?? 0) +
-      Number(report.remaining_offal ?? 0) +
-      Number(report.remaining_ground_chicken ?? 0) +
-      Number(report.remaining_drumstick ?? 0);
+    const remainingChicken = getRemainingChickenTotal(report);
     return Boolean(
       branch &&
         (remainingChicken <= branch.low_chicken_threshold ||
@@ -114,7 +108,7 @@ export default async function DashboardPage() {
           <div className="mt-3 space-y-2">
             {lowStockReports.map((report) => (
               <div key={report.id} className="rounded-2xl bg-white p-3 font-bold text-red-900">
-                {report.branches?.name}: ไก่รวม {numberFormatter.format(Number(report.remaining_original_chicken ?? 0) + Number(report.remaining_spicy_chicken ?? 0) + Number(report.remaining_chicken_skin ?? 0) + Number(report.remaining_offal ?? 0) + Number(report.remaining_ground_chicken ?? 0) + Number(report.remaining_drumstick ?? 0))}, ข้าวเหนียว {numberFormatter.format(report.remaining_sticky_rice)}, น้ำมัน {numberFormatter.format(report.remaining_oil)}
+                {report.branches?.name}: ไก่รวม {numberFormatter.format(getRemainingChickenTotal(report))}, ข้าวเหนียว {numberFormatter.format(report.remaining_sticky_rice)}, น้ำมัน {numberFormatter.format(report.remaining_oil)}
               </div>
             ))}
           </div>
@@ -140,6 +134,11 @@ export default async function DashboardPage() {
                   <div className="rounded-2xl bg-[#ffc400]/20 p-4 text-center">
                     <div className="text-xs font-bold">ยอดขายรวม</div>
                     <div className="text-3xl font-black">{moneyFormatter.format(report.total_sales)}</div>
+                  </div>
+                  <div className="rounded-2xl bg-[#ffc400]/30 p-4 text-center">
+                    <div className="text-xs font-bold">รวมไก่คงเหลือทั้งหมด</div>
+                    <div className="text-3xl font-black">{numberFormatter.format(getRemainingChickenTotal(report))}</div>
+                    <div className="text-xs font-bold text-black/60">กิโลกรัม</div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
                     {REMAINING_INVENTORY_ITEMS.map((item) => (
