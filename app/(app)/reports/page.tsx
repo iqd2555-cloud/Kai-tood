@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
+import { DateShortcuts } from "@/components/date-shortcuts";
 import { StatCard } from "@/components/stat-card";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
-import { daysAgoISO, formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib/format";
+import { formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib/format";
 import { ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, REMAINING_CHICKEN_FIELDS, REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS, getRemainingChickenTotal } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch, DailyReport } from "@/lib/types";
@@ -180,8 +181,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
 
   const params = searchParams ? await searchParams : {};
   const today = todayISO();
-  const defaultFrom = daysAgoISO(29);
-  const from = isIsoDate(params.from) ? params.from! : defaultFrom;
+  const from = isIsoDate(params.from) ? params.from! : today;
   const to = isIsoDate(params.to) ? params.to! : today;
 
   const { data: branchesData } = await supabase.from("branches").select("*").order("name").returns<Branch[]>();
@@ -230,6 +230,10 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       </section>
 
       <form className="grid gap-3 rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm sm:grid-cols-[1fr_1fr_1.4fr_auto]" action="/reports">
+        <div className="sm:col-span-4">
+          <p className="mb-2 text-sm font-black text-black/60">ปุ่มลัดช่วงวันที่</p>
+          <DateShortcuts basePath="/reports" branchId={selectedBranchId} />
+        </div>
         <label className="block">
           <span className="mb-2 block font-black">วันที่เริ่มต้น</span>
           <input className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 px-4 text-lg font-bold" type="date" name="from" defaultValue={from} />
