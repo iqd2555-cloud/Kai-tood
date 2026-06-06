@@ -1,17 +1,41 @@
 import { redirect } from "next/navigation";
+import { DateShortcuts } from "@/components/date-shortcuts";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
-import { formatThaiDate, moneyFormatter, numberFormatter } from "@/lib/format";
+import { formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib/format";
 import { ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS, getRemainingChickenTotal } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { DailyReport } from "@/lib/types";
 
-export default async function MyReportsPage() {
+type SearchParams = {
+  from?: string;
+  to?: string;
+};
+
+type MyReportsPageProps = {
+  searchParams?: Promise<SearchParams>;
+};
+
+function isIsoDate(value: string | undefined) {
+  return Boolean(value?.match(/^\d{4}-\d{2}-\d{2}$/));
+}
+
+export default async function MyReportsPage({ searchParams }: MyReportsPageProps) {
   const profile = await getCurrentProfile();
 
   const supabase = await createSupabaseServerClient();
   if (!supabase) redirect("/login?setup=supabase");
 
-  let query = supabase.from("daily_reports").select("*").order("report_date", { ascending: false }).limit(60);
+  const params = searchParams ? await searchParams : {};
+  const today = todayISO();
+  const from = isIsoDate(params.from) ? params.from! : today;
+  const to = isIsoDate(params.to) ? params.to! : today;
+
+  let query = supabase
+    .from("daily_reports")
+    .select("*")
+    .gte("report_date", from)
+    .lte("report_date", to)
+    .order("report_date", { ascending: false });
   if (!isOwner(profile) && profile.branch_id) {
     query = query.eq("branch_id", profile.branch_id);
   }
@@ -25,6 +49,27 @@ export default async function MyReportsPage() {
         <p className="text-sm font-bold text-[#ffc400]">{isOwner(profile) ? "สำหรับเจ้าของร้าน" : "สำหรับพนักงาน"}</p>
         <h1 className="mt-2 text-3xl font-black">รายงานของฉัน</h1>
         <p className="mt-1 text-sm text-white/80">{isOwner(profile) ? "เห็นรายงานทุกสาขา" : "เห็นเฉพาะสาขาของคุณ"}</p>
+      </section>
+
+      <form className="grid gap-3 rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm sm:grid-cols-[1fr_1fr_auto]" action="/my-reports">
+        <div className="sm:col-span-3">
+          <p className="mb-2 text-sm font-black text-black/60">ปุ่มลัดช่วงวันที่</p>
+          <DateShortcuts basePath="/my-reports" />
+        </div>
+        <label className="block">
+          <span className="mb-2 block font-black">วันที่เริ่มต้น</span>
+          <input className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 px-4 text-lg font-bold" type="date" name="from" defaultValue={from} />
+        </label>
+        <label className="block">
+          <span className="mb-2 block font-black">วันที่สิ้นสุด</span>
+          <input className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 px-4 text-lg font-bold" type="date" name="to" defaultValue={to} />
+        </label>
+        <button className="focus-ring min-h-14 self-end rounded-2xl bg-[#ffc400] px-6 text-lg font-black text-black shadow-sm">ดูรายงาน</button>
+      </form>
+
+      <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
+        <h2 className="text-2xl font-black">ช่วงวันที่ {formatThaiDate(from)} - {formatThaiDate(to)}</h2>
+        <p className="mt-1 text-sm font-bold text-black/60">พบ {numberFormatter.format(reports.length)} รายการ</p>
       </section>
 
       {reports.map((report) => {
