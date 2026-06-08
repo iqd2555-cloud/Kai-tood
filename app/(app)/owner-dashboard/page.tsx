@@ -12,6 +12,11 @@ type BranchNoteRow = {
 };
 
 const CHICKEN_COST_PER_KG = 65;
+const ESTIMATED_PROFIT_RATE = 0.35;
+
+function estimatedProfit(totalSales: number) {
+  return totalSales * ESTIMATED_PROFIT_RATE;
+}
 
 function pickNumber(row: ProfitRow, keys: string[]) {
   for (const key of keys) {
@@ -117,6 +122,9 @@ export default async function OwnerDashboardPage() {
   const salesToday = rangeSum(rows, today, today, "totalSales");
   const sales7 = rangeSum(rows, sevenStart, today, "totalSales");
   const salesMonth = sumMetric(monthRows, "totalSales");
+  const estimatedProfitToday = estimatedProfit(salesToday);
+  const estimatedProfit7 = estimatedProfit(sales7);
+  const estimatedProfitMonth = estimatedProfit(salesMonth);
 
   const chickenKgToday = rangeSum(rows, today, today, "chickenKg");
   const chickenKg7 = rangeSum(rows, sevenStart, today, "chickenKg");
@@ -166,6 +174,31 @@ export default async function OwnerDashboardPage() {
       <section className="rounded-3xl bg-[#111111] p-5 text-white shadow-xl">
         <p className="text-sm font-bold text-[#ffc400]">รายงาน Owner</p>
         <h1 className="mt-1 text-2xl font-black">ภาพรวมยอดขาย วัตถุดิบ และกำไร</h1>
+      </section>
+
+      <section className="rounded-3xl bg-white p-4 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black">กำไรประมาณการ</h2>
+            <p className="mt-1 text-xs font-bold text-black/60">คำนวณจากยอดขายรวม × 0.35 แบบ Real-time</p>
+          </div>
+          <span className="rounded-full bg-[#ffc400] px-3 py-1 text-xs font-black text-black">Owner เท่านั้น</span>
+        </div>
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <article className="rounded-3xl border border-yellow-600/20 bg-[#ffc400] p-5 text-black shadow-sm">
+            <p className="text-sm font-black opacity-70">กำไรประมาณการวันนี้</p>
+            <p className="mt-2 text-3xl font-black tracking-tight">{moneyFormatter.format(estimatedProfitToday)}</p>
+          </article>
+          <article className="rounded-3xl border border-black/10 bg-[#111111] p-5 text-white shadow-sm">
+            <p className="text-sm font-black text-white/70">กำไรประมาณการ 7 วัน</p>
+            <p className="mt-2 text-3xl font-black tracking-tight text-[#ffc400]">{moneyFormatter.format(estimatedProfit7)}</p>
+          </article>
+          <article className="rounded-3xl border border-black/10 bg-white p-5 text-black shadow-sm">
+            <p className="text-sm font-black opacity-70">กำไรประมาณการเดือนนี้</p>
+            <p className="mt-2 text-3xl font-black tracking-tight">{moneyFormatter.format(estimatedProfitMonth)}</p>
+          </article>
+        </div>
+        <p className="mt-3 text-xs font-bold text-black/60">* คำนวณจากกำไรเฉลี่ย 7 บาทต่อห่อ (ประมาณการ)</p>
       </section>
 
       <section className="rounded-3xl bg-white p-4 shadow-sm">
