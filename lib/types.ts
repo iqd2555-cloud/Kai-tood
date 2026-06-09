@@ -97,3 +97,51 @@ export type ReportTotals = {
   branch_count: number;
   report_count: number;
 };
+
+export type CounterPriceItem = {
+  id: string;
+  item_name: string;
+  price: number;
+  status: "active" | "inactive";
+  created_at: string;
+};
+
+export type CounterOrderStatus = "success" | "cancelled";
+export type CounterPrintStatus = "pending" | "printed" | "reprinted";
+
+export type CounterOrderItem = {
+  id: string;
+  order_id: string;
+  item_name: string;
+  price: number;
+  quantity: number;
+  line_total: number;
+};
+
+export type CounterCancellation = {
+  id: string;
+  order_id: string;
+  cancelled_by: string;
+  cancelled_at: string;
+  reason: string;
+  original_total: number;
+  profiles?: Pick<Profile, "full_name" | "role"> | null;
+};
+
+export type CounterOrder = {
+  id: string;
+  order_number: string;
+  branch_id: string;
+  user_id: string;
+  order_date: string;
+  order_time: string;
+  status: CounterOrderStatus;
+  total_amount: number;
+  print_status: CounterPrintStatus;
+  created_at: string;
+  updated_at: string;
+  branches?: Pick<Branch, "name" | "code"> | null;
+  profiles?: Pick<Profile, "full_name" | "role"> | null;
+  counter_order_items?: CounterOrderItem[] | null;
+  counter_cancellations?: CounterCancellation[] | null;
+};
