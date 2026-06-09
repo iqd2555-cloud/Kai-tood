@@ -22,6 +22,12 @@ type PriceRollup = {
   total: number;
 };
 
+const DEFAULT_COUNTER_PRICE_ITEMS = [
+  { item_name: "ไก่ทอดห่อ 20 บาท", price: 20 },
+  { item_name: "ไก่ทอดห่อ 25 บาท", price: 25 },
+  { item_name: "ไก่ทอดห่อ 30 บาท", price: 30 },
+];
+
 function isUuid(value: string | undefined) {
   return Boolean(value?.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i));
 }
@@ -98,13 +104,11 @@ export default async function CounterOrdersPage({ searchParams }: CounterOrdersP
 
   const selectedBranch = branches.find((branch) => branch.id === selectedBranchId) ?? profile.branch;
 
-  const { data: priceItemsData } = await supabase
-    .from("counter_price_items")
-    .select("*")
-    .eq("status", "active")
-    .order("price")
-    .returns<CounterPriceItem[]>();
-  const priceItems = (priceItemsData ?? []).map((item) => ({ ...item, price: Number(item.price) }));
+  const { data: priceItemsData } = await supabase.rpc("get_counter_price_items");
+  const rawPriceItems = Array.isArray(priceItemsData) && priceItemsData.length > 0
+    ? (priceItemsData as Pick<CounterPriceItem, "item_name" | "price">[])
+    : DEFAULT_COUNTER_PRICE_ITEMS;
+  const priceItems = rawPriceItems.map((item) => ({ ...item, price: Number(item.price) }));
 
   if (staffOrderInputEnabled) {
     return (

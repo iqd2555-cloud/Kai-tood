@@ -464,6 +464,18 @@ on conflict (price) do update
 set item_name = excluded.item_name,
     status = excluded.status;
 
+create or replace function public.get_counter_price_items()
+returns table(item_name text, price numeric)
+language sql
+security definer
+set search_path = public
+as $$
+  select cpi.item_name, cpi.price
+  from public.counter_price_items cpi
+  where cpi.status = 'active'
+  order by cpi.price;
+$$;
+
 create or replace function public.can_use_counter_branch(target_branch_id uuid)
 returns boolean
 language sql
@@ -503,6 +515,10 @@ begin
 
   if profile_row.role <> 'owner' and profile_row.branch_id <> p_branch_id then
     raise exception 'Branch is not allowed for this user';
+  end if;
+
+  if p_price is null or p_price <= 0 then
+    raise exception 'Price is invalid';
   end if;
 
   if p_quantity is null or p_quantity <= 0 or p_quantity > 999 then
@@ -636,6 +652,7 @@ begin
 end;
 $$;
 
+grant execute on function public.get_counter_price_items() to authenticated;
 grant execute on function public.can_use_counter_branch(uuid) to authenticated;
 grant execute on function public.create_counter_order(uuid, numeric, integer) to authenticated;
 grant execute on function public.cancel_latest_counter_order(uuid, text) to authenticated;
