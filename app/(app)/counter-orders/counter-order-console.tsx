@@ -146,7 +146,7 @@ export function StaffCounterOrderInput({ branchId, priceItems }: StaffCounterOrd
     if (!orderState.ok || !orderState.message) return;
 
     setBulkResetSignal((current) => current + 1);
-    setSuccessToast("✅ บันทึกออเดอร์แล้ว");
+    setSuccessToast("✅ บันทึกแล้ว");
 
     const timeout = window.setTimeout(() => setSuccessToast(""), 1600);
     return () => window.clearTimeout(timeout);

@@ -77,7 +77,7 @@ export async function createCounterOrder(_: ActionState, formData: FormData): Pr
   if (error) return { ok: false, message: error.message };
 
   revalidatePath("/counter-orders");
-  if (access.staffLimited) return { ok: true, message: "✅ บันทึกออเดอร์แล้ว" };
+  if (access.staffLimited) return { ok: true, message: "✅ บันทึกแล้ว" };
 
   return { ok: true, message: `บันทึก ${data?.order_number ?? "ออเดอร์ใหม่"} ยอด ${Number(data?.total_amount ?? price * quantity).toLocaleString("th-TH")} บาทแล้ว` };
 }
