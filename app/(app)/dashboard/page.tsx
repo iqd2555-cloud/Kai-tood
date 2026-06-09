@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { DashboardRealtime } from "@/components/dashboard-realtime";
 import { StatCard } from "@/components/stat-card";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
+import { canUseStaffCounterOrder } from "@/lib/counter-access";
 import { formatThaiDate, moneyFormatter, numberFormatter, todayISO, daysAgoISO } from "@/lib/format";
 import { REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS, getRemainingChickenTotal } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
@@ -14,6 +15,7 @@ function sumReports(reports: DailyReport[], field: keyof Pick<DailyReport, "tota
 
 export default async function DashboardPage() {
   const profile = await getCurrentProfile();
+  if (canUseStaffCounterOrder(profile)) redirect("/counter-orders");
   const supabase = await createSupabaseServerClient();
   if (!supabase) redirect("/login?setup=supabase");
 

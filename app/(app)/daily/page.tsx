@@ -1,12 +1,14 @@
 import { redirect } from "next/navigation";
 import { DailyForm } from "./daily-form";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
+import { canUseStaffCounterOrder } from "@/lib/counter-access";
 import { todayISO } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch, DailyReport } from "@/lib/types";
 
 export default async function DailyPage() {
   const profile = await getCurrentProfile();
+  if (canUseStaffCounterOrder(profile)) redirect("/counter-orders");
   const supabase = await createSupabaseServerClient();
   if (!supabase) redirect("/login?setup=supabase");
 

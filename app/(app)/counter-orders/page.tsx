@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CounterOrderConsole } from "./counter-order-console";
+import { CounterOrderConsole, StaffCounterOrderInput } from "./counter-order-console";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
+import { canUseStaffCounterOrder } from "@/lib/counter-access";
 import { formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch, CounterCancellation, CounterOrder, CounterPriceItem } from "@/lib/types";
@@ -56,13 +57,15 @@ function buildRollups(orders: CounterOrder[]) {
 export default async function CounterOrdersPage({ searchParams }: CounterOrdersPageProps) {
   const profile = await getCurrentProfile();
 
-  if (!isOwner(profile)) {
+  const staffOrderInputEnabled = canUseStaffCounterOrder(profile);
+
+  if (!isOwner(profile) && !staffOrderInputEnabled) {
     return (
       <div className="space-y-4">
         <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">
           <p className="text-sm font-bold text-[#ffc400]">เหนียวไก่เยอะโคตร</p>
           <h1 className="mt-2 text-3xl font-black">ระบบนับออเดอร์หน้าร้าน</h1>
-          <p className="mt-2 text-white/70">Phase 1 เป็น Owner Test Mode สำหรับเจ้าของร้านก่อน ส่วน Staff Account เตรียมโครงสร้างไว้สำหรับเฟสถัดไป</p>
+          <p className="mt-2 text-white/70">บัญชี Staff นี้ยังไม่ได้เปิดใช้ระบบนับออเดอร์หน้าร้าน</p>
         </section>
         <Link href="/dashboard" className="focus-ring block rounded-3xl bg-[#ffc400] px-5 py-5 text-center text-xl font-black text-black shadow-lg">กลับหน้า Dashboard</Link>
       </div>
@@ -102,6 +105,15 @@ export default async function CounterOrdersPage({ searchParams }: CounterOrdersP
     .order("price")
     .returns<CounterPriceItem[]>();
   const priceItems = (priceItemsData ?? []).map((item) => ({ ...item, price: Number(item.price) }));
+
+  if (staffOrderInputEnabled) {
+    return (
+      <StaffCounterOrderInput
+        branchId={selectedBranchId}
+        priceItems={priceItems.map((item) => ({ price: item.price, item_name: item.item_name }))}
+      />
+    );
+  }
 
   const { data: ordersData } = await supabase
     .from("counter_orders")

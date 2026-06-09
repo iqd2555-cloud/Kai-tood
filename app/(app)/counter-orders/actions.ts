@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getCurrentProfile } from "@/lib/auth";
+import { canUseStaffCounterOrder } from "@/lib/counter-access";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 const orderActionSchema = z.object({
@@ -35,10 +36,13 @@ function parseShortcut(shortcut: string | undefined) {
 
 async function assertBranchAccess(branchId: string) {
   const profile = await getCurrentProfile();
+  if (profile.role === "staff" && !canUseStaffCounterOrder(profile)) {
+    return { ok: false, message: "บัญชีนี้ยังไม่ได้เปิดใช้ระบบนับออเดอร์หน้าร้าน" };
+  }
   if (profile.role === "staff" && profile.branch_id !== branchId) {
     return { ok: false, message: "พนักงานกดขายได้เฉพาะสาขาของตัวเอง" };
   }
-  return { ok: true, message: "" };
+  return { ok: true, message: "", staffLimited: canUseStaffCounterOrder(profile) };
 }
 
 export async function createCounterOrder(_: ActionState, formData: FormData): Promise<ActionState> {
@@ -69,6 +73,8 @@ export async function createCounterOrder(_: ActionState, formData: FormData): Pr
   if (error) return { ok: false, message: error.message };
 
   revalidatePath("/counter-orders");
+  if (access.staffLimited) return { ok: true, message: "บันทึกออเดอร์สำเร็จ" };
+
   return { ok: true, message: `บันทึก ${data?.order_number ?? "ออเดอร์ใหม่"} ยอด ${Number(data?.total_amount ?? price * quantity).toLocaleString("th-TH")} บาทแล้ว` };
 }
 

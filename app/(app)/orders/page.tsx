@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { DateShortcuts } from "@/components/date-shortcuts";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
+import { canUseStaffCounterOrder } from "@/lib/counter-access";
 import { formatThaiDate, numberFormatter, todayISO } from "@/lib/format";
 import { formatStructuredOrderItems } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
@@ -21,6 +22,7 @@ function isIsoDate(value: string | undefined) {
 
 export default async function OrdersPage({ searchParams }: OrdersPageProps) {
   const profile = await getCurrentProfile();
+  if (canUseStaffCounterOrder(profile)) redirect("/counter-orders");
   if (!isOwner(profile)) redirect("/dashboard");
 
   const supabase = await createSupabaseServerClient();
