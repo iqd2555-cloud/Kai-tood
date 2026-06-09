@@ -11,6 +11,7 @@ const orderActionSchema = z.object({
   price: z.coerce.number().min(1).optional(),
   quantity: z.coerce.number().int().min(1).max(999).optional(),
   shortcut: z.string().optional(),
+  entry_mode: z.enum(["quick", "bulk"]).optional(),
 });
 
 const cancelActionSchema = z.object({
@@ -57,6 +58,9 @@ export async function createCounterOrder(_: ActionState, formData: FormData): Pr
 
   const access = await assertBranchAccess(parsed.data.branch_id);
   if (!access.ok) return access;
+  if (access.staffLimited && parsed.data.entry_mode === "bulk" && quantity < 6) {
+    return { ok: false, message: "กรุณากรอกจำนวนตั้งแต่ 6 ห่อขึ้นไป" };
+  }
 
   const supabase = await createSupabaseServerClient();
   if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์" };
@@ -73,7 +77,7 @@ export async function createCounterOrder(_: ActionState, formData: FormData): Pr
   if (error) return { ok: false, message: error.message };
 
   revalidatePath("/counter-orders");
-  if (access.staffLimited) return { ok: true, message: "บันทึกออเดอร์สำเร็จ" };
+  if (access.staffLimited) return { ok: true, message: "✅ บันทึกออเดอร์แล้ว" };
 
   return { ok: true, message: `บันทึก ${data?.order_number ?? "ออเดอร์ใหม่"} ยอด ${Number(data?.total_amount ?? price * quantity).toLocaleString("th-TH")} บาทแล้ว` };
 }

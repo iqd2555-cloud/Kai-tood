@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useActionState } from "react";
+import { useEffect, useMemo, useState, useActionState } from "react";
 import { cancelLatestCounterOrder, createCounterOrder, reprintLatestCounterOrder } from "./actions";
 
 type CounterOrderConsoleProps = {
@@ -66,26 +66,68 @@ function StaffQuickSaleCard({ action, branchId, item, pending }: { action: (form
   );
 }
 
-function StaffBulkSaleCard({ action, branchId, item, pending }: { action: (formData: FormData) => void; branchId: string; item: { price: number; item_name: string }; pending: boolean }) {
-  const [quantity, setQuantity] = useState(6);
+function StaffBulkSaleCard({
+  action,
+  branchId,
+  item,
+  pending,
+  resetSignal,
+}: {
+  action: (formData: FormData) => void;
+  branchId: string;
+  item: { price: number; item_name: string };
+  pending: boolean;
+  resetSignal: number;
+}) {
+  const [quantity, setQuantity] = useState("");
+  const [warning, setWarning] = useState("");
+
+  useEffect(() => {
+    setQuantity("");
+    setWarning("");
+  }, [resetSignal]);
+
+  function validateQuantity() {
+    const numericQuantity = Number(quantity);
+    if (!quantity || !Number.isFinite(numericQuantity) || numericQuantity < 6) {
+      setWarning("กรุณากรอกจำนวนตั้งแต่ 6 ห่อขึ้นไป");
+      return false;
+    }
+    setWarning("");
+    return true;
+  }
 
   return (
-    <form action={action} className="rounded-[1.5rem] bg-[#111111] p-4 text-white shadow-sm">
+    <form
+      action={action}
+      className="rounded-[1.5rem] bg-[#111111] p-4 text-white shadow-sm"
+      noValidate
+      onSubmit={(event) => {
+        if (!validateQuantity()) event.preventDefault();
+      }}
+    >
       <h3 className="text-2xl font-black">ราคา {item.price} บาท</h3>
       <p className="mt-1 text-sm font-bold text-white/60">กรอกจำนวนตั้งแต่ 6 ขึ้นไป</p>
       <input type="hidden" name="branch_id" value={branchId} />
       <input type="hidden" name="price" value={item.price} />
+      <input type="hidden" name="entry_mode" value="bulk" />
       <label className="mt-4 block">
         <span className="mb-2 block text-sm font-black text-[#ffc400]">จำนวนห่อ</span>
         <input
-          className="focus-ring min-h-16 w-full rounded-2xl border-2 border-white/20 bg-black px-4 text-center text-4xl font-black text-[#ffc400]"
+          className="focus-ring min-h-16 w-full rounded-2xl border-2 border-white/20 bg-black px-4 text-center text-4xl font-black text-[#ffc400] placeholder:text-xl placeholder:text-[#ffc400]/45"
           inputMode="numeric"
           min={6}
           name="quantity"
+          placeholder="กรอกจำนวน 6 ขึ้นไป"
           type="number"
           value={quantity}
-          onChange={(event) => setQuantity(Math.max(6, Number(event.target.value) || 6))}
+          onBlur={validateQuantity}
+          onChange={(event) => {
+            setQuantity(event.target.value);
+            if (warning) setWarning("");
+          }}
         />
+        {warning && <p className="mt-2 rounded-2xl bg-red-100 px-3 py-2 text-center text-sm font-black text-red-900" role="alert">{warning}</p>}
       </label>
       <button className="focus-ring mt-4 min-h-16 w-full rounded-2xl bg-[#ffc400] px-4 text-xl font-black text-black shadow active:scale-[0.99] disabled:opacity-60" disabled={pending} type="submit">
         บันทึก
@@ -96,7 +138,19 @@ function StaffBulkSaleCard({ action, branchId, item, pending }: { action: (formD
 
 export function StaffCounterOrderInput({ branchId, priceItems }: StaffCounterOrderInputProps) {
   const [orderState, orderAction, orderPending] = useActionState(createCounterOrder, initialState);
+  const [successToast, setSuccessToast] = useState("");
+  const [bulkResetSignal, setBulkResetSignal] = useState(0);
   const limitedPriceItems = availableStaffPriceItems(priceItems);
+
+  useEffect(() => {
+    if (!orderState.ok || !orderState.message) return;
+
+    setBulkResetSignal((current) => current + 1);
+    setSuccessToast("✅ บันทึกออเดอร์แล้ว");
+
+    const timeout = window.setTimeout(() => setSuccessToast(""), 1600);
+    return () => window.clearTimeout(timeout);
+  }, [orderState]);
 
   return (
     <div className="space-y-5">
@@ -122,11 +176,25 @@ export function StaffCounterOrderInput({ branchId, priceItems }: StaffCounterOrd
           <h2 className="text-2xl font-black">จำนวนมาก</h2>
         </div>
         <div className="grid gap-3 lg:grid-cols-3">
-          {limitedPriceItems.map((item) => <StaffBulkSaleCard key={item.price} action={orderAction} branchId={branchId} item={item} pending={orderPending} />)}
+          {limitedPriceItems.map((item) => (
+            <StaffBulkSaleCard
+              key={item.price}
+              action={orderAction}
+              branchId={branchId}
+              item={item}
+              pending={orderPending}
+              resetSignal={bulkResetSignal}
+            />
+          ))}
         </div>
       </section>
 
-      <SubmitHint message={orderState.message} ok={orderState.ok} />
+      {successToast && (
+        <div className="fixed inset-x-4 bottom-6 z-50 mx-auto max-w-sm rounded-3xl bg-green-600 px-5 py-4 text-center text-xl font-black text-white shadow-2xl" role="status">
+          {successToast}
+        </div>
+      )}
+      {!orderState.ok && <SubmitHint message={orderState.message} ok={orderState.ok} />}
     </div>
   );
 }
