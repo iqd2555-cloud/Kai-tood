@@ -14,6 +14,7 @@ export function AppNav({ profile }: { profile: Profile }) {
         <nav className="flex items-center gap-2 text-sm font-bold">
           <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/daily">กรอกข้อมูล</Link>
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/owner-dashboard">สรุปภาพรวม</Link>}
+          {isOwner && <Link className="focus-ring rounded-full bg-[#ffc400] px-3 py-2 text-black" href="/counter-orders">นับออเดอร์</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/reports">รายงาน</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/orders">สั่งของ</Link>}
           {!isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/my-reports">รายงานของฉัน</Link>}
