@@ -138,3 +138,26 @@ npm run dev
    - `NEXT_PUBLIC_APP_URL` (URL production จริง เช่น `https://your-app.vercel.app`)
 4. Deploy
 5. ทดสอบ `/api/health` และทดสอบติดตั้ง PWA บน Android + iPhone หลัง deploy
+
+## Counter Order production migration checklist
+
+เมื่อหน้า Counter Order แสดงข้อความ `กรุณารัน migration ล่าสุดของระบบนับออเดอร์ แล้วสั่ง reload schema` ให้ใช้ขั้นตอนนี้กับ Supabase production project:
+
+1. Apply pending migrations ทั้งหมดจากโฟลเดอร์ `supabase/migrations/` ตามลำดับเวลา โดย migration ล่าสุดสำหรับการตรวจสอบ production คือ `202606090004_counter_order_production_verification.sql`
+2. Migration `202606090004_counter_order_production_verification.sql` จะตรวจสอบและ fail ทันทีถ้าขาด table หรือ RPC ที่ระบบ Counter Order ต้องใช้ จากนั้นรัน `notify pgrst, 'reload schema';`
+3. หลัง apply migration แล้ว ให้รัน `supabase/counter_order_production_check.sql` ใน Supabase SQL Editor เพื่อดูสถานะ table, RPC function, migration history และ reload schema cache อีกครั้ง
+4. ตารางที่ต้องมีสำหรับ Counter Order:
+   - `public.counter_price_items`
+   - `public.counter_orders`
+   - `public.counter_order_items`
+   - `public.counter_cancellations`
+   - `public.counter_print_logs`
+5. RPC functions ที่ต้องมีสำหรับ Counter Order:
+   - `public.get_counter_price_items()`
+   - `public.can_use_counter_branch(uuid)`
+   - `public.create_counter_order(uuid,numeric,integer)`
+   - `public.cancel_latest_counter_order(uuid,text)`
+   - `public.mark_order_printed(uuid)`
+   - `public.reprint_order(uuid)`
+6. ทดสอบ Staff โดย login ด้วยบัญชี Staff ที่อยู่สาขาของตัวเอง เข้า `/counter-orders` แล้วกดบันทึกออเดอร์หนึ่งรายการ ต้องเห็นข้อความ `✅ บันทึกแล้ว`
+7. ทดสอบ Owner โดย login ด้วยบัญชี Owner เข้า `/counter-orders` เพื่อดูยอดรวมหน้าร้าน และเข้า `/reports` หรือ `/owner-dashboard` เพื่อดูสรุปรายงานทุกสาขา
