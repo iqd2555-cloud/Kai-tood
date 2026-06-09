@@ -10,7 +10,14 @@ type CounterOrderConsoleProps = {
   priceItems: { price: number; item_name: string }[];
 };
 
+type StaffCounterOrderInputProps = {
+  branchId: string;
+  priceItems: { price: number; item_name: string }[];
+};
+
 const shortcutQuantities = [1, 2, 3, 5];
+const staffQuickQuantities = [1, 2, 3, 4, 5];
+const staffPrices = [20, 25, 30];
 const customQuantities = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const cancelReasons = ["กดผิด", "ลูกค้าเปลี่ยนใจ", "รายการผิด", "อื่น ๆ"];
 const initialState = { ok: false, message: "" };
@@ -20,6 +27,106 @@ function SubmitHint({ message, ok }: { message: string; ok: boolean }) {
   return (
     <div className={`rounded-2xl px-4 py-3 text-center text-base font-black ${ok ? "bg-green-100 text-green-900" : "bg-red-100 text-red-900"}`} role="status">
       {message}
+    </div>
+  );
+}
+
+function availableStaffPriceItems(priceItems: StaffCounterOrderInputProps["priceItems"]) {
+  return staffPrices.map((price) => priceItems.find((item) => item.price === price) ?? { price, item_name: `ไก่ทอดห่อ ${price} บาท` });
+}
+
+function StaffQuickSaleCard({ action, branchId, item, pending }: { action: (formData: FormData) => void; branchId: string; item: { price: number; item_name: string }; pending: boolean }) {
+  const [quantity, setQuantity] = useState(1);
+
+  return (
+    <form action={action} className="rounded-[1.5rem] border-2 border-black/10 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-2xl font-black">ราคา {item.price} บาท</h3>
+        <span className="rounded-full bg-[#ffc400] px-3 py-1 text-sm font-black text-black">ขายเร็ว</span>
+      </div>
+      <input type="hidden" name="branch_id" value={branchId} />
+      <input type="hidden" name="price" value={item.price} />
+      <input type="hidden" name="quantity" value={quantity} />
+      <div className="mt-4 grid grid-cols-5 gap-2">
+        {staffQuickQuantities.map((amount) => (
+          <button
+            key={amount}
+            className={`focus-ring min-h-16 rounded-2xl border-2 text-2xl font-black ${quantity === amount ? "border-black bg-[#ffc400] text-black" : "border-black/10 bg-black/5 text-black"}`}
+            type="button"
+            onClick={() => setQuantity(amount)}
+          >
+            {amount}
+          </button>
+        ))}
+      </div>
+      <button className="focus-ring mt-4 min-h-16 w-full rounded-2xl bg-[#111111] px-4 text-xl font-black text-[#ffc400] shadow active:scale-[0.99] disabled:opacity-60" disabled={pending} type="submit">
+        บันทึก
+      </button>
+    </form>
+  );
+}
+
+function StaffBulkSaleCard({ action, branchId, item, pending }: { action: (formData: FormData) => void; branchId: string; item: { price: number; item_name: string }; pending: boolean }) {
+  const [quantity, setQuantity] = useState(6);
+
+  return (
+    <form action={action} className="rounded-[1.5rem] bg-[#111111] p-4 text-white shadow-sm">
+      <h3 className="text-2xl font-black">ราคา {item.price} บาท</h3>
+      <p className="mt-1 text-sm font-bold text-white/60">กรอกจำนวนตั้งแต่ 6 ขึ้นไป</p>
+      <input type="hidden" name="branch_id" value={branchId} />
+      <input type="hidden" name="price" value={item.price} />
+      <label className="mt-4 block">
+        <span className="mb-2 block text-sm font-black text-[#ffc400]">จำนวนห่อ</span>
+        <input
+          className="focus-ring min-h-16 w-full rounded-2xl border-2 border-white/20 bg-black px-4 text-center text-4xl font-black text-[#ffc400]"
+          inputMode="numeric"
+          min={6}
+          name="quantity"
+          type="number"
+          value={quantity}
+          onChange={(event) => setQuantity(Math.max(6, Number(event.target.value) || 6))}
+        />
+      </label>
+      <button className="focus-ring mt-4 min-h-16 w-full rounded-2xl bg-[#ffc400] px-4 text-xl font-black text-black shadow active:scale-[0.99] disabled:opacity-60" disabled={pending} type="submit">
+        บันทึก
+      </button>
+    </form>
+  );
+}
+
+export function StaffCounterOrderInput({ branchId, priceItems }: StaffCounterOrderInputProps) {
+  const [orderState, orderAction, orderPending] = useActionState(createCounterOrder, initialState);
+  const limitedPriceItems = availableStaffPriceItems(priceItems);
+
+  return (
+    <div className="space-y-5">
+      <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">
+        <p className="text-sm font-bold text-[#ffc400]">โหมด Staff Order Input</p>
+        <h1 className="mt-2 text-3xl font-black">กดขายหน้าร้าน</h1>
+        <p className="mt-2 text-white/70">เลือกปุ่มขายแล้วกดบันทึกเท่านั้น</p>
+      </section>
+
+      <section className="space-y-4 rounded-[2rem] border-4 border-[#ffc400] bg-[#ffc400]/10 p-4 shadow-xl">
+        <div>
+          <p className="text-sm font-black text-black/50">กลุ่มที่ 1</p>
+          <h2 className="text-2xl font-black">กดขายเร็ว</h2>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-3">
+          {limitedPriceItems.map((item) => <StaffQuickSaleCard key={item.price} action={orderAction} branchId={branchId} item={item} pending={orderPending} />)}
+        </div>
+      </section>
+
+      <section className="space-y-4 rounded-[2rem] bg-white p-4 shadow-xl">
+        <div>
+          <p className="text-sm font-black text-black/50">กลุ่มที่ 2</p>
+          <h2 className="text-2xl font-black">จำนวนมาก</h2>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-3">
+          {limitedPriceItems.map((item) => <StaffBulkSaleCard key={item.price} action={orderAction} branchId={branchId} item={item} pending={orderPending} />)}
+        </div>
+      </section>
+
+      <SubmitHint message={orderState.message} ok={orderState.ok} />
     </div>
   );
 }

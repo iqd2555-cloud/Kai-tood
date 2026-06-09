@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { DateShortcuts } from "@/components/date-shortcuts";
 import { StatCard } from "@/components/stat-card";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
+import { canUseStaffCounterOrder } from "@/lib/counter-access";
 import { formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib/format";
 import { ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, REMAINING_CHICKEN_FIELDS, REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS, getRemainingChickenTotal } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
@@ -174,6 +175,7 @@ function QuantityGrid({
 
 export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const profile = await getCurrentProfile();
+  if (canUseStaffCounterOrder(profile)) redirect("/counter-orders");
   if (!isOwner(profile)) redirect("/dashboard");
 
   const supabase = await createSupabaseServerClient();

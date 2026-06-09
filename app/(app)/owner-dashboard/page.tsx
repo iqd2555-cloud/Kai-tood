@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
+import { canUseStaffCounterOrder } from "@/lib/counter-access";
 import { formatThaiDate, moneyFormatter, todayISO, daysAgoISO } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -56,6 +57,7 @@ function barWidth(value: number, max: number) {
 
 export default async function OwnerDashboardPage() {
   const profile = await getCurrentProfile();
+  if (canUseStaffCounterOrder(profile)) redirect("/counter-orders");
   if (!isOwner(profile)) redirect("/dashboard");
 
   const supabase = await createSupabaseServerClient();
