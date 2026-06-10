@@ -135,6 +135,11 @@ export default async function CounterOrdersPage({ searchParams }: CounterOrdersP
   const totalQuantity = rollups.reduce((sum, item) => sum + item.quantity, 0);
   const cancellations = orders.flatMap((order) => (order.counter_cancellations ?? []).map((cancellation) => ({ ...cancellation, order }))) as (CounterCancellation & { order: CounterOrder })[];
 
+  console.info("accounting_report_branch_debug", {
+    selectedBranchId,
+    reportBranchId: [...new Set(orders.map((order) => order.branch_id))],
+  });
+
   return (
     <div className="space-y-5">
       <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">

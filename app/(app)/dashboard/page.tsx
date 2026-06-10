@@ -67,6 +67,11 @@ export default async function DashboardPage() {
     unit: "กก.",
   }));
 
+  console.info("dashboard_report_branch_debug", {
+    selectedBranchId: isOwner(profile) ? "all" : profile.branch_id,
+    reportBranchId: [...new Set(reports.map((report) => report.branch_id))],
+  });
+
   return (
     <div className="space-y-5">
       <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">

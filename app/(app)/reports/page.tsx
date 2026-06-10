@@ -213,12 +213,17 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const { data: branchReportsData } = await branchReportsQuery.returns<DailyReport[]>();
   const branchReports = branchReportsData ?? [];
 
-  console.info("owner_report_branch_debug", { selectedOwnerBranchId: selectedBranchId });
+  console.info("owner_report_branch_debug", {
+    selectedBranchId,
+    reportBranchId: [...new Set(branchReports.map((report) => report.branch_id))],
+  });
+
   const branchNotes = branchReports
     .filter((report) => typeof report.note === "string" && report.note.trim().length > 0)
     .map((report) => ({
       report_date: report.report_date,
-      branch_name: report.branch_name,
+      branch_id: report.branch_id,
+      branchName: report.branches?.name ?? "ไม่ระบุสาขา",
       note: report.note.trim(),
     }))
     .sort((a, b) => b.report_date.localeCompare(a.report_date));
@@ -333,9 +338,9 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         ) : (
           <div className="mt-4 space-y-3">
             {branchNotes.map((report, index) => (
-              <article key={`${report.report_date}-${report.branch_name}-${index}`} className="rounded-2xl bg-black/[0.04] p-4">
+              <article key={`${report.report_date}-${report.branch_id}-${index}`} className="rounded-2xl bg-black/[0.04] p-4">
                 <p className="text-sm font-bold text-black/50">{formatThaiDate(report.report_date)}</p>
-                <p className="text-base font-black">{report.branch_name || "ไม่ระบุสาขา"}</p>
+                <p className="text-base font-black">{report.branchName}</p>
                 <p className="mt-2 whitespace-pre-wrap text-base font-bold">{report.note}</p>
               </article>
             ))}
