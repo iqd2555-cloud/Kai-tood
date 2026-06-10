@@ -141,23 +141,34 @@ npm run dev
 
 ## Counter Order production migration checklist
 
-เมื่อหน้า Counter Order แสดงข้อความ `กรุณารัน migration ล่าสุดของระบบนับออเดอร์ แล้วสั่ง reload schema` ให้ใช้ขั้นตอนนี้กับ Supabase production project:
+เมื่อหน้า Counter Order แสดงข้อความ `กรุณารัน migration ล่าสุดของระบบนับออเดอร์ แล้วสั่ง reload schema` หรือ query `information_schema.tables` แล้วไม่พบตารางที่มีคำว่า `counter` ให้ใช้ขั้นตอนนี้กับ Supabase production project:
 
-1. Apply pending migrations ทั้งหมดจากโฟลเดอร์ `supabase/migrations/` ตามลำดับเวลา โดย migration ล่าสุดสำหรับการซ่อม production แบบเต็มคือ `202606090005_counter_order_full_repair.sql`
-2. Migration `202606090005_counter_order_full_repair.sql` จะสร้าง Counter Order table/RPC ที่ขาดอยู่แบบ idempotent, ตรวจสอบและ fail ทันทีถ้ายังขาด table หรือ RPC ที่ระบบ Counter Order ต้องใช้ จากนั้นรัน `notify pgrst, 'reload schema';`
-3. หลัง apply migration แล้ว ให้รัน `supabase/counter_order_production_check.sql` ใน Supabase SQL Editor เพื่อยืนยัน exact table names, exact RPC signatures, migration history และ reload schema cache อีกครั้ง
-4. ตารางที่ต้องมีสำหรับ Counter Order:
+1. วิธีแนะนำแบบตรงที่สุด: เปิด Supabase Dashboard → SQL Editor → New query แล้ว copy/run SQL ทั้งหมดจาก `supabase/migrations/202606100001_counter_order_direct_apply.sql`
+2. SQL direct-apply ตัวนี้จะสร้าง enum, sequence, table, index, RLS policy, seed ราคา, RPC, grant, ตรวจสอบ object ที่จำเป็น และสั่ง `notify pgrst, 'reload schema';` ให้ครบในไฟล์เดียว
+3. ถ้าใช้ Supabase CLI ให้รัน `supabase db push` จากเครื่องที่ตั้งค่า Supabase CLI และเชื่อม project production แล้ว โดย migration ล่าสุดคือ `202606100001_counter_order_direct_apply.sql`
+4. หลังรันสำเร็จ ให้ query ตรวจสอบซ้ำ:
+
+   ```sql
+   select table_name
+   from information_schema.tables
+   where table_schema='public'
+     and table_name like '%counter%'
+   order by table_name;
+   ```
+
+   ต้องเห็นอย่างน้อย `counter_price_items`, `counter_orders`, `counter_order_items`, `counter_cancellations`, `counter_print_logs`
+5. ตารางที่ต้องมีสำหรับ Counter Order:
    - `public.counter_price_items`
    - `public.counter_orders`
    - `public.counter_order_items`
    - `public.counter_cancellations`
    - `public.counter_print_logs`
-5. RPC functions ที่ต้องมีสำหรับ Counter Order:
+6. RPC functions ที่ต้องมีสำหรับ Counter Order:
    - `public.get_counter_price_items()`
    - `public.can_use_counter_branch(uuid)`
    - `public.create_counter_order(uuid,numeric,integer)`
    - `public.cancel_latest_counter_order(uuid,text)`
    - `public.mark_order_printed(uuid)`
    - `public.reprint_order(uuid)`
-6. ทดสอบ Staff โดย login ด้วยบัญชี Staff ที่อยู่สาขาของตัวเอง เข้า `/counter-orders` แล้วกดบันทึกออเดอร์หนึ่งรายการ ต้องเห็นข้อความ `✅ บันทึกแล้ว`
-7. ทดสอบ Owner โดย login ด้วยบัญชี Owner เข้า `/counter-orders` เพื่อดูยอดรวมหน้าร้าน และเข้า `/reports` หรือ `/owner-dashboard` เพื่อดูสรุปรายงานทุกสาขา
+7. ทดสอบ Staff โดย login ด้วยบัญชี Staff ที่อยู่สาขาของตัวเอง เข้า `/counter-orders` แล้วกดบันทึกออเดอร์หนึ่งรายการ ต้องเห็นข้อความ `✅ บันทึกแล้ว`
+8. ทดสอบ Owner โดย login ด้วยบัญชี Owner เข้า `/counter-orders` เพื่อดูยอดรวมหน้าร้าน และเข้า `/reports` หรือ `/owner-dashboard` เพื่อดูสรุปรายงานทุกสาขา
