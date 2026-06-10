@@ -60,8 +60,9 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
       return { ok: false, message: "โปรไฟล์พนักงานยังไม่ได้ผูกสาขา" };
     }
 
+    // Staff reports must always follow the branch_id from the logged-in profile.
+    // Never trust the submitted hidden field or fall back to a default branch.
     payload.branch_id = profile.branch_id;
-    payload.branch_name = profile.branch_name ?? payload.branch_name;
   }
 
   const parsedOtherItems = (() => {
@@ -97,11 +98,19 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
     .eq("id", payload.branch_id)
     .maybeSingle();
 
+  const canonicalBranchName = branchData?.name ?? payload.branch_name;
+
+  console.info("daily_report_branch_debug", {
+    currentUserEmail: profile.email,
+    profileBranchId: profile.branch_id,
+    reportBranchId: payload.branch_id,
+  });
+
   const { error } = await supabase.from("daily_reports").upsert(
     {
       ...payload,
       remaining_chicken: payload.remaining_original_chicken,
-      branch_name: profile.role === "staff" ? profile.branch_name ?? branchData?.name ?? payload.branch_name : branchData?.name ?? payload.branch_name,
+      branch_name: canonicalBranchName,
       requested_items: allRequestedItems,
       order_other_items: otherItems.success ? otherItems.data.filter((item) => item.name.trim() && item.amount > 0) : [],
       submitted_by: profile.id,

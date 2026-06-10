@@ -190,16 +190,30 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const branches = branchesData ?? [];
   const selectedBranchId = branches.some((branch) => branch.id === params.branch_id) ? params.branch_id : branches[0]?.id;
 
+  const reportSelect = "*, branches(name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold)";
+
   const { data: allReportsData } = await supabase
     .from("daily_reports")
-    .select("*, branches(name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold)")
+    .select(reportSelect)
     .gte("report_date", from)
     .lte("report_date", to)
     .order("report_date", { ascending: false })
     .returns<DailyReport[]>();
   const allReports = allReportsData ?? [];
 
-  const branchReports = selectedBranchId ? allReports.filter((report) => report.branch_id === selectedBranchId) : [];
+  const branchReportsQuery = supabase
+    .from("daily_reports")
+    .select(reportSelect)
+    .gte("report_date", from)
+    .lte("report_date", to)
+    .order("report_date", { ascending: false });
+
+  if (selectedBranchId) branchReportsQuery.eq("branch_id", selectedBranchId);
+
+  const { data: branchReportsData } = await branchReportsQuery.returns<DailyReport[]>();
+  const branchReports = branchReportsData ?? [];
+
+  console.info("owner_report_branch_debug", { selectedOwnerBranchId: selectedBranchId });
   const branchNotes = branchReports
     .filter((report) => typeof report.note === "string" && report.note.trim().length > 0)
     .map((report) => ({
