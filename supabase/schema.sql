@@ -114,6 +114,12 @@ insert into public.branches (name, code, low_chicken_threshold, low_sticky_rice_
 values ('สาขาหลัก', 'MAIN', 5, 5, 2)
 on conflict (code) do nothing;
 
+insert into public.branches (name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold)
+values
+  ('สาขาที่ 1 ร.ร.นวมินทร์', 'NAVAMIN', 5, 5, 2),
+  ('สาขาที่ 2 โลตัสป้อม 1', 'LOTUS-POM1', 5, 5, 2)
+on conflict (code) do update set name = excluded.name;
+
 create or replace function public.ensure_default_branch()
 returns uuid
 language plpgsql
@@ -146,7 +152,6 @@ security definer
 set search_path = public
 as $$
 declare
-  default_branch_id uuid;
   selected_role public.user_role;
   profile_row public.profiles;
   display_name text;
@@ -156,7 +161,6 @@ begin
     raise exception 'Cannot create profile for another user';
   end if;
 
-  default_branch_id := public.ensure_default_branch();
   normalized_email := nullif(lower(trim(coalesce(user_email, ''))), '');
   display_name := nullif(trim(coalesce(user_full_name, split_part(coalesce(normalized_email, ''), '@', 1), '')), '');
 
@@ -170,11 +174,7 @@ begin
     update public.profiles
     set
       full_name = coalesce(nullif(profile_row.full_name, ''), display_name),
-      email = coalesce(profile_row.email, normalized_email),
-      branch_id = case
-        when profile_row.role = 'staff' and profile_row.branch_id is null then default_branch_id
-        else profile_row.branch_id
-      end
+      email = coalesce(profile_row.email, normalized_email)
     where id = user_id
     returning * into profile_row;
 
@@ -183,13 +183,14 @@ begin
 
   selected_role := 'staff';
 
-  insert into public.profiles (id, email, full_name, role, branch_id)
+  insert into public.profiles (id, email, full_name, role, branch_id, branch_name)
   values (
     user_id,
     normalized_email,
     display_name,
     selected_role,
-    case when selected_role = 'staff' then default_branch_id else null end
+    null,
+    null
   )
   returning * into profile_row;
 
