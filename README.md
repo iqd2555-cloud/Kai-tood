@@ -143,9 +143,9 @@ npm run dev
 
 เมื่อหน้า Counter Order แสดงข้อความ `กรุณารัน migration ล่าสุดของระบบนับออเดอร์ แล้วสั่ง reload schema` หรือ query `information_schema.tables` แล้วไม่พบตารางที่มีคำว่า `counter` ให้ใช้ขั้นตอนนี้กับ Supabase production project:
 
-1. วิธีแนะนำแบบตรงที่สุด: เปิด Supabase Dashboard → SQL Editor → New query แล้ว copy/run SQL ทั้งหมดจาก `supabase/migrations/202606100001_counter_order_direct_apply.sql`
+1. วิธีแนะนำแบบตรงที่สุด: เปิด Supabase Dashboard → SQL Editor → New query แล้ว copy/run SQL ทั้งหมดจาก `supabase/migrations/202606100003_counter_order_sql_editor_full.sql`
 2. SQL direct-apply ตัวนี้จะสร้าง enum, sequence, table, index, RLS policy, seed ราคา, RPC, grant, ตรวจสอบ object ที่จำเป็น และสั่ง `notify pgrst, 'reload schema';` ให้ครบในไฟล์เดียว
-3. ถ้าใช้ Supabase CLI ให้รัน `supabase db push` จากเครื่องที่ตั้งค่า Supabase CLI และเชื่อม project production แล้ว โดย migration ล่าสุดคือ `202606100001_counter_order_direct_apply.sql`
+3. ถ้าใช้ Supabase CLI ให้รัน `supabase db push` จากเครื่องที่ตั้งค่า Supabase CLI และเชื่อม project production แล้ว โดย migration ล่าสุดคือ `202606100003_counter_order_sql_editor_full.sql`
 4. หลังรันสำเร็จ ให้ query ตรวจสอบซ้ำ:
 
    ```sql
