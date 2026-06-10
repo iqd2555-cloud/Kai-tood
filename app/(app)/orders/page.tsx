@@ -43,6 +43,11 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
     .returns<DailyReport[]>();
   const reports = reportsData ?? [];
 
+  console.info("orders_report_branch_debug", {
+    selectedBranchId: "all",
+    reportBranchId: [...new Set(reports.map((report) => report.branch_id))],
+  });
+
   return (
     <div className="space-y-5">
       <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">

@@ -8,8 +8,9 @@ type ProfitRow = Record<string, string | number | null>;
 type MetricKey = "totalSales" | "chickenCost" | "otherExpenses";
 type BranchNoteRow = {
   report_date: string;
-  branch_name: string | null;
+  branch_id: string;
   note: string | null;
+  branches: { name: string } | null;
 };
 
 const CHICKEN_COST_PER_KG = 65;
@@ -68,7 +69,7 @@ export default async function OwnerDashboardPage() {
 
   const { data: rawBranchNotes, error: branchNotesError } = await supabase
     .from("daily_reports")
-    .select("report_date,branch_name,note")
+    .select("report_date,branch_id,note,branches(name)")
     .not("note", "is", null)
     .returns<BranchNoteRow[]>();
   if (branchNotesError) {
@@ -78,11 +79,17 @@ export default async function OwnerDashboardPage() {
   const branchNotes = (rawBranchNotes ?? [])
     .map((item) => ({
       reportDate: item.report_date,
-      branchName: item.branch_name?.trim() || "ไม่ระบุสาขา",
+      branchId: item.branch_id,
+      branchName: item.branches?.name?.trim() || "ไม่ระบุสาขา",
       note: item.note?.trim() ?? "",
     }))
     .filter((item) => item.note.length > 0)
     .sort((a, b) => b.reportDate.localeCompare(a.reportDate));
+
+  console.info("owner_summary_branch_debug", {
+    selectedBranchId: "all",
+    reportBranchId: [...new Set((rawBranchNotes ?? []).map((report) => report.branch_id))],
+  });
 
   const rows = (data ?? []).map((row) => {
     const totalSales = pickNumber(row, ["total_sales", "sales_total", "total_revenue", "revenue"]);
@@ -272,7 +279,7 @@ export default async function OwnerDashboardPage() {
           <div className="mt-4 space-y-3">
             <h3 className="text-base font-black">📝 หมายเหตุจากสาขา</h3>
             {branchNotes.map((item) => (
-              <article key={`${item.reportDate}-${item.branchName}-${item.note}`} className="rounded-2xl border border-black/10 bg-black/[0.03] p-3">
+              <article key={`${item.reportDate}-${item.branchId}-${item.note}`} className="rounded-2xl border border-black/10 bg-black/[0.03] p-3">
                 <p className="text-xs font-bold text-black/70">{formatThaiDate(item.reportDate)}</p>
                 <p className="text-sm font-black">{item.branchName}</p>
                 <p className="mt-2 whitespace-pre-wrap text-sm font-medium text-black/90">{item.note}</p>
