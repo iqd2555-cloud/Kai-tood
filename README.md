@@ -143,9 +143,9 @@ npm run dev
 
 เมื่อหน้า Counter Order แสดงข้อความ `กรุณารัน migration ล่าสุดของระบบนับออเดอร์ แล้วสั่ง reload schema` ให้ใช้ขั้นตอนนี้กับ Supabase production project:
 
-1. Apply pending migrations ทั้งหมดจากโฟลเดอร์ `supabase/migrations/` ตามลำดับเวลา โดย migration ล่าสุดสำหรับการตรวจสอบ production คือ `202606090004_counter_order_production_verification.sql`
-2. Migration `202606090004_counter_order_production_verification.sql` จะตรวจสอบและ fail ทันทีถ้าขาด table หรือ RPC ที่ระบบ Counter Order ต้องใช้ จากนั้นรัน `notify pgrst, 'reload schema';`
-3. หลัง apply migration แล้ว ให้รัน `supabase/counter_order_production_check.sql` ใน Supabase SQL Editor เพื่อดูสถานะ table, RPC function, migration history และ reload schema cache อีกครั้ง
+1. Apply pending migrations ทั้งหมดจากโฟลเดอร์ `supabase/migrations/` ตามลำดับเวลา โดย migration ล่าสุดสำหรับการซ่อม production แบบเต็มคือ `202606090005_counter_order_full_repair.sql`
+2. Migration `202606090005_counter_order_full_repair.sql` จะสร้าง Counter Order table/RPC ที่ขาดอยู่แบบ idempotent, ตรวจสอบและ fail ทันทีถ้ายังขาด table หรือ RPC ที่ระบบ Counter Order ต้องใช้ จากนั้นรัน `notify pgrst, 'reload schema';`
+3. หลัง apply migration แล้ว ให้รัน `supabase/counter_order_production_check.sql` ใน Supabase SQL Editor เพื่อยืนยัน exact table names, exact RPC signatures, migration history และ reload schema cache อีกครั้ง
 4. ตารางที่ต้องมีสำหรับ Counter Order:
    - `public.counter_price_items`
    - `public.counter_orders`
