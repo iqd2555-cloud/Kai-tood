@@ -38,7 +38,7 @@ npm install
 1. เข้า https://supabase.com แล้วสร้าง Project ใหม่
 2. ไปที่ **SQL Editor**
 3. คัดลอกไฟล์ `supabase/schema.sql` ไปวางและกด Run
-4. ไปที่ **Project Settings > API** แล้วคัดลอก `Project URL` และ `anon public key`
+4. ไปที่ **Project Settings > API** แล้วคัดลอก `Project URL`, `anon public key` และ `service_role key` (ใช้เฉพาะฝั่ง Server/Vercel เท่านั้น ห้ามใส่ในโค้ดฝั่ง Browser)
 
 ### 3) ตั้งค่า Environment
 
@@ -54,15 +54,19 @@ cp .env.example .env.local
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-### 4) สร้างผู้ใช้ Owner และ Staff
+### 4) สมัครผู้ใช้ Owner และ Staff แบบไม่ต้องยืนยันอีเมล
 
-1. ใน Supabase ไปที่ **Authentication > Users** แล้วกด Add user
-2. สร้างอีเมล/รหัสผ่านของเจ้าของร้านและพนักงาน
-3. Login ครั้งแรก ระบบจะเรียก `public.ensure_login_profile` เพื่อสร้าง `profiles` ให้อัตโนมัติ
-4. ผู้ใช้คนแรกที่ Login จะเป็น `owner`; ผู้ใช้ถัดไปจะเป็น `staff` และจะถูกผูกกับสาขาเริ่มต้น `MAIN` อัตโนมัติ
-5. หากต้องการเปลี่ยนสิทธิ์หรือสาขา ให้แก้ในตาราง `profiles` หลังจาก Login ครั้งแรกแล้ว
+1. ตั้งค่า `SUPABASE_SERVICE_ROLE_KEY` ใน `.env.local` และใน Vercel เพื่อให้ Server Action สร้างผู้ใช้ผ่าน Supabase Admin API พร้อม `email_confirm: true`
+2. เปิดหน้า Login แล้วเลือกแท็บ **สมัครสมาชิก** ผู้ใช้จะถูกสร้างแบบยืนยันอีเมลแล้ว และระบบจะ Login เข้าใช้งานทันทีโดยไม่ต้องกดลิงก์ในอีเมล
+3. หากเคยสมัครไว้ก่อนหน้าและติดสถานะ `Email not confirmed` ระบบ Login จะพยายามยืนยันอีเมลให้ด้วย Admin API แล้ว Login ซ้ำให้อัตโนมัติ
+4. Login ครั้งแรก ระบบจะเรียก `public.ensure_login_profile` เพื่อสร้าง `profiles` ให้อัตโนมัติ
+5. ผู้ใช้คนแรกที่ Login จะเป็น `owner`; ผู้ใช้ถัดไปจะเป็น `staff` และจะถูกผูกกับสาขาเริ่มต้น `MAIN` อัตโนมัติ
+6. หากต้องการเปลี่ยนสิทธิ์หรือสาขา ให้แก้ในตาราง `profiles` หลังจาก Login ครั้งแรกแล้ว
+
+> หากไม่ได้ตั้งค่า `SUPABASE_SERVICE_ROLE_KEY` ต้องไปที่ Supabase Dashboard → **Authentication > Providers > Email** แล้วปิด **Confirm email** เอง ไม่เช่นนั้น Supabase จะยังบังคับยืนยันอีเมลก่อน Login
 
 > ถ้าฐานข้อมูลเดิมแจ้ง error ว่าไม่พบ `public.ensure_login_profile(user_email, user_full_name, user_id)` ให้เปิด Supabase SQL Editor แล้วรันไฟล์ `supabase/migrations/202605110001_ensure_login_profile.sql` ทั้งไฟล์ จากนั้นลอง Login อีกครั้ง ไฟล์นี้จะลบ signature เก่า `ensure_login_profile(uuid, text, text)` และสร้าง signature ที่ Supabase RPC หาอยู่คือ `ensure_login_profile(text, text, uuid)` พร้อม `notify pgrst, 'reload schema'`
 >
@@ -74,13 +78,13 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 npm run dev
 ```
 
-เปิด http://localhost:3000 แล้วเข้าสู่ระบบด้วยบัญชีที่สร้างไว้
+เปิด http://localhost:3000 แล้วสมัครสมาชิกหรือเข้าสู่ระบบ ผู้ใช้ใหม่ควรเข้าใช้งานได้ทันทีโดยไม่ต้องยืนยันอีเมล
 
 ### 6) Deploy บน Vercel
 
 1. Push โค้ดขึ้น GitHub
 2. เข้า https://vercel.com แล้ว Import repository
-3. เพิ่ม Environment Variables เหมือน `.env.local`
+3. เพิ่ม Environment Variables เหมือน `.env.local` รวมถึง `SUPABASE_SERVICE_ROLE_KEY` เพื่อให้สมัครแล้ว Login ได้ทันทีโดยไม่ต้องยืนยันอีเมล
 4. Deploy
 5. เมื่อได้โดเมนจริง ให้ตั้ง `NEXT_PUBLIC_APP_URL` เป็น URL ของ Vercel เช่น `https://kai-tood.vercel.app`
 
@@ -107,6 +111,7 @@ npm run dev
 - เปิด Supabase Realtime สำหรับ `daily_reports` แล้วใน schema
 - ใช้ `daily_report_rollups` view แบบ `security_invoker = true` และ `owner_dashboard_totals()` RPC สำหรับต่อยอดรายงานโดยยังอยู่ภายใต้ RLS
 - ควรตั้งรหัสผ่านผู้ใช้ให้แข็งแรง และเพิ่ม MFA ใน Supabase หากใช้จริงในร้านหลายสาขา
+- เก็บ `SUPABASE_SERVICE_ROLE_KEY` เป็น Environment Variable ฝั่ง Server เท่านั้น เพราะคีย์นี้ใช้สร้างและยืนยันผู้ใช้โดยข้ามการยืนยันอีเมลได้
 - Service worker cache เฉพาะ GET request เพื่อช่วยโหลดเร็วขึ้น แต่ข้อมูลการบันทึกยังต้องออนไลน์เพื่อส่งเข้า Supabase
 
 
@@ -136,6 +141,7 @@ npm run dev
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `NEXT_PUBLIC_APP_URL` (URL production จริง เช่น `https://your-app.vercel.app`)
+   - `SUPABASE_SERVICE_ROLE_KEY` (Server-only; ห้าม expose เป็น `NEXT_PUBLIC_*`)
 4. Deploy
 5. ทดสอบ `/api/health` และทดสอบติดตั้ง PWA บน Android + iPhone หลัง deploy
 

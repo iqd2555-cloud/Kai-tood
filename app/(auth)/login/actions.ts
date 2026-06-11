@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { ensureProfileForUser } from "@/lib/auth";
+import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 export type AuthFormState = {
@@ -40,15 +41,65 @@ export async function login(_: AuthFormState, formData: FormData): Promise<AuthF
 
   const { email, password, next } = parsed.data;
   const normalizedEmail = email.toLowerCase();
+  return completeImmediateLogin(normalizedEmail, password, next);
+}
+
+function isExistingUserError(message: string) {
+  const normalizedMessage = message.toLowerCase();
+  return (
+    normalizedMessage.includes("already registered") ||
+    normalizedMessage.includes("already been registered") ||
+    normalizedMessage.includes("already exists") ||
+    normalizedMessage.includes("user exists")
+  );
+}
+
+function isEmailConfirmationError(message: string) {
+  return message.toLowerCase().includes("email not confirmed");
+}
+
+async function confirmExistingEmail(email: string) {
+  const adminSupabase = createSupabaseAdminClient();
+  if (!adminSupabase) return { ok: false, message: "" };
+
+  const { data, error } = await adminSupabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (error) return { ok: false, message: error.message };
+
+  const existingUser = data.users.find((user) => user.email?.toLowerCase() === email);
+  if (!existingUser) return { ok: false, message: "ไม่พบผู้ใช้ใน Supabase Auth" };
+  if (existingUser.email_confirmed_at) return { ok: true, message: "" };
+
+  const { error: updateError } = await adminSupabase.auth.admin.updateUserById(existingUser.id, { email_confirm: true });
+  if (updateError) return { ok: false, message: updateError.message };
+
+  return { ok: true, message: "" };
+}
+
+async function completeImmediateLogin(email: string, password: string, next: string, shouldRetryAfterConfirm = true): Promise<AuthFormState> {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return { message: "ยังไม่ได้ตั้งค่า Supabase URL หรือ Anon Key", success: "" };
+  }
+
   const {
     data: { user },
     error,
   } = await supabase.auth.signInWithPassword({
-    email: normalizedEmail,
+    email,
     password,
   });
 
   if (error) {
+    if (shouldRetryAfterConfirm && isEmailConfirmationError(error.message)) {
+      const confirmResult = await confirmExistingEmail(email);
+      if (confirmResult.ok) return completeImmediateLogin(email, password, next, false);
+      const confirmMessage = confirmResult.message ? ` (${confirmResult.message})` : "";
+      return {
+        message: `Supabase: ${error.message} กรุณาตั้งค่า SUPABASE_SERVICE_ROLE_KEY บน Vercel/เครื่องเซิร์ฟเวอร์ หรือปิด Confirm email ใน Supabase Auth เพื่อให้สมัครแล้วเข้าใช้งานได้ทันที${confirmMessage}`,
+        success: "",
+      };
+    }
+
     return { message: `Supabase: ${error.message}`, success: "" };
   }
 
@@ -81,16 +132,38 @@ export async function signup(_: AuthFormState, formData: FormData): Promise<Auth
     return { message: "ยังไม่ได้ตั้งค่า Supabase URL หรือ Anon Key", success: "" };
   }
 
-  const { email, password } = parsed.data;
+  const { email, password, next } = parsed.data;
   const normalizedEmail = email.toLowerCase();
+  const fullName = normalizedEmail.split("@")[0];
+  const adminSupabase = createSupabaseAdminClient();
 
-  const { error } = await supabase.auth.signUp({
+  if (adminSupabase) {
+    const { error: createUserError } = await adminSupabase.auth.admin.createUser({
+      email: normalizedEmail,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: fullName,
+      },
+    });
+
+    if (createUserError && !isExistingUserError(createUserError.message)) {
+      return { message: `Supabase: ${createUserError.message}`, success: "" };
+    }
+
+    return completeImmediateLogin(normalizedEmail, password, next);
+  }
+
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.signUp({
     email: normalizedEmail,
     password,
     options: {
       emailRedirectTo: undefined,
       data: {
-        full_name: normalizedEmail.split("@")[0],
+        full_name: fullName,
       },
     },
   });
@@ -99,8 +172,19 @@ export async function signup(_: AuthFormState, formData: FormData): Promise<Auth
     return { message: `Supabase: ${error.message}`, success: "" };
   }
 
+  if (session?.user) {
+    const profileResult = await ensureProfileForUser(session.user);
+    if (!profileResult.ok) {
+      await supabase.auth.signOut();
+      return { message: profileResult.message, success: "" };
+    }
+
+    redirect(normalizeRedirectPath(next));
+  }
+
   return {
-    message: "",
-    success: "สมัครสมาชิกสำเร็จแล้ว กรุณาเข้าสู่ระบบด้วยอีเมลและรหัสผ่านของคุณ",
+    message:
+      "สมัครสมาชิกสำเร็จ แต่ Supabase ยังเปิดการยืนยันอีเมลอยู่ กรุณาตั้งค่า SUPABASE_SERVICE_ROLE_KEY หรือปิด Confirm email ใน Supabase Auth เพื่อให้เข้าใช้งานได้ทันที",
+    success: "",
   };
 }
