@@ -140,6 +140,8 @@ begin
 end;
 $$;
 
+grant execute on function public.ensure_default_branch() to authenticated;
+
 drop function if exists public.ensure_login_profile(uuid, text, text);
 
 create or replace function public.ensure_login_profile(
@@ -153,6 +155,7 @@ security definer
 set search_path = public
 as $$
 declare
+  default_branch_id uuid;
   selected_role public.user_role;
   selected_branch_id uuid;
   selected_branch_name text;
@@ -165,6 +168,7 @@ begin
     raise exception 'Cannot create profile for another user';
   end if;
 
+  default_branch_id := public.ensure_default_branch();
   normalized_email := nullif(lower(trim(coalesce(user_email, ''))), '');
   display_name := nullif(trim(coalesce(user_full_name, split_part(coalesce(normalized_email, ''), '@', 1), '')), '');
 
@@ -178,7 +182,7 @@ begin
     selected_branch_name := null;
   else
     selected_role := 'staff';
-    selected_branch_id := null;
+    selected_branch_id := default_branch_id;
     selected_branch_name := null;
   end if;
 
@@ -190,7 +194,11 @@ begin
       full_name = coalesce(nullif(profile_row.full_name, ''), display_name),
       email = coalesce(normalized_email, profile_row.email),
       role = case when normalized_email = second_owner_email then 'owner'::public.user_role else profile_row.role end,
-      branch_id = case when normalized_email = second_owner_email then null else profile_row.branch_id end,
+      branch_id = case
+        when normalized_email = second_owner_email then null
+        when profile_row.role = 'staff' and profile_row.branch_id is null then default_branch_id
+        else profile_row.branch_id
+      end,
       branch_name = case when normalized_email = second_owner_email then null else profile_row.branch_name end
     where id = user_id
     returning * into profile_row;
@@ -213,8 +221,6 @@ begin
 end;
 $$;
 
-
-grant execute on function public.ensure_default_branch() to authenticated;
 grant execute on function public.ensure_login_profile(text, text, uuid) to authenticated;
 
 
