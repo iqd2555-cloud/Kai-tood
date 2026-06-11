@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "prebuild": "node scripts/generate-pwa-version.mjs"
+    "prebuild": "node scripts/generate-pwa-version.mjs",
+    "verify:env": "node scripts/verify-env.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

@@ -60,13 +60,14 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ### 4) สมัครผู้ใช้ Owner และ Staff แบบไม่ต้องยืนยันอีเมล
 
 1. ตั้งค่า `SUPABASE_SERVICE_ROLE_KEY` ใน `.env.local` และใน Vercel เพื่อให้ Server Action สร้างผู้ใช้ผ่าน Supabase Admin API พร้อม `email_confirm: true`
-2. เปิดหน้า Login แล้วเลือกแท็บ **สมัครสมาชิก** ผู้ใช้จะถูกสร้างแบบยืนยันอีเมลแล้ว และระบบจะ Login เข้าใช้งานทันทีโดยไม่ต้องกดลิงก์ในอีเมล
-3. หากเคยสมัครไว้ก่อนหน้าและติดสถานะ `Email not confirmed` ระบบ Login จะพยายามยืนยันอีเมลให้ด้วย Admin API แล้ว Login ซ้ำให้อัตโนมัติ
-4. Login ครั้งแรก ระบบจะเรียก `public.ensure_login_profile` เพื่อสร้าง `profiles` ให้อัตโนมัติ
-5. ผู้ใช้คนแรกที่ Login จะเป็น `owner`; ผู้ใช้ถัดไปจะเป็น `staff` และจะถูกผูกกับสาขาเริ่มต้น `MAIN` อัตโนมัติ
-6. หากต้องการเปลี่ยนสิทธิ์หรือสาขา ให้แก้ในตาราง `profiles` หลังจาก Login ครั้งแรกแล้ว
+2. สำหรับการใช้งานภายในร้าน ให้ไปที่ Supabase Dashboard → **Authentication > Providers > Email** แล้วปิด **Confirm email** เพื่อไม่บังคับให้พนักงานหรือเจ้าของร้านกดลิงก์อีเมลก่อนเข้าใช้
+3. เปิดหน้า Login แล้วเลือกแท็บ **สมัครสมาชิก** ผู้ใช้จะถูกสร้างแบบยืนยันอีเมลแล้ว และระบบจะ Login เข้าใช้งานทันทีโดยไม่ต้องกดลิงก์ในอีเมล
+4. หากเคยสมัครไว้ก่อนหน้าและติดสถานะ `Email not confirmed` ระบบ Login จะพยายามยืนยันอีเมลให้ด้วย Admin API แล้ว Login ซ้ำให้อัตโนมัติ
+5. Login ครั้งแรก ระบบจะเรียก `public.ensure_login_profile` เพื่อสร้าง `profiles` ให้อัตโนมัติ
+6. บัญชี `koykoykoy9783@gmail.com` จะถูกกำหนดเป็น `owner` โดย migration `supabase/migrations/202606110001_create_second_owner_profile.sql`; หลังรัน migration ให้สมัคร/เข้าสู่ระบบด้วยอีเมลนี้เพื่อตรวจว่าเข้า `/owner-dashboard` ได้
+7. หากต้องการเปลี่ยนสิทธิ์หรือสาขา ให้แก้ในตาราง `profiles` หลังจาก Login ครั้งแรกแล้ว
 
-> หากไม่ได้ตั้งค่า `SUPABASE_SERVICE_ROLE_KEY` ต้องไปที่ Supabase Dashboard → **Authentication > Providers > Email** แล้วปิด **Confirm email** เอง ไม่เช่นนั้น Supabase จะยังบังคับยืนยันอีเมลก่อน Login
+> หากไม่ได้ตั้งค่า `SUPABASE_SERVICE_ROLE_KEY` และยังเปิด **Confirm email** อยู่ Supabase จะยังตอบ `Email not confirmed` และผู้ใช้ใหม่จะไม่สามารถ Login ได้ทันที
 
 > ถ้าฐานข้อมูลเดิมแจ้ง error ว่าไม่พบ `public.ensure_login_profile(user_email, user_full_name, user_id)` ให้เปิด Supabase SQL Editor แล้วรันไฟล์ `supabase/migrations/202605110001_ensure_login_profile.sql` ทั้งไฟล์ จากนั้นลอง Login อีกครั้ง ไฟล์นี้จะลบ signature เก่า `ensure_login_profile(uuid, text, text)` และสร้าง signature ที่ Supabase RPC หาอยู่คือ `ensure_login_profile(text, text, uuid)` พร้อม `notify pgrst, 'reload schema'`
 >
@@ -137,13 +138,18 @@ npm run dev
 
 1. Push โค้ดขึ้น GitHub
 2. Import repo ใน Vercel
-3. ตั้ง Environment Variables:
+3. ตั้ง Environment Variables ใน Vercel → Project → Settings → Environment Variables ให้ครบทุก environment ที่ใช้งาน (`Production`, `Preview`, `Development` ถ้าต้องการ):
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `NEXT_PUBLIC_APP_URL` (URL production จริง เช่น `https://your-app.vercel.app`)
    - `SUPABASE_SERVICE_ROLE_KEY` (Server-only; ห้าม expose เป็น `NEXT_PUBLIC_*`)
-4. Deploy
-5. ทดสอบ `/api/health` และทดสอบติดตั้ง PWA บน Android + iPhone หลัง deploy
+   - `NEXT_PUBLIC_APP_URL` (URL production จริง เช่น `https://your-app.vercel.app`)
+4. ถ้าใช้ Vercel CLI ให้ตรวจค่าที่ตั้งไว้ด้วยคำสั่ง `vercel env ls` และถ้าต้องการตรวจบนเครื่องให้ pull env ก่อนด้วย `vercel env pull .env.local` แล้วรัน `npm run verify:env`
+5. ไปที่ Supabase Dashboard → **Authentication > Providers > Email** แล้วปิด **Confirm email** สำหรับระบบภายในร้าน เพื่อให้ผู้ใช้ใหม่ Login ได้ทันที
+6. เปิด Supabase SQL Editor แล้วรัน migration ล่าสุดที่เกี่ยวกับ owner: `supabase/migrations/202606110001_create_second_owner_profile.sql` เพื่อให้ `koykoykoy9783@gmail.com` เป็น `owner`
+7. Deploy ใหม่หลังเพิ่ม/แก้ Environment Variables เพราะ Vercel จะ inject env ตอน build/runtime ของ deployment ใหม่
+8. ทดสอบ `/api/health` หลัง deploy: ค่า `supabase.nextPublicSupabaseUrl`, `supabase.nextPublicSupabaseAnonKey`, `supabase.supabaseServiceRoleKey`, และ `supabase.serverConfigValid` ต้องเป็น `true` โดย endpoint นี้ไม่แสดงค่า secret
+9. สมัคร/เข้าสู่ระบบด้วย `koykoykoy9783@gmail.com`; หากบัญชีเคยค้าง `Email not confirmed` ระบบจะใช้ `SUPABASE_SERVICE_ROLE_KEY` ยืนยันอีเมลเดิมแล้ว Login ซ้ำให้อัตโนมัติ
+10. ทดสอบเข้า `/owner-dashboard` เพื่อยืนยันว่า owner role assignment ยังทำงาน และทดสอบติดตั้ง PWA บน Android + iPhone หลัง deploy
 
 ## Counter Order production migration checklist
 

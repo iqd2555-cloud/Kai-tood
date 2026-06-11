@@ -58,14 +58,26 @@ function isEmailConfirmationError(message: string) {
   return message.toLowerCase().includes("email not confirmed");
 }
 
+const immediateSignupSetupMessage =
+  "Supabase ยังเปิด Confirm email หรือยังไม่ได้ตั้งค่า SUPABASE_SERVICE_ROLE_KEY บน Vercel จึงไม่สามารถให้ผู้ใช้ใหม่เข้าใช้งานทันทีได้ กรุณาเพิ่ม SUPABASE_SERVICE_ROLE_KEY เป็น Server Environment Variable และปิด Confirm email ใน Supabase Auth > Providers > Email";
+
 async function confirmExistingEmail(email: string) {
   const adminSupabase = createSupabaseAdminClient();
   if (!adminSupabase) return { ok: false, message: "" };
 
-  const { data, error } = await adminSupabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  if (error) return { ok: false, message: error.message };
+  let page = 1;
+  const perPage = 1000;
+  let existingUser: { id: string; email?: string | null; email_confirmed_at?: string | null } | null = null;
 
-  const existingUser = data.users.find((user) => user.email?.toLowerCase() === email);
+  while (!existingUser) {
+    const { data, error } = await adminSupabase.auth.admin.listUsers({ page, perPage });
+    if (error) return { ok: false, message: error.message };
+
+    existingUser = data.users.find((user) => user.email?.toLowerCase() === email) ?? null;
+    if (existingUser || data.users.length < perPage) break;
+    page += 1;
+  }
+
   if (!existingUser) return { ok: false, message: "ไม่พบผู้ใช้ใน Supabase Auth" };
   if (existingUser.email_confirmed_at) return { ok: true, message: "" };
 
@@ -95,7 +107,7 @@ async function completeImmediateLogin(email: string, password: string, next: str
       if (confirmResult.ok) return completeImmediateLogin(email, password, next, false);
       const confirmMessage = confirmResult.message ? ` (${confirmResult.message})` : "";
       return {
-        message: `Supabase: ${error.message} กรุณาตั้งค่า SUPABASE_SERVICE_ROLE_KEY บน Vercel/เครื่องเซิร์ฟเวอร์ หรือปิด Confirm email ใน Supabase Auth เพื่อให้สมัครแล้วเข้าใช้งานได้ทันที${confirmMessage}`,
+        message: `Supabase: ${error.message} ${immediateSignupSetupMessage}${confirmMessage}`,
         success: "",
       };
     }
@@ -147,8 +159,16 @@ export async function signup(_: AuthFormState, formData: FormData): Promise<Auth
       },
     });
 
-    if (createUserError && !isExistingUserError(createUserError.message)) {
-      return { message: `Supabase: ${createUserError.message}`, success: "" };
+    if (createUserError) {
+      if (!isExistingUserError(createUserError.message)) {
+        return { message: `Supabase: ${createUserError.message}`, success: "" };
+      }
+
+      const confirmResult = await confirmExistingEmail(normalizedEmail);
+      if (!confirmResult.ok) {
+        const confirmMessage = confirmResult.message ? ` (${confirmResult.message})` : "";
+        return { message: `Supabase: ไม่สามารถยืนยันอีเมลผู้ใช้เดิมได้${confirmMessage}`, success: "" };
+      }
     }
 
     return completeImmediateLogin(normalizedEmail, password, next);
@@ -183,8 +203,7 @@ export async function signup(_: AuthFormState, formData: FormData): Promise<Auth
   }
 
   return {
-    message:
-      "สมัครสมาชิกสำเร็จ แต่ Supabase ยังเปิดการยืนยันอีเมลอยู่ กรุณาตั้งค่า SUPABASE_SERVICE_ROLE_KEY หรือปิด Confirm email ใน Supabase Auth เพื่อให้เข้าใช้งานได้ทันที",
+    message: `สมัครสมาชิกสำเร็จ แต่ยังเข้าใช้งานทันทีไม่ได้: ${immediateSignupSetupMessage}`,
     success: "",
   };
 }
