@@ -1,21 +1,17 @@
--- Create or promote the second owner profile for Kai Tood Manager.
+-- Auth immediate-login repair for Kai Tood Manager.
 -- Safe to run multiple times in Supabase SQL Editor.
 --
--- Owner profile requirement:
---   email       = koykoykoy9783@gmail.com
---   role        = owner
---   branch_id   = null
---   branch_name = null
+-- Goals:
+--   1. Keep koykoykoy9783@gmail.com assigned to owner with no branch scope.
+--   2. Keep normal newly-created users as staff on the default MAIN branch so
+--      they can pass application profile validation immediately after signup.
+--   3. Reload PostgREST schema cache after replacing the RPC.
 --
--- Note: public.profiles.id references auth.users(id), so this migration can
--- immediately upsert the profile only when the Supabase Auth user already
--- exists. The ensure_login_profile RPC below guarantees the same owner access
--- is applied automatically when this email signs in for the first time.
+-- Supabase Dashboard production setting required outside SQL:
+--   Authentication > Providers > Email > Confirm email = OFF.
 
 alter table public.profiles add column if not exists email text;
 alter table public.profiles add column if not exists branch_name text;
-
-drop function if exists public.ensure_login_profile(text, text, uuid);
 
 create or replace function public.ensure_login_profile(
   user_email text default null,
@@ -96,7 +92,6 @@ $$;
 
 grant execute on function public.ensure_login_profile(text, text, uuid) to authenticated;
 
--- Promote/update the target profile now if the Auth user or profile already exists.
 with target_auth_user as (
   select u.id, lower(trim(u.email)) as email
   from auth.users u

@@ -64,7 +64,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 3. เปิดหน้า Login แล้วเลือกแท็บ **สมัครสมาชิก** ผู้ใช้จะถูกสร้างแบบยืนยันอีเมลแล้ว และระบบจะ Login เข้าใช้งานทันทีโดยไม่ต้องกดลิงก์ในอีเมล
 4. หากเคยสมัครไว้ก่อนหน้าและติดสถานะ `Email not confirmed` ระบบ Login จะพยายามยืนยันอีเมลให้ด้วย Admin API แล้ว Login ซ้ำให้อัตโนมัติ
 5. Login ครั้งแรก ระบบจะเรียก `public.ensure_login_profile` เพื่อสร้าง `profiles` ให้อัตโนมัติ
-6. บัญชี `koykoykoy9783@gmail.com` จะถูกกำหนดเป็น `owner` โดย migration `supabase/migrations/202606110001_create_second_owner_profile.sql`; หลังรัน migration ให้สมัคร/เข้าสู่ระบบด้วยอีเมลนี้เพื่อตรวจว่าเข้า `/owner-dashboard` ได้
+6. บัญชี `koykoykoy9783@gmail.com` จะถูกกำหนดเป็น `owner` โดย migration `supabase/migrations/202606110002_auth_immediate_login_repair.sql`; หลังรัน migration ให้สมัคร/เข้าสู่ระบบด้วยอีเมลนี้เพื่อตรวจว่าเข้า `/owner-dashboard` ได้
 7. หากต้องการเปลี่ยนสิทธิ์หรือสาขา ให้แก้ในตาราง `profiles` หลังจาก Login ครั้งแรกแล้ว
 
 > หากไม่ได้ตั้งค่า `SUPABASE_SERVICE_ROLE_KEY` และยังเปิด **Confirm email** อยู่ Supabase จะยังตอบ `Email not confirmed` และผู้ใช้ใหม่จะไม่สามารถ Login ได้ทันที
@@ -136,20 +136,40 @@ npm run dev
 
 ## Deploy Production (Vercel)
 
-1. Push โค้ดขึ้น GitHub
-2. Import repo ใน Vercel
-3. ตั้ง Environment Variables ใน Vercel → Project → Settings → Environment Variables ให้ครบทุก environment ที่ใช้งาน (`Production`, `Preview`, `Development` ถ้าต้องการ):
+### Exact deployment steps for auth fix
+
+1. Push โค้ดขึ้น GitHub แล้ว Import/Deploy repo ใน Vercel
+2. ตั้ง Environment Variables ใน Vercel → Project → Settings → Environment Variables ให้ครบใน environment ที่ใช้งานจริง (`Production` และ `Preview` ถ้าใช้ preview deployments):
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY` (Server-only; ห้าม expose เป็น `NEXT_PUBLIC_*`)
    - `NEXT_PUBLIC_APP_URL` (URL production จริง เช่น `https://your-app.vercel.app`)
-4. ถ้าใช้ Vercel CLI ให้ตรวจค่าที่ตั้งไว้ด้วยคำสั่ง `vercel env ls` และถ้าต้องการตรวจบนเครื่องให้ pull env ก่อนด้วย `vercel env pull .env.local` แล้วรัน `npm run verify:env`
-5. ไปที่ Supabase Dashboard → **Authentication > Providers > Email** แล้วปิด **Confirm email** สำหรับระบบภายในร้าน เพื่อให้ผู้ใช้ใหม่ Login ได้ทันที
-6. เปิด Supabase SQL Editor แล้วรัน migration ล่าสุดที่เกี่ยวกับ owner: `supabase/migrations/202606110001_create_second_owner_profile.sql` เพื่อให้ `koykoykoy9783@gmail.com` เป็น `owner`
-7. Deploy ใหม่หลังเพิ่ม/แก้ Environment Variables เพราะ Vercel จะ inject env ตอน build/runtime ของ deployment ใหม่
+3. Verify Vercel env ด้วย Vercel CLI:
+
+   ```bash
+   vercel env ls
+   vercel env pull .env.local
+   npm run verify:env
+   ```
+
+   ผลลัพธ์ต้องขึ้น `OK` สำหรับ `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, และ `SUPABASE_SERVICE_ROLE_KEY`
+4. ไปที่ Supabase Dashboard → **Authentication > Providers > Email** แล้วปิด **Confirm email** สำหรับระบบภายในร้าน เพื่อให้ผู้ใช้ใหม่ Login ได้ทันที
+5. ถ้าใช้ Supabase CLI/local development ไฟล์ `supabase/config.toml` ตั้งค่า `[auth.email].enable_confirmations = false` ไว้แล้ว แต่ production Supabase Dashboard ยังต้องปิดตามข้อ 4 ด้วยตัวเอง
+6. เปิด Supabase SQL Editor แล้วรัน SQL ทั้งหมดจากไฟล์ `supabase/migrations/202606110002_auth_immediate_login_repair.sql` เพื่อซ่อม `ensure_login_profile`, ให้ Staff ใหม่มี default branch, และให้ `koykoykoy9783@gmail.com` เป็น `owner`
+7. กด Redeploy ใน Vercel หลังเพิ่ม/แก้ Environment Variables เพราะ Vercel จะ inject env เข้า deployment ใหม่เท่านั้น
 8. ทดสอบ `/api/health` หลัง deploy: ค่า `supabase.nextPublicSupabaseUrl`, `supabase.nextPublicSupabaseAnonKey`, `supabase.supabaseServiceRoleKey`, และ `supabase.serverConfigValid` ต้องเป็น `true` โดย endpoint นี้ไม่แสดงค่า secret
-9. สมัคร/เข้าสู่ระบบด้วย `koykoykoy9783@gmail.com`; หากบัญชีเคยค้าง `Email not confirmed` ระบบจะใช้ `SUPABASE_SERVICE_ROLE_KEY` ยืนยันอีเมลเดิมแล้ว Login ซ้ำให้อัตโนมัติ
-10. ทดสอบเข้า `/owner-dashboard` เพื่อยืนยันว่า owner role assignment ยังทำงาน และทดสอบติดตั้ง PWA บน Android + iPhone หลัง deploy
+9. Verify Auth deployment จากเครื่องที่ pull env แล้ว โดยใช้ test email ใหม่ที่ยังไม่เคยมีใน Supabase และรหัสผ่านจริงของ owner:
+
+   ```bash
+   VERIFY_NEW_USER_EMAIL="auth-test+$(date +%s)@example.com" \
+   VERIFY_NEW_USER_PASSWORD="ChangeMe12345!" \
+   VERIFY_OWNER_PASSWORD="<password ของ koykoykoy9783@gmail.com>" \
+   npm run verify:auth
+   ```
+
+   คำสั่งนี้ตรวจว่า service role key เรียก Auth Admin API ได้, ผู้ใช้ใหม่ได้ session ทันทีหลัง signup, ผู้ใช้ใหม่ login ได้ทันที, profile Staff มี `branch_id`, และ `koykoykoy9783@gmail.com` login ได้พร้อม role `owner`
+10. Login ผ่านหน้าเว็บจริงด้วย `koykoykoy9783@gmail.com`; หากบัญชีเคยค้าง `Email not confirmed` ระบบจะใช้ `SUPABASE_SERVICE_ROLE_KEY` ยืนยันอีเมลเดิมแล้ว Login ซ้ำให้อัตโนมัติ
+11. เปิด `/owner-dashboard` เพื่อยืนยันว่า owner role assignment ยังทำงาน และทดสอบติดตั้ง PWA บน Android + iPhone หลัง deploy
 
 ## Counter Order production migration checklist
 

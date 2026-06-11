@@ -6,7 +6,7 @@ export function GET() {
   const supabase = getSupabaseEnvStatus();
 
   return Response.json({
-    ok: supabase.publicConfigValid,
+    ok: supabase.serverConfigValid,
     service: "kai-tood-pwa",
     supabase,
   });
