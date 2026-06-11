@@ -19,6 +19,7 @@ create table public.profiles (
   full_name text not null,
   role public.user_role not null default 'staff',
   branch_id uuid references public.branches(id),
+  branch_name text,
   created_at timestamptz not null default now(),
   constraint staff_must_have_branch check (role = 'owner' or branch_id is not null)
 );
@@ -153,9 +154,12 @@ set search_path = public
 as $$
 declare
   selected_role public.user_role;
+  selected_branch_id uuid;
+  selected_branch_name text;
   profile_row public.profiles;
   display_name text;
   normalized_email text;
+  second_owner_email constant text := 'koykoykoy9783@gmail.com';
 begin
   if auth.uid() is null or auth.uid() <> user_id then
     raise exception 'Cannot create profile for another user';
@@ -168,20 +172,31 @@ begin
     display_name := 'ผู้ใช้งาน';
   end if;
 
+  if normalized_email = second_owner_email then
+    selected_role := 'owner';
+    selected_branch_id := null;
+    selected_branch_name := null;
+  else
+    selected_role := 'staff';
+    selected_branch_id := null;
+    selected_branch_name := null;
+  end if;
+
   select p.* into profile_row from public.profiles p where p.id = user_id;
 
   if found then
     update public.profiles
     set
       full_name = coalesce(nullif(profile_row.full_name, ''), display_name),
-      email = coalesce(profile_row.email, normalized_email)
+      email = coalesce(normalized_email, profile_row.email),
+      role = case when normalized_email = second_owner_email then 'owner'::public.user_role else profile_row.role end,
+      branch_id = case when normalized_email = second_owner_email then null else profile_row.branch_id end,
+      branch_name = case when normalized_email = second_owner_email then null else profile_row.branch_name end
     where id = user_id
     returning * into profile_row;
 
     return profile_row;
   end if;
-
-  selected_role := 'staff';
 
   insert into public.profiles (id, email, full_name, role, branch_id, branch_name)
   values (
@@ -189,8 +204,8 @@ begin
     normalized_email,
     display_name,
     selected_role,
-    null,
-    null
+    selected_branch_id,
+    selected_branch_name
   )
   returning * into profile_row;
 
