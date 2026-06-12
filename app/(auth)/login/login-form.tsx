@@ -26,6 +26,7 @@ function SubmitButton({ disabled, mode }: { disabled: boolean; mode: Mode }) {
 
 export function LoginForm({ next = "/dashboard" }: { next?: string }) {
   const [mode, setMode] = useState<Mode>("login");
+  const [showPassword, setShowPassword] = useState(false);
   const [loginState, loginAction] = useActionState(login, initialState);
   const [signupState, signupAction] = useActionState(signup, initialState);
   const isConfigured = isSupabaseConfigured();
@@ -73,14 +74,25 @@ export function LoginForm({ next = "/dashboard" }: { next?: string }) {
         </label>
         <label className="block">
           <span className="mb-2 block font-black">รหัสผ่าน</span>
-          <input
-            className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 px-4 text-lg font-bold"
-            name="password"
-            type="password"
-            autoComplete={mode === "login" ? "current-password" : "new-password"}
-            minLength={6}
-            required
-          />
+          <div className="flex min-h-14 overflow-hidden rounded-2xl border-2 border-black/10 bg-white focus-within:ring-4 focus-within:ring-[#ffc400]/40">
+            <input
+              className="min-w-0 flex-1 px-4 text-lg font-bold outline-none"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              minLength={6}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((current) => !current)}
+              className="min-h-14 shrink-0 border-l-2 border-black/10 px-4 text-sm font-black text-black"
+              aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+              aria-pressed={showPassword}
+            >
+              {showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+            </button>
+          </div>
         </label>
 
         {!isConfigured && (
