@@ -1,4 +1,4 @@
--- Supabase schema for Kai Tood Manager
+-- Supabase schema for เหนียวไก่เยอะโคตร ระบบบริหารร้านและแฟรนไชส์
 create extension if not exists "pgcrypto";
 
 create type public.user_role as enum ('owner', 'staff');

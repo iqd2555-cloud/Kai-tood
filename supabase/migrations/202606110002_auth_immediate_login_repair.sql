@@ -1,4 +1,4 @@
--- Auth immediate-login repair for Kai Tood Manager.
+-- Auth immediate-login repair for เหนียวไก่เยอะโคตร ระบบบริหารร้านและแฟรนไชส์.
 -- Safe to run multiple times in Supabase SQL Editor.
 --
 -- Goals:

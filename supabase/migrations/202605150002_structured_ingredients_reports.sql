@@ -1,4 +1,4 @@
--- Structured ingredient usage and order request fields for Kai Tood reports.
+-- Structured ingredient usage and order request fields for เหนียวไก่เยอะโคตร reports.
 -- Safe to run in Supabase SQL Editor on an existing project.
 
 alter table public.daily_reports
