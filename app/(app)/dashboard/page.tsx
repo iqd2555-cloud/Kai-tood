@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { BrandLogo } from "@/components/brand-logo";
 import { DashboardRealtime } from "@/components/dashboard-realtime";
 import { StatCard } from "@/components/stat-card";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
+import { BRAND_NAME, BRAND_SUBTITLE } from "@/lib/brand";
 import { formatThaiDate, moneyFormatter, numberFormatter, todayISO, daysAgoISO } from "@/lib/format";
 import { REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS, getRemainingChickenTotal } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
@@ -75,10 +77,19 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-5">
       <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">
-        <p className="text-sm font-bold text-[#ffc400]">ภาพรวมวันนี้</p>
-        <h1 className="mt-2 text-3xl font-black">{isOwner(profile) ? "ทุกสาขา" : profile.branch?.name}</h1>
-        <p className="mt-2 text-white/70">ข้อมูลอัปเดตทันทีเมื่อพนักงานบันทึกยอดขาย วัตถุดิบ และรายการสั่งของ</p>
-        <div className="mt-4"><DashboardRealtime /></div>
+        <div className="flex items-center gap-4">
+          <BrandLogo size={64} priority className="rounded-2xl shadow-lg shadow-[#ffc400]/20" />
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-[#ffc400]">ภาพรวมวันนี้</p>
+            <h1 className="truncate text-3xl font-black text-[#ffc400]">{BRAND_NAME}</h1>
+            <p className="text-sm font-bold text-white/80">{BRAND_SUBTITLE}</p>
+          </div>
+        </div>
+        <div className="mt-5 rounded-2xl bg-white/10 p-4">
+          <h2 className="text-2xl font-black">{isOwner(profile) ? "ทุกสาขา" : profile.branch?.name}</h2>
+          <p className="mt-2 text-white/70">ข้อมูลอัปเดตทันทีเมื่อพนักงานบันทึกยอดขาย วัตถุดิบ และรายการสั่งของ</p>
+          <div className="mt-4"><DashboardRealtime /></div>
+        </div>
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

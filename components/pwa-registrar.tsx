@@ -178,7 +178,7 @@ export function PwaRegistrar() {
           onClick={handleInstall}
           className="fixed bottom-4 left-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-xl bg-yellow-400 px-4 py-3 text-base font-bold text-black shadow-lg"
         >
-          ติดตั้งแอป Kai Tood Manager
+          ติดตั้งแอปเหนียวไก่เยอะโคตร
         </button>
       ) : null}
 

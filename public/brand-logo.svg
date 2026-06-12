@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
-  <title id="title">เหนียวไก่เยอะโคตร app icon</title>
-  <desc id="desc">Brand app icon using the restaurant logo.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">เหนียวไก่เยอะโคตร logo</title>
+  <desc id="desc">Black and yellow brand logo for the restaurant management app.</desc>
   <rect width="512" height="512" rx="116" fill="#111111"/>
   <path d="M126 344c0-72 58-130 130-130s130 58 130 130v26H126v-26Z" fill="#FFC400"/>
   <path d="M166 217c30-60 73-91 90-91s60 31 90 91c-28-13-58-20-90-20s-62 7-90 20Z" fill="#FFFFFF"/>

@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { PwaRegistrar } from "@/components/pwa-registrar";
+import { BRAND_DESCRIPTION, BRAND_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Kai Tood Manager",
-  description: "ระบบจัดการร้านเหนียวไก่เยอะโคตร",
+  title: BRAND_NAME,
+  description: BRAND_DESCRIPTION,
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Kai Tood",
+    title: BRAND_NAME,
   },
 };
 

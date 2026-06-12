@@ -1,4 +1,4 @@
--- Create or promote the second owner profile for Kai Tood Manager.
+-- Create or promote the second owner profile for เหนียวไก่เยอะโคตร ระบบบริหารร้านและแฟรนไชส์.
 -- Safe to run multiple times in Supabase SQL Editor.
 --
 -- Owner profile requirement:

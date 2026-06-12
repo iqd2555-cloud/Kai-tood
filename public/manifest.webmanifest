@@ -1,7 +1,7 @@
 {
-  "name": "Kai Tood Manager",
-  "short_name": "Kai Tood",
-  "description": "ระบบจัดการร้านเหนียวไก่เยอะโคตร",
+  "name": "เหนียวไก่เยอะโคตร",
+  "short_name": "เหนียวไก่",
+  "description": "ระบบบริหารร้านและแฟรนไชส์",
   "start_url": "/login?v=latest",
   "scope": "/",
   "display": "standalone",

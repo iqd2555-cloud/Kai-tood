@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
+import { BRAND_NAME, BRAND_SUBTITLE } from "@/lib/brand";
 import { signOut } from "@/app/actions";
 import { canUseStaffCounterOrder } from "@/lib/counter-access";
 import type { Profile } from "@/lib/types";
@@ -11,9 +13,13 @@ export function AppNav({ profile }: { profile: Profile }) {
     <header className="sticky top-0 z-20 border-b border-black/10 bg-[#111111] text-white shadow-lg">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
         <div className="flex min-w-0 flex-col gap-1">
-          <Link href="/dashboard" className="focus-ring rounded-xl">
-            <div className="text-lg font-black text-[#ffc400]">Kai Tood</div>
-            <div className="text-xs text-white/70">{isOwner ? "เจ้าของร้าน" : profile.branch?.name ?? "พนักงาน"}</div>
+          <Link href="/dashboard" className="focus-ring flex items-center gap-3 rounded-xl">
+            <BrandLogo size={46} className="rounded-xl" />
+            <div className="min-w-0">
+              <div className="truncate text-lg font-black leading-tight text-[#ffc400]">{BRAND_NAME}</div>
+              <div className="truncate text-xs font-bold text-white/80">{BRAND_SUBTITLE}</div>
+              <div className="truncate text-xs text-white/60">{isOwner ? "เจ้าของร้าน" : profile.branch?.name ?? "พนักงาน"}</div>
+            </div>
           </Link>
           {isOwner && (
             <div className="max-w-[16rem] truncate rounded-full bg-[#ffc400]/15 px-3 py-1 text-xs font-black text-[#ffc400] sm:max-w-sm">

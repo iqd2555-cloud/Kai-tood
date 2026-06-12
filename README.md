@@ -1,4 +1,4 @@
-# Kai Tood Manager PWA
+# เหนียวไก่เยอะโคตร PWA
 
 เว็บแอป PWA สำหรับบริหารร้านไก่ทอดและข้าวเหนียว รองรับหลายสาขา แยกสิทธิ์ Owner/Staff และใช้ Supabase เป็นฐานข้อมูล + Auth + Realtime
 
@@ -124,7 +124,7 @@ npm run dev
 
 1. เปิด URL ของระบบผ่าน Chrome
 2. Login ให้เรียบร้อย
-3. กดปุ่ม **ติดตั้งแอป Kai Tood Manager** ที่ด้านล่างหน้าจอ (Add to Home Screen)
+3. กดปุ่ม **ติดตั้งแอปเหนียวไก่เยอะโคตร** ที่ด้านล่างหน้าจอ (Add to Home Screen)
 4. กดยืนยัน Install
 5. เปิดจากไอคอนบนหน้า Home จะใช้งานแบบเต็มจอ ไม่มี URL bar และมี splash screen จากค่า manifest
 

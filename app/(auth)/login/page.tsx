@@ -1,3 +1,5 @@
+import { BrandLogo } from "@/components/brand-logo";
+import { BRAND_NAME, BRAND_SUBTITLE } from "@/lib/brand";
 import { LoginForm } from "./login-form";
 
 function getSafeNext(next: string | string[] | undefined) {
@@ -22,10 +24,12 @@ export default async function LoginPage({
   return (
     <main className="app-shell flex min-h-dvh items-center justify-center px-4 py-8">
       <div className="w-full max-w-md rounded-[2rem] border border-black/10 bg-white p-6 shadow-2xl">
-        <div className="mb-8 rounded-[1.5rem] bg-[#111111] p-6 text-white">
-          <div className="text-sm font-bold text-[#ffc400]">ระบบร้านไก่ทอด</div>
-          <h1 className="mt-2 text-4xl font-black leading-tight">เข้าสู่ระบบ / สมัครสมาชิก</h1>
-          <p className="mt-2 text-white/70">สำหรับพนักงานและเจ้าของร้าน รองรับมือถือและติดตั้งเป็น PWA พร้อมโหมดสมัครสมาชิกพนักงาน</p>
+        <div className="mb-8 rounded-[1.5rem] bg-[#111111] p-6 text-center text-white">
+          <div className="flex justify-center">
+            <BrandLogo size={88} priority className="shadow-lg shadow-[#ffc400]/20" />
+          </div>
+          <h1 className="mt-4 text-3xl font-black leading-tight text-[#ffc400]">{BRAND_NAME}</h1>
+          <p className="mt-2 text-base font-bold text-white/85">{BRAND_SUBTITLE}</p>
         </div>
         {setupMissing && (
           <div className="mb-5 rounded-2xl bg-yellow-50 p-3 font-bold text-yellow-900">
