@@ -61,6 +61,23 @@ function isEmailConfirmationError(message: string) {
 const immediateSignupSetupMessage =
   "Supabase ยังเปิด Confirm email หรือยังไม่ได้ตั้งค่า SUPABASE_SERVICE_ROLE_KEY บน Vercel จึงไม่สามารถให้ผู้ใช้ใหม่เข้าใช้งานทันทีได้ กรุณาเพิ่ม SUPABASE_SERVICE_ROLE_KEY เป็น Server Environment Variable และปิด Confirm email ใน Supabase Auth > Providers > Email";
 
+function getProductionEmailRedirectUrl() {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (!appUrl) return undefined;
+
+  try {
+    const parsedUrl = new URL(appUrl);
+    if (parsedUrl.protocol !== "https:") return undefined;
+    if (["localhost", "127.0.0.1", "0.0.0.0"].includes(parsedUrl.hostname)) return undefined;
+
+    parsedUrl.hash = "";
+    parsedUrl.search = "";
+    return parsedUrl.toString().replace(/\/$/, "");
+  } catch {
+    return undefined;
+  }
+}
+
 async function confirmExistingEmail(email: string) {
   const adminSupabase = createSupabaseAdminClient();
   if (!adminSupabase) return { ok: false, message: "" };
@@ -181,7 +198,7 @@ export async function signup(_: AuthFormState, formData: FormData): Promise<Auth
     email: normalizedEmail,
     password,
     options: {
-      emailRedirectTo: undefined,
+      emailRedirectTo: getProductionEmailRedirectUrl(),
       data: {
         full_name: fullName,
       },
