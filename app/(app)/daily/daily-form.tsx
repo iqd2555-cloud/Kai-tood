@@ -3,7 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { saveDailyReport } from "@/app/actions";
 import { NumberField, TextAreaField } from "@/components/field";
-import { ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS } from "@/lib/report-items";
+import { INVENTORY_FLOW_ITEMS, OPENING_INVENTORY_ITEMS, ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS } from "@/lib/report-items";
 import { moneyFormatter } from "@/lib/format";
 import { SubmitButton } from "./submit-button";
 import type { Branch, DailyReport } from "@/lib/types";
@@ -17,6 +17,17 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
   const [selectedBranchId, setSelectedBranchId] = useState(existingReport?.branch_id ?? defaultBranchId);
   const selectedBranchName = branches.find((branch) => branch.id === selectedBranchId)?.name ?? "";
   const totalSales = useMemo(() => cashSales + transferSales, [cashSales, transferSales]);
+  const [inventoryValues, setInventoryValues] = useState<Record<string, number>>(() => {
+    const values: Record<string, number> = {};
+    for (const item of INVENTORY_FLOW_ITEMS) {
+      values[item.opening] = Number(existingReport?.[item.opening] ?? 0);
+      values[item.received] = Number(existingReport?.[item.received] ?? 0);
+      values[item.used] = Number(existingReport?.[item.used] ?? 0);
+      values[item.remaining] = Number(existingReport?.[item.remaining] ?? 0);
+    }
+    return values;
+  });
+  const setInventoryField = (name: string, value: number) => setInventoryValues((prev) => ({ ...prev, [name]: value }));
 
   const [otherOrderItems, setOtherOrderItems] = useState<{ name: string; amount: number }[]>(
     Array.isArray(existingReport?.order_other_items) && existingReport?.order_other_items.length > 0
@@ -48,6 +59,22 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
         </div>
       </section>
 
+      <section id="opening-inventory" className="scroll-mt-24 rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
+        <h2 className="text-2xl font-black">0. ยกมา / คงเหลือจากเมื่อวาน</h2>
+        <p className="mt-1 text-sm font-bold text-black/50">กรอกจำนวนวัตถุดิบที่ยกมาจากเมื่อวานให้ครบทุกประเภท เพื่อใช้คำนวณคงเหลือวันนี้</p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          {OPENING_INVENTORY_ITEMS.map((item) => (
+            <NumberField
+              key={item.name}
+              label={`${item.label} (${item.unit})`}
+              name={item.name}
+              defaultValue={Number(existingReport?.[item.name] ?? 0)}
+              onChange={(event) => setInventoryField(item.name, Number(event.target.value || 0))}
+            />
+          ))}
+        </div>
+      </section>
+
       <section id="received-inventory" className="scroll-mt-24 rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
         <h2 className="text-2xl font-black">1. วัตถุดิบรับเข้า</h2>
         <p className="mt-1 text-sm font-bold text-black/50">กรอกตอนเช้าหรือตอนของมาส่ง เพื่อให้รายงานคำนวณรับเข้า เหลือ ใช้ไป และควรสั่งเพิ่มได้ครบ</p>
@@ -58,6 +85,7 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
               label={`${item.label} (${item.unit})`}
               name={item.name}
               defaultValue={Number(existingReport?.[item.name] ?? 0)}
+              onChange={(event) => setInventoryField(item.name, Number(event.target.value || 0))}
             />
           ))}
         </div>
@@ -109,6 +137,7 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
               label={`${item.label} (${item.unit})`}
               name={item.name}
               defaultValue={Number(existingReport?.[item.name] ?? 0)}
+              onChange={(event) => setInventoryField(item.name, Number(event.target.value || 0))}
             />
           ))}
         </div>
@@ -124,8 +153,35 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
               label={`${item.label} (${item.unit})`}
               name={item.name}
               defaultValue={Number(existingReport?.[item.name] ?? 0)}
+              onChange={(event) => setInventoryField(item.name, Number(event.target.value || 0))}
             />
           ))}
+        </div>
+      </section>
+
+      <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
+        <h2 className="text-2xl font-black">คงเหลือคำนวณวันนี้</h2>
+        <p className="mt-1 text-sm font-bold text-black/50">สูตร: ยกมา + รับเข้า - ใช้ไป และเทียบกับสินค้าคงเหลือปิดร้านที่กรอกจริง</p>
+        <div className="mt-4 overflow-hidden rounded-2xl border border-black/10">
+          <div className="grid grid-cols-4 bg-black px-3 py-2 text-xs font-black text-white">
+            <span>วัตถุดิบ</span>
+            <span className="text-right">คำนวณวันนี้</span>
+            <span className="text-right">ปิดร้านจริง</span>
+            <span className="text-right">ส่วนต่าง</span>
+          </div>
+          {INVENTORY_FLOW_ITEMS.map((item) => {
+            const calculated = (inventoryValues[item.opening] ?? 0) + (inventoryValues[item.received] ?? 0) - (inventoryValues[item.used] ?? 0);
+            const actual = inventoryValues[item.remaining] ?? 0;
+            const difference = actual - calculated;
+            return (
+              <div key={item.label} className="grid grid-cols-4 border-t border-black/10 px-3 py-3 text-xs font-bold sm:text-sm">
+                <span>{item.label}</span>
+                <span className="text-right">{calculated.toLocaleString("th-TH")}</span>
+                <span className="text-right">{actual.toLocaleString("th-TH")}</span>
+                <span className={`text-right font-black ${difference === 0 ? "text-green-700" : "text-red-700"}`}>{difference.toLocaleString("th-TH")}</span>
+              </div>
+            );
+          })}
         </div>
       </section>
 

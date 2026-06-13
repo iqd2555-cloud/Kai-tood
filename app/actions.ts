@@ -13,7 +13,21 @@ const dailyReportSchema = z.object({
   branch_name: z.string().optional().default(""),
   cash_sales: z.coerce.number().min(0),
   transfer_sales: z.coerce.number().min(0),
-  received_chicken: z.coerce.number().min(0),
+  opening_original_chicken: z.coerce.number().min(0),
+  opening_spicy_chicken: z.coerce.number().min(0),
+  opening_ground_chicken: z.coerce.number().min(0),
+  opening_drumstick: z.coerce.number().min(0),
+  opening_offal: z.coerce.number().min(0),
+  opening_chicken_skin: z.coerce.number().min(0),
+  opening_sticky_rice: z.coerce.number().min(0),
+  opening_oil: z.coerce.number().min(0),
+  received_original_chicken: z.coerce.number().min(0),
+  received_spicy_chicken: z.coerce.number().min(0),
+  received_ground_chicken: z.coerce.number().min(0),
+  received_drumstick: z.coerce.number().min(0),
+  received_offal: z.coerce.number().min(0),
+  received_chicken_skin: z.coerce.number().min(0),
+  received_chicken: z.coerce.number().min(0).optional().default(0),
   received_sticky_rice: z.coerce.number().min(0),
   received_oil: z.coerce.number().min(0),
   used_bl: z.coerce.number().min(0),
@@ -23,6 +37,7 @@ const dailyReportSchema = z.object({
   used_sticky_rice: z.coerce.number().min(0),
   used_chopped_chicken: z.coerce.number().min(0),
   used_drumstick: z.coerce.number().min(0),
+  used_offal: z.coerce.number().min(0),
   remaining_original_chicken: z.coerce.number().min(0),
   remaining_spicy_chicken: z.coerce.number().min(0),
   remaining_ground_chicken: z.coerce.number().min(0),
@@ -106,9 +121,12 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
     reportBranchId: payload.branch_id,
   });
 
+  const totalReceivedChicken = payload.received_original_chicken + payload.received_spicy_chicken + payload.received_ground_chicken + payload.received_drumstick + payload.received_offal + payload.received_chicken_skin;
+
   const { error } = await supabase.from("daily_reports").upsert(
     {
       ...payload,
+      received_chicken: totalReceivedChicken,
       remaining_chicken: payload.remaining_original_chicken,
       branch_name: canonicalBranchName,
       requested_items: allRequestedItems,

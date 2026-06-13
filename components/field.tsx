@@ -1,4 +1,6 @@
-export function NumberField({ label, name, defaultValue = 0, step = "0.01" }: { label: string; name: string; defaultValue?: number; step?: string }) {
+import type { ChangeEventHandler } from "react";
+
+export function NumberField({ label, name, defaultValue = 0, step = "0.01", onChange }: { label: string; name: string; defaultValue?: number; step?: string; onChange?: ChangeEventHandler<HTMLInputElement> }) {
   return (
     <label className="block">
       <span className="mb-2 block text-base font-black text-black">{label}</span>
@@ -10,6 +12,7 @@ export function NumberField({ label, name, defaultValue = 0, step = "0.01" }: { 
         step={step}
         name={name}
         defaultValue={defaultValue}
+        onChange={onChange}
       />
     </label>
   );
