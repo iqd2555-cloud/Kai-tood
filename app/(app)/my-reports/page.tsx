@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { DateShortcuts } from "@/components/date-shortcuts";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
-import { canUseStaffCounterOrder } from "@/lib/counter-access";
 import { formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib/format";
 import { ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS, getRemainingChickenTotal } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
@@ -22,8 +21,6 @@ function isIsoDate(value: string | undefined) {
 
 export default async function MyReportsPage({ searchParams }: MyReportsPageProps) {
   const profile = await getCurrentProfile();
-  if (canUseStaffCounterOrder(profile)) redirect("/counter-orders");
-
   const supabase = await createSupabaseServerClient();
   if (!supabase) redirect("/login?setup=supabase");
 
@@ -38,8 +35,8 @@ export default async function MyReportsPage({ searchParams }: MyReportsPageProps
     .gte("report_date", from)
     .lte("report_date", to)
     .order("report_date", { ascending: false });
-  if (!isOwner(profile) && profile.branch_id) {
-    query = query.eq("branch_id", profile.branch_id);
+  if (!isOwner(profile)) {
+    query = query.eq("submitted_by", profile.id);
   }
 
   const { data } = await query.returns<DailyReport[]>();
@@ -47,6 +44,7 @@ export default async function MyReportsPage({ searchParams }: MyReportsPageProps
 
   return (
     <div className="space-y-4">
+      <div className="rounded-full bg-[#ffc400]/20 px-4 py-2 text-sm font-black text-black">Debug: MyReportsPage</div>
       <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">
         <p className="text-sm font-bold text-[#ffc400]">{isOwner(profile) ? "สำหรับเจ้าของร้าน" : "สำหรับพนักงาน"}</p>
         <h1 className="mt-2 text-3xl font-black">รายงานของฉัน</h1>

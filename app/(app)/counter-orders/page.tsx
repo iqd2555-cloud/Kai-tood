@@ -112,10 +112,13 @@ export default async function CounterOrdersPage({ searchParams }: CounterOrdersP
 
   if (staffOrderInputEnabled) {
     return (
-      <StaffCounterOrderInput
-        branchId={selectedBranchId}
-        priceItems={priceItems.map((item) => ({ price: item.price, item_name: item.item_name }))}
-      />
+      <div className="space-y-4">
+        <div className="rounded-full bg-[#ffc400]/20 px-4 py-2 text-sm font-black text-black">Debug: StaffCounterOrderPage</div>
+        <StaffCounterOrderInput
+          branchId={selectedBranchId}
+          priceItems={priceItems.map((item) => ({ price: item.price, item_name: item.item_name }))}
+        />
+      </div>
     );
   }
 

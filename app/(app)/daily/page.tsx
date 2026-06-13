@@ -1,14 +1,12 @@
 import { redirect } from "next/navigation";
 import { DailyForm } from "./daily-form";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
-import { canUseStaffCounterOrder } from "@/lib/counter-access";
 import { todayISO } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch, DailyReport } from "@/lib/types";
 
 export default async function DailyPage() {
   const profile = await getCurrentProfile();
-  if (canUseStaffCounterOrder(profile)) redirect("/counter-orders");
   const supabase = await createSupabaseServerClient();
   if (!supabase) redirect("/login?setup=supabase");
 
@@ -42,6 +40,7 @@ export default async function DailyPage() {
 
   return (
     <div className="space-y-5">
+      <div className="rounded-full bg-[#ffc400]/20 px-4 py-2 text-sm font-black text-black">Debug: DailyInputPage</div>
       <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">
         <p className="text-sm font-bold text-[#ffc400]">สำหรับพนักงาน</p>
         <h1 className="mt-2 text-3xl font-black">กรอกข้อมูลประจำวัน</h1>
