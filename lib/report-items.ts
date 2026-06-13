@@ -1,30 +1,23 @@
 import type { DailyReport } from "@/lib/types";
 
-export const RECEIVED_INGREDIENT_ITEMS = [
+export const INVENTORY_FLOW_ITEMS = [
+  { label: "ไก่ทอดดั้งเดิม", unit: "กิโลกรัม", opening: "opening_original_chicken", received: "received_original_chicken", used: "used_bl", remaining: "remaining_original_chicken" },
+  { label: "ไก่เผ็ด", unit: "กิโลกรัม", opening: "opening_spicy_chicken", received: "received_spicy_chicken", used: "used_bb", remaining: "remaining_spicy_chicken" },
+  { label: "ไก่สับ", unit: "กิโลกรัม", opening: "opening_ground_chicken", received: "received_ground_chicken", used: "used_chopped_chicken", remaining: "remaining_ground_chicken" },
+  { label: "น่องไก่", unit: "กิโลกรัม", opening: "opening_drumstick", received: "received_drumstick", used: "used_drumstick", remaining: "remaining_drumstick" },
+  { label: "เครื่องในไก่", unit: "กิโลกรัม", opening: "opening_offal", received: "received_offal", used: "used_offal", remaining: "remaining_offal" },
+  { label: "หนังไก่", unit: "กิโลกรัม", opening: "opening_chicken_skin", received: "received_chicken_skin", used: "used_chicken_skin", remaining: "remaining_chicken_skin" },
+  { label: "ข้าวเหนียว", unit: "กิโลกรัม", opening: "opening_sticky_rice", received: "received_sticky_rice", used: "used_sticky_rice", remaining: "remaining_sticky_rice" },
+  { label: "น้ำมัน", unit: "กิโลกรัม", opening: "opening_oil", received: "received_oil", used: "used_oil", remaining: "remaining_oil" },
+] as const;
+
+export const OPENING_INVENTORY_ITEMS = INVENTORY_FLOW_ITEMS.map(({ label, opening: name, unit }) => ({ label, name, unit })) as readonly { label: string; name: OpeningInventoryField; unit: string }[];
+export const RECEIVED_INGREDIENT_ITEMS = INVENTORY_FLOW_ITEMS.map(({ label, received: name, unit }) => ({ label, name, unit })) as readonly { label: string; name: ReceivedIngredientField; unit: string }[];
+export const USED_INGREDIENT_ITEMS = INVENTORY_FLOW_ITEMS.map(({ label, used: name, unit }) => ({ label, name, unit })) as readonly { label: string; name: UsedIngredientField; unit: string }[];
+export const REMAINING_INVENTORY_ITEMS = INVENTORY_FLOW_ITEMS.map(({ label, remaining: name, unit }) => ({ label: `${label}คงเหลือ`, name, unit })) as readonly { label: string; name: RemainingInventoryField; unit: string }[];
+
+export const LEGACY_RECEIVED_INGREDIENT_ITEMS = [
   { label: "ไก่รับเข้า", name: "received_chicken", unit: "กิโลกรัม" },
-  { label: "ข้าวเหนียวรับเข้า", name: "received_sticky_rice", unit: "กิโลกรัม" },
-  { label: "น้ำมันรับเข้า", name: "received_oil", unit: "กิโลกรัม" },
-] as const;
-
-export const USED_INGREDIENT_ITEMS = [
-  { label: "ไก่ทอดดั้งเดิม", name: "used_bl", unit: "กิโลกรัม" },
-  { label: "ไก่เผ็ด", name: "used_bb", unit: "กิโลกรัม" },
-  { label: "น้ำมัน", name: "used_oil", unit: "กิโลกรัม" },
-  { label: "ไก่สับ", name: "used_chopped_chicken", unit: "กิโลกรัม" },
-  { label: "น่องไก่", name: "used_drumstick", unit: "กิโลกรัม" },
-  { label: "หนังไก่", name: "used_chicken_skin", unit: "กิโลกรัม" },
-  { label: "ข้าวเหนียว", name: "used_sticky_rice", unit: "กิโลกรัม" },
-] as const;
-
-export const REMAINING_INVENTORY_ITEMS = [
-  { label: "ไก่ทอดดั้งเดิมคงเหลือ", name: "remaining_original_chicken", unit: "กิโลกรัม" },
-  { label: "ไก่ทอดพริกคงเหลือ", name: "remaining_spicy_chicken", unit: "กิโลกรัม" },
-  { label: "ไก่สับคงเหลือ", name: "remaining_ground_chicken", unit: "กิโลกรัม" },
-  { label: "น่องไก่คงเหลือ", name: "remaining_drumstick", unit: "กิโลกรัม" },
-  { label: "เครื่องในไก่คงเหลือ", name: "remaining_offal", unit: "กิโลกรัม" },
-  { label: "หนังไก่คงเหลือ", name: "remaining_chicken_skin", unit: "กิโลกรัม" },
-  { label: "ข้าวเหนียวคงเหลือ", name: "remaining_sticky_rice", unit: "กิโลกรัม" },
-  { label: "น้ำมันคงเหลือ", name: "remaining_oil", unit: "กิโลกรัม" },
 ] as const;
 
 export const ORDER_REQUEST_ITEMS = [
@@ -39,9 +32,10 @@ export const ORDER_REQUEST_ITEMS = [
   { label: "น้ำตาลปี๊บ", name: "order_palm_sugar", unit: "กิโลกรัม" },
 ] as const;
 
-export type ReceivedIngredientField = (typeof RECEIVED_INGREDIENT_ITEMS)[number]["name"];
-export type UsedIngredientField = (typeof USED_INGREDIENT_ITEMS)[number]["name"];
-export type RemainingInventoryField = (typeof REMAINING_INVENTORY_ITEMS)[number]["name"];
+export type OpeningInventoryField = (typeof INVENTORY_FLOW_ITEMS)[number]["opening"];
+export type ReceivedIngredientField = (typeof INVENTORY_FLOW_ITEMS)[number]["received"] | (typeof LEGACY_RECEIVED_INGREDIENT_ITEMS)[number]["name"];
+export type UsedIngredientField = (typeof INVENTORY_FLOW_ITEMS)[number]["used"];
+export type RemainingInventoryField = (typeof INVENTORY_FLOW_ITEMS)[number]["remaining"];
 export type OrderRequestField = (typeof ORDER_REQUEST_ITEMS)[number]["name"];
 
 export const REMAINING_CHICKEN_FIELDS = [
@@ -57,6 +51,14 @@ export type RemainingChickenField = (typeof REMAINING_CHICKEN_FIELDS)[number];
 
 export function getRemainingChickenTotal(report: Pick<DailyReport, RemainingChickenField>) {
   return REMAINING_CHICKEN_FIELDS.reduce((sum, field) => sum + Number(report[field] ?? 0), 0);
+}
+
+export function getCalculatedRemaining(report: DailyReport, item: (typeof INVENTORY_FLOW_ITEMS)[number]) {
+  return Number(report[item.opening] ?? 0) + Number(report[item.received] ?? 0) - Number(report[item.used] ?? 0);
+}
+
+export function getInventoryDifference(report: DailyReport, item: (typeof INVENTORY_FLOW_ITEMS)[number]) {
+  return Number(report[item.remaining] ?? 0) - getCalculatedRemaining(report, item);
 }
 
 export function formatStructuredOrderItems(report: Pick<DailyReport, OrderRequestField | "requested_items" | "order_other_items">) {
