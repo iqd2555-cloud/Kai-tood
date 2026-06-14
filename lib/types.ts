@@ -175,3 +175,28 @@ export type CounterOrder = {
   counter_order_items?: CounterOrderItem[] | null;
   counter_cancellations?: CounterCancellation[] | null;
 };
+
+
+export type LeadStatus = "new" | "contacted" | "qualified" | "not_qualified" | "pending_payment" | "converted";
+
+export type FranchiseLead = {
+  id: string;
+  full_name: string;
+  phone: string;
+  line_id: string | null;
+  province: string;
+  district: string | null;
+  current_job: string | null;
+  available_time_per_day: string | null;
+  budget_range: string;
+  has_location: string;
+  location_type: string | null;
+  expected_daily_income: string | null;
+  business_experience: string | null;
+  note: string | null;
+  internal_note: string | null;
+  status: LeadStatus;
+  source: string;
+  created_at: string;
+  updated_at: string;
+};
