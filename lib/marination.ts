@@ -19,7 +19,7 @@ export type MarinationStockMovement = {
   note: string | null;
   created_by: string;
   created_at: string;
-  chicken_parts?: Pick<ChickenPart, "name"> | null;
+  chicken_part?: Pick<ChickenPart, "id" | "name" | "sort_order"> | null;
   profiles?: Pick<Profile, "full_name" | "role"> | null;
 };
 
