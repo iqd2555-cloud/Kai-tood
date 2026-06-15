@@ -22,7 +22,7 @@ export default async function MarinationPage({ searchParams }: Props) {
     supabase.from("chicken_parts").select("*").eq("is_active", true).order("sort_order", { ascending: true }).returns<ChickenPart[]>(),
     supabase
       .from("marination_stock_movements")
-      .select("*, chicken_parts(name), profiles(full_name, role)")
+      .select(`*, chicken_part:chicken_parts!marination_stock_movements_chicken_part_id_fkey(id, name, sort_order), profiles(full_name, role)`)
       .eq("movement_date", selectedDate)
       .order("created_at", { ascending: false })
       .returns<MarinationStockMovement[]>(),
