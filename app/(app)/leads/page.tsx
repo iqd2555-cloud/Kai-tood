@@ -41,8 +41,19 @@ export default async function LeadsPage({ searchParams }: { searchParams?: Promi
         {leads.map((lead) => (
           <article key={lead.id} className="rounded-[1.5rem] border border-black/10 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h2 className="text-xl font-black">{lead.full_name}</h2><p className="font-bold text-black/60">{lead.phone} • {lead.province}{lead.district ? ` / ${lead.district}` : ""}</p><p className="mt-1 text-sm font-bold text-black/45">ส่งเมื่อ {formatDate(lead.created_at)}</p></div><span className="w-fit rounded-full bg-[#ffc400] px-3 py-1 text-sm font-black">{statusLabels[lead.status]}</span></div>
-            <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2"><div><b>Line:</b> {lead.line_id || "-"}</div><div><b>งบ:</b> {lead.budget_range}</div><div><b>ทำเล:</b> {lead.has_location} {lead.location_type || ""}</div><div><b>เวลา:</b> {lead.available_time_per_day || "-"}</div><div><b>อาชีพ:</b> {lead.current_job || "-"}</div><div><b>รายได้คาดหวัง:</b> {lead.expected_daily_income || "-"}</div></dl>
-            {lead.business_experience && <p className="mt-3 text-sm"><b>ประสบการณ์:</b> {lead.business_experience}</p>}{lead.note && <p className="mt-2 text-sm"><b>หมายเหตุผู้สมัคร:</b> {lead.note}</p>}
+            <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+              <div><b>Line:</b> {lead.line_id || "-"}</div>
+              <div><b>จังหวัด/อำเภอ:</b> {lead.province}{lead.district ? ` / ${lead.district}` : ""}</div>
+              <div><b>มีทำเล:</b> {lead.has_location}</div>
+              <div><b>ประเภททำเล:</b> {lead.location_type}</div>
+              <div><b>งบ:</b> {lead.budget_range}</div>
+              <div><b>ทุนสำรอง:</b> {lead.working_capital}</div>
+              <div><b>เวลา:</b> {lead.available_time_per_day}</div>
+              <div><b>ประสบการณ์:</b> {lead.business_experience}</div>
+              <div><b>รายได้คาดหวัง:</b> {lead.expected_daily_income}</div>
+              <div><b>ยืนยันความเข้าใจ:</b> {lead.understanding_confirmed ? "ยืนยันแล้ว" : "ยังไม่ยืนยัน"}</div>
+            </dl>
+            {lead.note && <p className="mt-3 text-sm"><b>หมายเหตุผู้สมัคร:</b> {lead.note}</p>}
             <form action={updateLead} className="mt-4 grid gap-3 border-t border-black/10 pt-4 sm:grid-cols-[220px_1fr_auto]"><input type="hidden" name="id" value={lead.id} /><select name="status" defaultValue={lead.status} className="rounded-2xl border border-black/10 px-4 py-3 font-bold">{statuses.map((s) => <option key={s} value={s}>{statusLabels[s]}</option>)}</select><input name="internal_note" defaultValue={lead.internal_note ?? ""} placeholder="บันทึกภายใน" className="rounded-2xl border border-black/10 px-4 py-3 font-bold" /><button className="rounded-2xl bg-[#ffc400] px-5 py-3 font-black text-black">บันทึก</button></form>
           </article>
         ))}
