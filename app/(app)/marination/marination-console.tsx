@@ -1,37 +1,56 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase-client";
 import { buildMarinationSummaries, movementTypeLabels, type ChickenPart, type MarinationMovementType, type MarinationStockMovement } from "@/lib/marination";
 import { formatThaiDate, numberFormatter, todayISO } from "@/lib/format";
 
-type Props = { parts: ChickenPart[]; initialMovements: MarinationStockMovement[]; userId: string; isOwner: boolean; selectedDate: string };
+type Props = { parts: ChickenPart[]; initialMovements: MarinationStockMovement[]; userId: string; selectedDate: string };
 
 function kg(value: number | null) { return value === null ? "-" : `${numberFormatter.format(value)} กก.`; }
 function time(value: string) { return new Date(value).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Bangkok" }); }
 
-export function MarinationConsole({ parts, initialMovements, userId, isOwner, selectedDate }: Props) {
+export function MarinationConsole({ parts, initialMovements, userId, selectedDate }: Props) {
   const [movements, setMovements] = useState(initialMovements);
+  const [dateValue, setDateValue] = useState(selectedDate);
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const pathname = usePathname();
   const partsById = useMemo(() => Object.fromEntries(parts.map((part) => [part.id, part])), [parts]);
   const { summaries, totals } = useMemo(() => buildMarinationSummaries(parts, movements), [parts, movements]);
 
   useEffect(() => {
     setMovements(initialMovements);
-  }, [initialMovements]);
+    setDateValue(selectedDate);
+  }, [initialMovements, selectedDate]);
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
     if (!supabase) return;
     const channel = supabase
       .channel("marination_stock_movements_realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "marination_stock_movements" }, () => router.refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "marination_stock_movements" }, (payload) => {
+        const newMovementDate = (payload.new as Partial<MarinationStockMovement>).movement_date;
+        const oldMovementDate = (payload.old as Partial<MarinationStockMovement>).movement_date;
+        if (newMovementDate === selectedDate || oldMovementDate === selectedDate) router.refresh();
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [router]);
+  }, [router, selectedDate]);
+
+  function changeReportDate(nextDate: string) {
+    if (!nextDate) return;
+    setDateValue(nextDate);
+    const params = new URLSearchParams();
+    params.set("date", nextDate);
+    startTransition(() => router.replace(`${pathname}?${params.toString()}`));
+  }
+
+  function goToday() {
+    changeReportDate(todayISO());
+  }
 
   async function submitMovement(formData: FormData) {
     setMessage("");
@@ -75,22 +94,35 @@ export function MarinationConsole({ parts, initialMovements, userId, isOwner, se
       </nav>
 
       <section className="grid gap-3 sm:grid-cols-5">
-        <Stat label="รับเข้าวันนี้" value={kg(totals.received)} highlight />
-        <Stat label="ใช้หมักวันนี้" value={kg(totals.used)} />
+        <Stat label="รับเข้าวันที่เลือก" value={kg(totals.received)} highlight />
+        <Stat label="ใช้หมักวันที่เลือก" value={kg(totals.used)} />
         <Stat label="คงเหลือตามระบบ" value={kg(totals.systemBalance)} />
         <Stat label="ตรวจนับจริงล่าสุด" value={kg(totals.latestCounted)} />
         <Stat label="ส่วนต่างรวม" value={kg(totals.variance)} danger={totals.variance < 0} />
       </section>
 
       <section id="overview" className="rounded-[1.75rem] border border-black/10 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="grid gap-4">
+          <div className="flex flex-col gap-3 rounded-3xl bg-[#ffc400]/15 p-3 sm:flex-row sm:items-end sm:justify-between">
+            <label className="flex-1">
+              <span className="mb-2 block text-sm font-black text-black/60">เลือกวันที่</span>
+              <input
+                className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-black shadow-sm sm:max-w-xs"
+                type="date"
+                value={dateValue}
+                aria-label="เลือกวันที่รายงานโรงหมัก"
+                onChange={(event) => changeReportDate(event.target.value)}
+              />
+            </label>
+            <button type="button" onClick={goToday} disabled={isPending || dateValue === todayISO()} className="focus-ring min-h-14 rounded-2xl bg-black px-5 text-lg font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-black/30">วันนี้</button>
+          </div>
           <div><p className="text-sm font-black text-black/50">ภาพรวมโรงหมัก</p><h2 className="text-2xl font-black">สรุปวันที่ {formatThaiDate(selectedDate)}</h2></div>
-          {isOwner && <form><input className="focus-ring min-h-12 rounded-2xl border-2 border-black/10 px-4 font-bold" type="date" name="date" defaultValue={selectedDate} /><button className="ml-2 min-h-12 rounded-2xl bg-black px-4 font-black text-white">ดูย้อนหลัง</button></form>}
+          {movements.length === 0 && <p className="rounded-2xl bg-black/5 px-4 py-3 text-sm font-bold text-black/60">ยังไม่มีรายการบันทึกในวันที่นี้</p>}
         </div>
         <div className="mt-4 overflow-x-auto rounded-2xl border border-black/10">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="bg-[#111111] text-white"><tr>{["ชิ้นส่วนไก่","รับเข้า","ใช้หมัก","คงเหลือตามระบบ","ตรวจนับจริงล่าสุด","ส่วนต่าง","หมายเหตุล่าสุด"].map(h => <th key={h} className="p-3">{h}</th>)}</tr></thead>
-            <tbody>{summaries.map(row => <tr key={row.part.id} className="border-t border-black/10 font-bold"><td className="p-3 text-base font-black">{row.part.name}</td><td className="p-3">{kg(row.received)}</td><td className="p-3">{kg(row.used)}</td><td className="p-3">{kg(row.systemBalance)}</td><td className="p-3">{kg(row.latestCounted)}</td><td className={`p-3 ${row.variance && row.variance < 0 ? "text-red-600" : ""}`}>{kg(row.variance)}</td><td className="p-3">{row.latestNote}</td></tr>)}</tbody>
+          <table className="w-full min-w-[860px] text-left text-sm">
+            <thead className="bg-[#111111] text-white"><tr>{["ชิ้นส่วนไก่","รับเข้า","ใช้หมัก","ปรับยอด","คงเหลือตามระบบ","ตรวจนับจริงล่าสุด","ส่วนต่าง","หมายเหตุล่าสุด"].map(h => <th key={h} className="p-3">{h}</th>)}</tr></thead>
+            <tbody>{summaries.map(row => <tr key={row.part.id} className="border-t border-black/10 font-bold"><td className="p-3 text-base font-black">{row.part.name}</td><td className="p-3">{kg(row.received)}</td><td className="p-3">{kg(row.used)}</td><td className="p-3">{kg(row.adjustment)}</td><td className="p-3">{kg(row.systemBalance)}</td><td className="p-3">{kg(row.latestCounted)}</td><td className={`p-3 ${row.variance && row.variance < 0 ? "text-red-600" : ""}`}>{kg(row.variance)}</td><td className="p-3">{row.latestNote}</td></tr>)}</tbody>
           </table>
         </div>
       </section>
