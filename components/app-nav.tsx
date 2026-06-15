@@ -3,11 +3,13 @@ import { BrandLogo } from "@/components/brand-logo";
 import { BRAND_NAME, BRAND_SUBTITLE } from "@/lib/brand";
 import { signOut } from "@/app/actions";
 import { canUseStaffCounterOrder } from "@/lib/counter-access";
+import { canAccessMarinationByEmail } from "@/lib/marination-access";
 import type { Profile } from "@/lib/types";
 
 export function AppNav({ profile }: { profile: Profile }) {
   const isOwner = profile.role === "owner";
   const staffOrderInputEnabled = canUseStaffCounterOrder(profile);
+  const canAccessMarination = canAccessMarinationByEmail(profile.email);
   const ownerIdentity = profile.email || profile.full_name || "ไม่พบชื่อผู้ใช้";
   return (
     <header className="sticky top-0 z-20 border-b border-black/10 bg-[#111111] text-white shadow-lg">
@@ -31,7 +33,7 @@ export function AppNav({ profile }: { profile: Profile }) {
           {!isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/daily">กรอกข้อมูล</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/owner-dashboard">สรุปภาพรวม</Link>}
           {(isOwner || staffOrderInputEnabled) && <Link className="focus-ring rounded-full bg-[#ffc400] px-3 py-2 text-black" href="/counter-orders">นับออเดอร์</Link>}
-          <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/marination">โรงหมักไก่</Link>
+          {canAccessMarination && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/marination">โรงหมักไก่</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/reports">รายงาน</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/orders">สั่งของ</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/leads">รายชื่อผู้สนใจแฟรนไชส์</Link>}
