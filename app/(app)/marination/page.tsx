@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentProfile, isOwner } from "@/lib/auth";
+import { getCurrentProfile } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { todayISO } from "@/lib/format";
 import { MarinationConsole } from "./marination-console";
@@ -64,7 +64,6 @@ export default async function MarinationPage({ searchParams }: Props) {
       parts={partsData ?? []}
       initialMovements={movementsData ?? []}
       userId={profile.id}
-      isOwner={isOwner(profile)}
       selectedDate={selectedDate}
     />
   );
