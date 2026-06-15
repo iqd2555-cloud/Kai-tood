@@ -31,6 +31,7 @@ export function AppNav({ profile }: { profile: Profile }) {
           {!isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/daily">กรอกข้อมูล</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/owner-dashboard">สรุปภาพรวม</Link>}
           {(isOwner || staffOrderInputEnabled) && <Link className="focus-ring rounded-full bg-[#ffc400] px-3 py-2 text-black" href="/counter-orders">นับออเดอร์</Link>}
+          <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/marination">โรงหมักไก่</Link>
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/reports">รายงาน</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/orders">สั่งของ</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/leads">รายชื่อผู้สนใจแฟรนไชส์</Link>}
