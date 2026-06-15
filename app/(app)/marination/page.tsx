@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { todayISO } from "@/lib/format";
 import { MarinationConsole } from "./marination-console";
 import type { ChickenPart, MarinationStockMovement } from "@/lib/marination";
+import { canAccessMarinationByEmail } from "@/lib/marination-access";
 
 type Props = { searchParams?: Promise<{ date?: string }> };
 
@@ -15,6 +16,21 @@ export default async function MarinationPage({ searchParams }: Props) {
   const profile = await getCurrentProfile();
   const supabase = await createSupabaseServerClient();
   if (!supabase) redirect("/login?setup=supabase");
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const canAccessMarination = canAccessMarinationByEmail(user?.email ?? profile.email);
+
+  if (!canAccessMarination) {
+    return (
+      <section className="rounded-[2rem] bg-white p-5 text-center shadow-sm">
+        <p className="text-sm font-black text-black/50">ระบบโรงหมักไก่</p>
+        <h1 className="mt-2 text-2xl font-black">คุณไม่มีสิทธิ์เข้าใช้งานระบบโรงหมักไก่</h1>
+        <p className="mt-2 font-bold text-black/60">กรุณาติดต่อเจ้าของร้าน หากต้องการเพิ่มสิทธิ์เข้าใช้งาน</p>
+      </section>
+    );
+  }
+
   const params = searchParams ? await searchParams : {};
   const selectedDate = normalizeDate(params.date);
 
