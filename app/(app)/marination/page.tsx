@@ -19,10 +19,15 @@ export default async function MarinationPage({ searchParams }: Props) {
   const selectedDate = normalizeDate(params.date);
 
   const [{ data: partsData, error: partsError }, { data: movementsData, error: movementsError }] = await Promise.all([
-    supabase.from("chicken_parts").select("*").eq("is_active", true).order("sort_order", { ascending: true }).returns<ChickenPart[]>(),
+    supabase
+      .from("chicken_parts")
+      .select("id, name, sort_order, is_active")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .returns<ChickenPart[]>(),
     supabase
       .from("marination_stock_movements")
-      .select(`*, chicken_part:chicken_parts!marination_stock_movements_chicken_part_id_fkey(id, name, sort_order), profiles(full_name, role)`)
+      .select("id, movement_date, chicken_part_id, movement_type, quantity_kg, note, created_by, created_at")
       .eq("movement_date", selectedDate)
       .order("created_at", { ascending: false })
       .returns<MarinationStockMovement[]>(),

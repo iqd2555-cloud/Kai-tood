@@ -16,6 +16,7 @@ export function MarinationConsole({ parts, initialMovements, userId, isOwner, se
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const partsById = useMemo(() => Object.fromEntries(parts.map((part) => [part.id, part])), [parts]);
   const { summaries, totals } = useMemo(() => buildMarinationSummaries(parts, movements), [parts, movements]);
 
   useEffect(() => {
@@ -109,7 +110,7 @@ export function MarinationConsole({ parts, initialMovements, userId, isOwner, se
 
       <section id="history" className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
         <h2 className="text-2xl font-black">รายการล่าสุดของวันที่เลือก</h2>
-        <div className="mt-4 space-y-3">{movements.length === 0 ? <p className="font-bold text-black/50">ยังไม่มีรายการ</p> : movements.slice(0, 40).map(m => <article key={m.id} className="rounded-2xl border border-black/10 p-4"><div className="flex justify-between gap-3"><div><h3 className="text-lg font-black">{m.chicken_part?.name} · {movementTypeLabels[m.movement_type]}</h3><p className="text-sm font-bold text-black/50">ผู้บันทึก {m.profiles?.full_name ?? "-"} · {time(m.created_at)}</p></div><div className="text-right text-2xl font-black">{kg(Number(m.quantity_kg))}</div></div>{m.note && <p className="mt-2 rounded-xl bg-black/5 p-3 font-bold">{m.note}</p>}</article>)}</div>
+        <div className="mt-4 space-y-3">{movements.length === 0 ? <p className="font-bold text-black/50">ยังไม่มีรายการ</p> : movements.slice(0, 40).map(m => <article key={m.id} className="rounded-2xl border border-black/10 p-4"><div className="flex justify-between gap-3"><div><h3 className="text-lg font-black">{partsById[m.chicken_part_id]?.name || "ไม่พบชิ้นส่วน"} · {movementTypeLabels[m.movement_type]}</h3><p className="text-sm font-bold text-black/50">ผู้บันทึก {m.created_by || "-"} · {time(m.created_at)}</p></div><div className="text-right text-2xl font-black">{kg(Number(m.quantity_kg))}</div></div>{m.note && <p className="mt-2 rounded-xl bg-black/5 p-3 font-bold">{m.note}</p>}</article>)}</div>
       </section>
     </div>
   );
