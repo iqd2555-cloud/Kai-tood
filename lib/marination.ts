@@ -1,5 +1,3 @@
-import type { Profile } from "@/lib/types";
-
 export type MarinationMovementType = "received" | "used" | "counted" | "adjustment";
 
 export type ChickenPart = {
@@ -7,7 +5,7 @@ export type ChickenPart = {
   name: string;
   sort_order: number | null;
   is_active: boolean;
-  created_at: string;
+  created_at?: string;
 };
 
 export type MarinationStockMovement = {
@@ -19,8 +17,6 @@ export type MarinationStockMovement = {
   note: string | null;
   created_by: string;
   created_at: string;
-  chicken_part?: Pick<ChickenPart, "id" | "name" | "sort_order"> | null;
-  profiles?: Pick<Profile, "full_name" | "role"> | null;
 };
 
 export type MarinationPartSummary = {
@@ -73,7 +69,7 @@ export function buildMarinationSummaries(parts: ChickenPart[], movements: Marina
       variance: latestCounted === null ? null : latestCounted - systemBalance,
       latestNote: latestWithNote?.note?.trim() ?? "-",
       latestMovementAt: latestMovement?.created_at ?? null,
-      latestRecorder: latestMovement?.profiles?.full_name ?? "-",
+      latestRecorder: latestMovement?.created_by ?? "-",
     };
   });
 
