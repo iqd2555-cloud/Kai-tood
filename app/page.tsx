@@ -30,8 +30,8 @@ export default function LandingPage() {
           <div className="grid gap-8 py-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
             <div>
               <p className="inline-flex rounded-full bg-[#ffc400] px-4 py-2 text-sm font-black text-black">เปิดรับผู้สนใจแฟรนไชส์</p>
-              <h1 className="mt-5 text-4xl font-black leading-tight sm:text-6xl">แฟรนไชส์ข้าวเหนียวไก่ทอดสำหรับคนอยากเริ่มต้นขายจริง</h1>
-              <p className="mt-5 max-w-2xl text-lg font-bold leading-8 text-white/78">จากร้านข้างทาง สู่ระบบแฟรนไชส์ที่มีสาขาจริง ยอดขายจริง และระบบหลังบ้านจริง</p>
+              <h1 className="mt-5 text-4xl font-black leading-tight sm:text-6xl">แฟรนไชส์ข้าวเหนียวไก่ทอด สำหรับคนอยากเริ่มต้นขายจริง</h1>
+              <p className="mt-5 max-w-2xl text-lg font-bold leading-8 text-white/78">จากร้านข้างทาง สู่ระบบแฟรนไชส์ที่มีสาขาจริง ลูกค้าจริง และระบบหลังบ้านจริง</p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link href="/franchise/apply" className="rounded-full bg-[#ffc400] px-6 py-4 text-center text-lg font-black text-black shadow-lg shadow-[#ffc400]/20">สมัครแฟรนไชส์</Link>
                 <Link href="/login" className="rounded-full bg-white px-6 py-4 text-center text-lg font-black text-black">เข้าสู่ระบบสาขา</Link>
