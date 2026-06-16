@@ -181,7 +181,7 @@ export default async function OwnerDashboardPage() {
   return (
     <div className="space-y-4 pb-6">
       <section className="rounded-3xl bg-[#111111] p-5 text-white shadow-xl">
-        <p className="text-sm font-bold text-[#ffc400]">รายงาน Owner</p>
+        <p className="text-sm font-bold text-[#E60012]">รายงาน Owner</p>
         <h1 className="mt-1 text-2xl font-black">ภาพรวมยอดขาย วัตถุดิบ และกำไร</h1>
       </section>
 
@@ -191,16 +191,16 @@ export default async function OwnerDashboardPage() {
             <h2 className="text-lg font-black">กำไรประมาณการ</h2>
             <p className="mt-1 text-xs font-bold text-black/60">คำนวณจากยอดขายรวม × 0.35 แบบ Real-time</p>
           </div>
-          <span className="rounded-full bg-[#ffc400] px-3 py-1 text-xs font-black text-black">Owner เท่านั้น</span>
+          <span className="rounded-full bg-[#E60012] px-3 py-1 text-xs font-black text-white">Owner เท่านั้น</span>
         </div>
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-          <article className="rounded-3xl border border-yellow-600/20 bg-[#ffc400] p-5 text-black shadow-sm">
+          <article className="rounded-3xl border border-red-600/20 bg-[#E60012] p-5 text-white shadow-sm">
             <p className="text-sm font-black opacity-70">กำไรประมาณการวันนี้</p>
             <p className="mt-2 text-3xl font-black tracking-tight">{moneyFormatter.format(estimatedProfitToday)}</p>
           </article>
           <article className="rounded-3xl border border-black/10 bg-[#111111] p-5 text-white shadow-sm">
             <p className="text-sm font-black text-white/70">กำไรประมาณการ 7 วัน</p>
-            <p className="mt-2 text-3xl font-black tracking-tight text-[#ffc400]">{moneyFormatter.format(estimatedProfit7)}</p>
+            <p className="mt-2 text-3xl font-black tracking-tight text-[#E60012]">{moneyFormatter.format(estimatedProfit7)}</p>
           </article>
           <article className="rounded-3xl border border-black/10 bg-white p-5 text-black shadow-sm">
             <p className="text-sm font-black opacity-70">กำไรประมาณการเดือนนี้</p>
@@ -222,7 +222,7 @@ export default async function OwnerDashboardPage() {
           {salesLine.map((item) => (
             <div key={item.date}>
               <div className="mb-1 flex justify-between text-xs font-bold"><span>{formatThaiDate(item.date)}</span><span>{moneyFormatter.format(item.value)}</span></div>
-              <div className="h-2 rounded-full bg-black/10"><div className="h-2 rounded-full bg-[#ffc400]" style={{ width: `${barWidth(item.value, maxSalesLine)}%` }} /></div>
+              <div className="h-2 rounded-full bg-black/10"><div className="h-2 rounded-full bg-[#E60012]" style={{ width: `${barWidth(item.value, maxSalesLine)}%` }} /></div>
             </div>
           ))}
         </div>
@@ -250,9 +250,9 @@ export default async function OwnerDashboardPage() {
         <h2 className="text-lg font-black">หมวด 3: กำไรขั้นต้น</h2>
         <p className="mt-1 text-xs font-bold text-black/60">สูตร: ยอดขาย - ต้นทุนไก่ - ค่าใช้จ่ายอื่น</p>
         <div className="mt-3 space-y-2 text-sm font-bold">
-          <div className="rounded-2xl bg-[#ffc400]/30 p-3">วันนี้: {moneyFormatter.format(gpToday)} ({pctChange(gpToday, gpPrevDay).toFixed(1)}% เทียบเมื่อวาน)</div>
-          <div className="rounded-2xl bg-[#ffc400]/30 p-3">7 วัน: {moneyFormatter.format(gp7)} ({pctChange(gp7, gpPrev7).toFixed(1)}% เทียบ 7 วันก่อน)</div>
-          <div className="rounded-2xl bg-[#ffc400]/30 p-3">เดือนนี้: {moneyFormatter.format(gpMonth)} ({pctChange(gpMonth, gpPrevMonthMtd).toFixed(1)}% เทียบเดือนก่อนช่วงเดียวกัน)</div>
+          <div className="rounded-2xl bg-[#E60012]/30 p-3">วันนี้: {moneyFormatter.format(gpToday)} ({pctChange(gpToday, gpPrevDay).toFixed(1)}% เทียบเมื่อวาน)</div>
+          <div className="rounded-2xl bg-[#E60012]/30 p-3">7 วัน: {moneyFormatter.format(gp7)} ({pctChange(gp7, gpPrev7).toFixed(1)}% เทียบ 7 วันก่อน)</div>
+          <div className="rounded-2xl bg-[#E60012]/30 p-3">เดือนนี้: {moneyFormatter.format(gpMonth)} ({pctChange(gpMonth, gpPrevMonthMtd).toFixed(1)}% เทียบเดือนก่อนช่วงเดียวกัน)</div>
         </div>
       </section>
 

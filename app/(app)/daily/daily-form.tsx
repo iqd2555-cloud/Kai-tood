@@ -121,7 +121,7 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
             />
           </label>
         </div>
-        <div className="mt-4 rounded-3xl bg-[#ffc400] p-5 text-center text-black">
+        <div className="mt-4 rounded-3xl bg-[#E60012] p-5 text-center text-white">
           <div className="text-sm font-black opacity-70">ยอดรวมอัตโนมัติ</div>
           <div className="text-4xl font-black tracking-tight">{moneyFormatter.format(totalSales)}</div>
         </div>
@@ -206,7 +206,7 @@ export function DailyForm({ branches, defaultBranchId, reportDate, existingRepor
               </div>
             ))}
             <input type="hidden" name="order_other_items" value={JSON.stringify(otherOrderItems.filter((item) => item.name.trim() && item.amount > 0))} />
-            <button type="button" className="focus-ring rounded-xl bg-[#ffc400] px-4 py-2 text-sm font-black" onClick={() => setOtherOrderItems((prev) => [...prev, { name: "", amount: 0 }])}>+ เพิ่มรายการอื่นๆ</button>
+            <button type="button" className="focus-ring rounded-xl bg-[#E60012] px-4 py-2 text-sm font-black" onClick={() => setOtherOrderItems((prev) => [...prev, { name: "", amount: 0 }])}>+ เพิ่มรายการอื่นๆ</button>
           </div>
         </div>
       </section>

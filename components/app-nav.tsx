@@ -22,13 +22,13 @@ export function AppNav({ profile }: { profile: Profile }) {
           <Link href={homeHref} className="focus-ring flex items-center gap-3 rounded-xl">
             <BrandLogo size={46} className="rounded-xl" />
             <div className="min-w-0">
-              <div className="truncate text-lg font-black leading-tight text-[#ffc400]">{BRAND_NAME}</div>
+              <div className="truncate text-lg font-black leading-tight text-[#E60012]">{BRAND_NAME}</div>
               <div className="truncate text-xs font-bold text-white/80">{BRAND_SUBTITLE}</div>
               <div className="truncate text-xs text-white/60">{isOwner ? "เจ้าของร้าน" : profile.branch?.name ?? "พนักงาน"}</div>
             </div>
           </Link>
           {isOwner && (
-            <div className="max-w-[16rem] truncate rounded-full bg-[#ffc400]/15 px-3 py-1 text-xs font-black text-[#ffc400] sm:max-w-sm">
+            <div className="max-w-[16rem] truncate rounded-full bg-[#E60012]/15 px-3 py-1 text-xs font-black text-[#E60012] sm:max-w-sm">
               เจ้าของร้าน: {ownerIdentity}
             </div>
           )}
@@ -36,14 +36,14 @@ export function AppNav({ profile }: { profile: Profile }) {
         <nav className="flex flex-wrap items-center justify-end gap-2 text-sm font-bold">
           {!isOwner && canUseDailyInput && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/daily">กรอกข้อมูล</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/owner-dashboard">สรุปภาพรวม</Link>}
-          {!marinationOnlyStaff && (isOwner || staffOrderInputEnabled) && <Link className="focus-ring rounded-full bg-[#ffc400] px-3 py-2 text-black" href="/counter-orders">นับออเดอร์</Link>}
+          {!marinationOnlyStaff && (isOwner || staffOrderInputEnabled) && <Link className="focus-ring rounded-full bg-[#E60012] px-3 py-2 text-white" href="/counter-orders">นับออเดอร์</Link>}
           {canAccessMarination && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/marination">โรงหมักไก่</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/reports">รายงาน</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/orders">สั่งของ</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/leads">รายชื่อผู้สนใจแฟรนไชส์</Link>}
           {!isOwner && canUseMyReport && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/my-reports">รายงานของฉัน</Link>}
           <form action={signOut}>
-            <button className="focus-ring rounded-full bg-[#ffc400] px-3 py-2 font-black text-black">ออก</button>
+            <button className="focus-ring rounded-full bg-[#E60012] px-3 py-2 font-black text-white">ออก</button>
           </form>
         </nav>
       </div>

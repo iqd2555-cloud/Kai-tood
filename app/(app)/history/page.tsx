@@ -23,7 +23,7 @@ export default async function HistoryPage() {
   return (
     <div className="space-y-5">
       <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">
-        <p className="text-sm font-bold text-[#ffc400]">เจ้าของร้าน</p>
+        <p className="text-sm font-bold text-[#E60012]">เจ้าของร้าน</p>
         <h1 className="mt-2 text-3xl font-black">สรุปย้อนหลัง</h1>
         <p className="mt-2 text-white/70">แสดงข้อมูลล่าสุด 60 รายการจากทุกสาขา</p>
       </section>

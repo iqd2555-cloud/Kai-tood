@@ -17,7 +17,7 @@ function SubmitButton({ disabled, mode }: { disabled: boolean; mode: Mode }) {
   return (
     <button
       disabled={pending || disabled}
-      className="focus-ring min-h-14 w-full rounded-2xl bg-[#ffc400] text-xl font-black text-black shadow-lg disabled:opacity-60"
+      className="focus-ring min-h-14 w-full rounded-2xl bg-[#E60012] text-xl font-black text-white shadow-lg disabled:opacity-60"
     >
       {pending ? pendingLabel : label}
     </button>
@@ -74,7 +74,7 @@ export function LoginForm({ next = "/dashboard" }: { next?: string }) {
         </label>
         <label className="block">
           <span className="mb-2 block font-black">รหัสผ่าน</span>
-          <div className="flex min-h-14 overflow-hidden rounded-2xl border-2 border-black/10 bg-white focus-within:ring-4 focus-within:ring-[#ffc400]/40">
+          <div className="flex min-h-14 overflow-hidden rounded-2xl border-2 border-black/10 bg-white focus-within:ring-4 focus-within:ring-[#E60012]/40">
             <input
               className="min-w-0 flex-1 px-4 text-lg font-bold outline-none"
               name="password"
@@ -96,7 +96,7 @@ export function LoginForm({ next = "/dashboard" }: { next?: string }) {
         </label>
 
         {!isConfigured && (
-          <div className="rounded-2xl bg-yellow-50 p-3 font-bold text-yellow-900">
+          <div className="rounded-2xl bg-[#FDECEC] p-3 font-bold text-[#7A0008]">
             ยังไม่ได้ตั้งค่า NEXT_PUBLIC_SUPABASE_URL และ NEXT_PUBLIC_SUPABASE_ANON_KEY บน Vercel
           </div>
         )}

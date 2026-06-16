@@ -1,8 +1,8 @@
-export function StatCard({ label, value, tone = "light" }: { label: string; value: string; tone?: "light" | "dark" | "yellow" }) {
+export function StatCard({ label, value, tone = "light" }: { label: string; value: string; tone?: "light" | "dark" | "brand" }) {
   const classes = {
     light: "bg-white text-black border-black/10",
     dark: "bg-[#111111] text-white border-black",
-    yellow: "bg-[#ffc400] text-black border-yellow-600/20",
+    brand: "bg-gradient-to-br from-[#E60012] to-[#b8000e] text-white border-[#E60012]",
   }[tone];
 
   return (

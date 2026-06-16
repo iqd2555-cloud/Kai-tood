@@ -159,13 +159,13 @@ export function PwaRegistrar() {
   return (
     <>
       {updateReady ? (
-        <div className="fixed inset-x-4 bottom-4 z-[60] rounded-2xl border border-yellow-400 bg-black p-4 text-white shadow-2xl">
-          <p className="text-base font-black text-yellow-300">มีเวอร์ชันใหม่พร้อมใช้งาน</p>
+        <div className="fixed inset-x-4 bottom-4 z-[60] rounded-2xl border border-red-200 bg-black p-4 text-white shadow-2xl">
+          <p className="text-base font-black text-red-100">มีเวอร์ชันใหม่พร้อมใช้งาน</p>
           <p className="mt-1 text-sm text-white/80">กดรีเฟรชเพื่อล้างแคชเก่าและโหลดแอปล่าสุด</p>
           <button
             type="button"
             onClick={handleRefreshApp}
-            className="mt-3 w-full rounded-xl bg-yellow-400 px-4 py-3 text-base font-black text-black"
+            className="mt-3 w-full rounded-xl bg-[#E60012] px-4 py-3 text-base font-black text-white"
           >
             รีเฟรชแอปตอนนี้
           </button>
@@ -176,7 +176,7 @@ export function PwaRegistrar() {
         <button
           type="button"
           onClick={handleInstall}
-          className="fixed bottom-4 left-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-xl bg-yellow-400 px-4 py-3 text-base font-bold text-black shadow-lg"
+          className="fixed bottom-4 left-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-xl bg-[#E60012] px-4 py-3 text-base font-bold text-white shadow-lg"
         >
           ติดตั้งแอปเหนียวไก่เยอะโคตร
         </button>
@@ -193,7 +193,7 @@ export function PwaRegistrar() {
       ) : null}
 
       {!isStandalone && isIos && showIosGuide ? (
-        <div className="fixed inset-x-4 bottom-4 z-50 rounded-xl border border-yellow-400 bg-white p-4 text-sm text-black shadow-xl">
+        <div className="fixed inset-x-4 bottom-4 z-50 rounded-xl border border-red-200 bg-white p-4 text-sm text-black shadow-xl">
           <p className="font-bold">ติดตั้งบน iPhone</p>
           <p>1) กดปุ่มแชร์ใน Safari</p>
           <p>2) เลือก “Add to Home Screen”</p>

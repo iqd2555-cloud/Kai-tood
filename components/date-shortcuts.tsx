@@ -35,7 +35,7 @@ export function DateShortcuts({ basePath, branchId }: DateShortcutsProps) {
         <Link
           key={shortcut.label}
           href={buildHref(basePath, shortcut, branchId)}
-          className="focus-ring rounded-2xl border-2 border-black/10 bg-black px-4 py-3 text-center text-sm font-black text-white shadow-sm hover:bg-[#ffc400] hover:text-black"
+          className="focus-ring rounded-2xl border-2 border-black/10 bg-black px-4 py-3 text-center text-sm font-black text-white shadow-sm hover:bg-[#E60012] hover:text-white"
         >
           {shortcut.label}
         </Link>

@@ -42,7 +42,7 @@ function StaffQuickSaleCard({ action, branchId, item, pending }: { action: (form
     <form action={action} className="rounded-[1.5rem] border-2 border-black/10 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-2xl font-black">ราคา {item.price} บาท</h3>
-        <span className="rounded-full bg-[#ffc400] px-3 py-1 text-sm font-black text-black">ขายเร็ว</span>
+        <span className="rounded-full bg-[#E60012] px-3 py-1 text-sm font-black text-white">ขายเร็ว</span>
       </div>
       <input type="hidden" name="branch_id" value={branchId} />
       <input type="hidden" name="price" value={item.price} />
@@ -51,7 +51,7 @@ function StaffQuickSaleCard({ action, branchId, item, pending }: { action: (form
         {staffQuickQuantities.map((amount) => (
           <button
             key={amount}
-            className={`focus-ring min-h-16 rounded-2xl border-2 text-2xl font-black ${quantity === amount ? "border-black bg-[#ffc400] text-black" : "border-black/10 bg-black/5 text-black"}`}
+            className={`focus-ring min-h-16 rounded-2xl border-2 text-2xl font-black ${quantity === amount ? "border-black bg-[#E60012] text-white" : "border-black/10 bg-black/5 text-black"}`}
             type="button"
             onClick={() => setQuantity(amount)}
           >
@@ -59,7 +59,7 @@ function StaffQuickSaleCard({ action, branchId, item, pending }: { action: (form
           </button>
         ))}
       </div>
-      <button className="focus-ring mt-4 min-h-16 w-full rounded-2xl bg-[#111111] px-4 text-xl font-black text-[#ffc400] shadow active:scale-[0.99] disabled:opacity-60" disabled={pending} type="submit">
+      <button className="focus-ring mt-4 min-h-16 w-full rounded-2xl bg-[#111111] px-4 text-xl font-black text-[#E60012] shadow active:scale-[0.99] disabled:opacity-60" disabled={pending} type="submit">
         บันทึก
       </button>
     </form>
@@ -112,9 +112,9 @@ function StaffBulkSaleCard({
       <input type="hidden" name="price" value={item.price} />
       <input type="hidden" name="entry_mode" value="bulk" />
       <label className="mt-4 block">
-        <span className="mb-2 block text-sm font-black text-[#ffc400]">จำนวนห่อ</span>
+        <span className="mb-2 block text-sm font-black text-[#E60012]">จำนวนห่อ</span>
         <input
-          className="focus-ring min-h-16 w-full rounded-2xl border-2 border-white/20 bg-black px-4 text-center text-4xl font-black text-[#ffc400] placeholder:text-xl placeholder:text-[#ffc400]/45"
+          className="focus-ring min-h-16 w-full rounded-2xl border-2 border-white/20 bg-black px-4 text-center text-4xl font-black text-[#E60012] placeholder:text-xl placeholder:text-[#E60012]/45"
           inputMode="numeric"
           min={6}
           name="quantity"
@@ -129,7 +129,7 @@ function StaffBulkSaleCard({
         />
         {warning && <p className="mt-2 rounded-2xl bg-red-100 px-3 py-2 text-center text-sm font-black text-red-900" role="alert">{warning}</p>}
       </label>
-      <button className="focus-ring mt-4 min-h-16 w-full rounded-2xl bg-[#ffc400] px-4 text-xl font-black text-black shadow active:scale-[0.99] disabled:opacity-60" disabled={pending} type="submit">
+      <button className="focus-ring mt-4 min-h-16 w-full rounded-2xl bg-[#E60012] px-4 text-xl font-black text-white shadow active:scale-[0.99] disabled:opacity-60" disabled={pending} type="submit">
         บันทึก
       </button>
     </form>
@@ -155,12 +155,12 @@ export function StaffCounterOrderInput({ branchId, priceItems }: StaffCounterOrd
   return (
     <div className="space-y-5">
       <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">
-        <p className="text-sm font-bold text-[#ffc400]">โหมด Staff Order Input</p>
+        <p className="text-sm font-bold text-[#E60012]">โหมด Staff Order Input</p>
         <h1 className="mt-2 text-3xl font-black">กดขายหน้าร้าน</h1>
         <p className="mt-2 text-white/70">เลือกปุ่มขายแล้วกดบันทึกเท่านั้น</p>
       </section>
 
-      <section className="space-y-4 rounded-[2rem] border-4 border-[#ffc400] bg-[#ffc400]/10 p-4 shadow-xl">
+      <section className="space-y-4 rounded-[2rem] border-4 border-[#E60012] bg-[#E60012]/10 p-4 shadow-xl">
         <div>
           <p className="text-sm font-black text-black/50">กลุ่มที่ 1</p>
           <h2 className="text-2xl font-black">กดขายเร็ว</h2>
@@ -212,7 +212,7 @@ export function CounterOrderConsole({ branchId, latestOrderNumber, latestOrderId
 
   return (
     <div className="space-y-5">
-      <form action={orderAction} className="space-y-4 rounded-[2rem] border-4 border-[#ffc400] bg-white p-4 shadow-xl">
+      <form action={orderAction} className="space-y-4 rounded-[2rem] border-4 border-[#E60012] bg-white p-4 shadow-xl">
         <input type="hidden" name="branch_id" value={branchId} />
         <div>
           <p className="text-sm font-black text-black/50">โหมดขายเร็วแบบกดครั้งเดียว</p>
@@ -222,7 +222,7 @@ export function CounterOrderConsole({ branchId, latestOrderNumber, latestOrderId
           {priceItems.flatMap((item) => shortcutQuantities.map((shortcutQuantity) => (
             <button
               key={`${item.price}-${shortcutQuantity}`}
-              className="focus-ring min-h-24 rounded-[1.5rem] bg-[#111111] px-3 py-4 text-center text-3xl font-black text-[#ffc400] shadow active:scale-[0.98] disabled:opacity-60"
+              className="focus-ring min-h-24 rounded-[1.5rem] bg-[#111111] px-3 py-4 text-center text-3xl font-black text-[#E60012] shadow active:scale-[0.98] disabled:opacity-60"
               disabled={orderPending}
               name="shortcut"
               value={`${item.price}:${shortcutQuantity}`}
@@ -240,14 +240,14 @@ export function CounterOrderConsole({ branchId, latestOrderNumber, latestOrderId
         <input type="hidden" name="price" value={selectedPrice} />
         <input type="hidden" name="quantity" value={quantity} />
         <div>
-          <p className="text-sm font-black text-[#ffc400]">โหมดกด 2 ครั้ง</p>
+          <p className="text-sm font-black text-[#E60012]">โหมดกด 2 ครั้ง</p>
           <h2 className="text-2xl font-black">เลือกราคา → เลือกจำนวน → บันทึก</h2>
         </div>
         <div className="grid grid-cols-3 gap-2">
           {priceItems.map((item) => (
             <button
               key={item.price}
-              className={`focus-ring min-h-20 rounded-[1.25rem] border-2 px-3 text-2xl font-black ${selectedPrice === item.price ? "border-[#ffc400] bg-[#ffc400] text-black" : "border-white/20 bg-white/10 text-white"}`}
+              className={`focus-ring min-h-20 rounded-[1.25rem] border-2 px-3 text-2xl font-black ${selectedPrice === item.price ? "border-[#E60012] bg-[#E60012] text-white" : "border-white/20 bg-white/10 text-white"}`}
               type="button"
               onClick={() => setSelectedPrice(item.price)}
             >
@@ -259,7 +259,7 @@ export function CounterOrderConsole({ branchId, latestOrderNumber, latestOrderId
           {customQuantities.map((amount) => (
             <button
               key={amount}
-              className={`focus-ring min-h-16 rounded-2xl border-2 text-2xl font-black ${quantity === amount ? "border-[#ffc400] bg-[#ffc400] text-black" : "border-white/20 bg-white/10 text-white"}`}
+              className={`focus-ring min-h-16 rounded-2xl border-2 text-2xl font-black ${quantity === amount ? "border-[#E60012] bg-[#E60012] text-white" : "border-white/20 bg-white/10 text-white"}`}
               type="button"
               onClick={() => setQuantity(amount)}
             >
@@ -271,11 +271,11 @@ export function CounterOrderConsole({ branchId, latestOrderNumber, latestOrderId
           <button className="focus-ring h-16 w-16 rounded-2xl bg-white text-4xl font-black text-black" type="button" onClick={() => setQuantity((current) => Math.max(1, current - 1))}>−</button>
           <label className="block text-center">
             <span className="block text-sm font-bold text-white/60">จำนวนห่อ</span>
-            <input className="mt-1 w-full rounded-2xl border-2 border-white/20 bg-black px-3 py-3 text-center text-4xl font-black text-[#ffc400]" inputMode="numeric" min={1} max={999} type="number" value={quantity} onChange={(event) => setQuantity(Math.max(1, Number(event.target.value) || 1))} />
+            <input className="mt-1 w-full rounded-2xl border-2 border-white/20 bg-black px-3 py-3 text-center text-4xl font-black text-[#E60012]" inputMode="numeric" min={1} max={999} type="number" value={quantity} onChange={(event) => setQuantity(Math.max(1, Number(event.target.value) || 1))} />
           </label>
-          <button className="focus-ring h-16 w-16 rounded-2xl bg-[#ffc400] text-4xl font-black text-black" type="button" onClick={() => setQuantity((current) => Math.min(999, current + 1))}>+</button>
+          <button className="focus-ring h-16 w-16 rounded-2xl bg-[#E60012] text-4xl font-black text-white" type="button" onClick={() => setQuantity((current) => Math.min(999, current + 1))}>+</button>
         </div>
-        <button className="focus-ring min-h-20 w-full rounded-[1.5rem] bg-[#ffc400] px-4 py-4 text-2xl font-black text-black shadow active:scale-[0.99] disabled:opacity-60" disabled={orderPending} type="submit">
+        <button className="focus-ring min-h-20 w-full rounded-[1.5rem] bg-[#E60012] px-4 py-4 text-2xl font-black text-white shadow active:scale-[0.99] disabled:opacity-60" disabled={orderPending} type="submit">
           บันทึก {selectedItemName} × {quantity} = {total.toLocaleString("th-TH")} บาท
         </button>
       </form>
@@ -289,8 +289,8 @@ export function CounterOrderConsole({ branchId, latestOrderNumber, latestOrderId
               ยกเลิกออเดอร์ล่าสุด
             </button>
             <a className="focus-ring min-h-14 rounded-2xl bg-black px-4 py-4 text-center font-black text-white" href="#latest-orders">ดูออเดอร์ล่าสุด</a>
-            <a className="focus-ring min-h-14 rounded-2xl bg-[#ffc400] px-4 py-4 text-center font-black text-black" href="#today-report">รายงานวันนี้</a>
-            <a className="focus-ring min-h-14 rounded-2xl bg-[#ffc400] px-4 py-4 text-center font-black text-black" href="#accounting-report">รายงานส่งบัญชี</a>
+            <a className="focus-ring min-h-14 rounded-2xl bg-[#E60012] px-4 py-4 text-center font-black text-white" href="#today-report">รายงานวันนี้</a>
+            <a className="focus-ring min-h-14 rounded-2xl bg-[#E60012] px-4 py-4 text-center font-black text-white" href="#accounting-report">รายงานส่งบัญชี</a>
           </div>
         </div>
 

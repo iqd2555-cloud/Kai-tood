@@ -26,13 +26,13 @@ export default async function LoginPage({
       <div className="w-full max-w-md rounded-[2rem] border border-black/10 bg-white p-6 shadow-2xl">
         <div className="mb-8 rounded-[1.5rem] bg-[#111111] p-6 text-center text-white">
           <div className="flex justify-center">
-            <BrandLogo size={88} priority className="shadow-lg shadow-[#ffc400]/20" />
+            <BrandLogo size={88} priority className="shadow-lg shadow-[#E60012]/20" />
           </div>
-          <h1 className="mt-4 text-3xl font-black leading-tight text-[#ffc400]">{BRAND_NAME}</h1>
+          <h1 className="mt-4 text-3xl font-black leading-tight text-[#E60012]">{BRAND_NAME}</h1>
           <p className="mt-2 text-base font-bold text-white/85">{BRAND_SUBTITLE}</p>
         </div>
         {setupMissing && (
-          <div className="mb-5 rounded-2xl bg-yellow-50 p-3 font-bold text-yellow-900">
+          <div className="mb-5 rounded-2xl bg-[#FDECEC] p-3 font-bold text-[#7A0008]">
             ยังไม่ได้ตั้งค่า Supabase บนระบบนี้ กรุณาตรวจสอบ Environment Variables
           </div>
         )}
