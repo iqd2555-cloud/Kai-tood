@@ -78,7 +78,7 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
   return (
     <div className="space-y-5">
       <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">
-        <p className="text-sm font-bold text-[#ffc400]">ระบบหลังบ้าน Kai-tood</p>
+        <p className="text-sm font-bold text-[#E60012]">ระบบหลังบ้าน Kai-tood</p>
         <h1 className="mt-2 text-3xl font-black">โรงหมักไก่</h1>
         <p className="mt-2 text-white/70">บันทึกและติดตามไก่สดรับเข้า ใช้หมัก คงเหลือตามระบบ และยอดตรวจนับจริงแบบ Real-time</p>
         <div className="mt-4 rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-800">เชื่อมต่อ Supabase Realtime สำหรับ Owner Dashboard แล้ว</div>
@@ -103,7 +103,7 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
 
       <section id="overview" className="rounded-[1.75rem] border border-black/10 bg-white p-4 shadow-sm">
         <div className="grid gap-4">
-          <div className="flex flex-col gap-3 rounded-3xl bg-[#ffc400]/15 p-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-3 rounded-3xl bg-[#E60012]/15 p-3 sm:flex-row sm:items-end sm:justify-between">
             <label className="flex-1">
               <span className="mb-2 block text-sm font-black text-black/60">เลือกวันที่</span>
               <input
@@ -135,9 +135,9 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
           <Field label="ประเภทการบันทึก"><select className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold shadow-sm" name="movement_type" required>{(Object.keys(movementTypeLabels) as MarinationMovementType[]).map(type => <option key={type} value={type}>{movementTypeLabels[type]}</option>)}</select></Field>
           <Field label="จำนวนกิโลกรัม"><input className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold shadow-sm" type="number" inputMode="decimal" step="0.01" name="quantity_kg" placeholder="เช่น 30" required /></Field>
           <label className="sm:col-span-2"><span className="mb-2 block font-black">หมายเหตุ</span><textarea className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold shadow-sm min-h-28 py-3" name="note" placeholder="เช่น ปรับยอดเพราะชั่งผิด / ตรวจนับรอบเย็น" /></label>
-          <button disabled={isPending} className="focus-ring min-h-14 rounded-2xl bg-[#ffc400] px-5 text-xl font-black text-black shadow-lg sm:col-span-2">{isPending ? "กำลังบันทึก..." : "บันทึกข้อมูล"}</button>
+          <button disabled={isPending} className="focus-ring min-h-14 rounded-2xl bg-[#E60012] px-5 text-xl font-black text-white shadow-lg sm:col-span-2">{isPending ? "กำลังบันทึก..." : "บันทึกข้อมูล"}</button>
         </form>
-        {message && <div className="mt-3 rounded-2xl bg-[#ffc400]/20 p-3 font-black">{message}</div>}
+        {message && <div className="mt-3 rounded-2xl bg-[#E60012]/20 p-3 font-black">{message}</div>}
       </section>
 
       <section id="history" className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
@@ -148,5 +148,12 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
   );
 }
 
-function Stat({ label, value, highlight, danger }: { label: string; value: string; highlight?: boolean; danger?: boolean }) { return <div className={`rounded-3xl p-4 shadow-sm ${highlight ? "bg-[#ffc400]" : danger ? "bg-red-50" : "bg-white"}`}><div className="text-sm font-black text-black/50">{label}</div><div className="mt-1 text-2xl font-black">{value}</div></div>; }
+function Stat({ label, value, highlight, danger }: { label: string; value: string; highlight?: boolean; danger?: boolean }) {
+  return (
+    <div className={`rounded-3xl border p-4 shadow-sm ${highlight ? "border-[#E60012] bg-[#E60012] text-white" : danger ? "border-red-100 bg-red-50" : "border-black/10 bg-white"}`}>
+      <div className={`text-sm font-black ${highlight ? "text-white/75" : "text-black/50"}`}>{label}</div>
+      <div className="mt-1 text-2xl font-black">{value}</div>
+    </div>
+  );
+}
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label><span className="mb-2 block font-black">{label}</span>{children}</label>; }

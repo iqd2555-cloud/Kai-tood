@@ -51,7 +51,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
   return (
     <div className="space-y-5">
       <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">
-        <p className="text-sm font-bold text-[#ffc400]">รายการสั่งของ</p>
+        <p className="text-sm font-bold text-[#E60012]">รายการสั่งของ</p>
         <h1 className="mt-2 text-3xl font-black">วัตถุดิบที่ต้องการ</h1>
         <p className="mt-2 text-white/70">รวมรายการที่พนักงานขอสำหรับวันถัดไป</p>
       </section>
@@ -69,7 +69,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
           <span className="mb-2 block font-black">วันที่สิ้นสุด</span>
           <input className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 px-4 text-lg font-bold" type="date" name="to" defaultValue={to} />
         </label>
-        <button className="focus-ring min-h-14 self-end rounded-2xl bg-[#ffc400] px-6 text-lg font-black text-black shadow-sm">ดูรายการ</button>
+        <button className="focus-ring min-h-14 self-end rounded-2xl bg-[#E60012] px-6 text-lg font-black text-white shadow-sm">ดูรายการ</button>
       </form>
 
       <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
@@ -85,7 +85,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                 <h2 className="text-xl font-black">{report.branches?.name}</h2>
                 <p className="text-sm font-bold text-black/50">ข้อมูลวันที่ {formatThaiDate(report.report_date)}</p>
               </div>
-              <span className="rounded-full bg-[#ffc400] px-3 py-1 text-sm font-black">สั่งพรุ่งนี้</span>
+              <span className="rounded-full bg-[#E60012] px-3 py-1 text-sm font-black text-white">สั่งพรุ่งนี้</span>
             </div>
             <p className="whitespace-pre-wrap rounded-2xl bg-black/5 p-4 text-lg font-bold">{formatStructuredOrderItems(report)}</p>
           </article>

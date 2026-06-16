@@ -71,11 +71,11 @@ export default async function CounterOrdersPage({ searchParams }: CounterOrdersP
     return (
       <div className="space-y-4">
         <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">
-          <p className="text-sm font-bold text-[#ffc400]">เหนียวไก่เยอะโคตร</p>
+          <p className="text-sm font-bold text-[#E60012]">เหนียวไก่เยอะโคตร</p>
           <h1 className="mt-2 text-3xl font-black">ระบบนับออเดอร์หน้าร้าน</h1>
           <p className="mt-2 text-white/70">บัญชี Staff นี้ยังไม่ได้เปิดใช้ระบบนับออเดอร์หน้าร้าน</p>
         </section>
-        <Link href="/dashboard" className="focus-ring block rounded-3xl bg-[#ffc400] px-5 py-5 text-center text-xl font-black text-black shadow-lg">กลับหน้า Dashboard</Link>
+        <Link href="/dashboard" className="focus-ring block rounded-3xl bg-[#E60012] px-5 py-5 text-center text-xl font-black text-white shadow-lg">กลับหน้า Dashboard</Link>
       </div>
     );
   }
@@ -115,7 +115,7 @@ export default async function CounterOrdersPage({ searchParams }: CounterOrdersP
   if (staffOrderInputEnabled) {
     return (
       <div className="space-y-4">
-        <div className="rounded-full bg-[#ffc400]/20 px-4 py-2 text-sm font-black text-black">Debug: StaffCounterOrderPage</div>
+        <div className="rounded-full bg-[#E60012]/20 px-4 py-2 text-sm font-black text-black">Debug: StaffCounterOrderPage</div>
         <StaffCounterOrderInput
           branchId={selectedBranchId}
           priceItems={priceItems.map((item) => ({ price: item.price, item_name: item.item_name }))}
@@ -148,14 +148,14 @@ export default async function CounterOrdersPage({ searchParams }: CounterOrdersP
   return (
     <div className="space-y-5">
       <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">
-        <p className="text-sm font-bold text-[#ffc400]">เหนียวไก่เยอะโคตร</p>
+        <p className="text-sm font-bold text-[#E60012]">เหนียวไก่เยอะโคตร</p>
         <h1 className="mt-2 text-3xl font-black">ระบบนับออเดอร์หน้าร้าน</h1>
         <p className="mt-2 text-white/70">Owner Test Mode: กดราคา + กดจำนวน แล้วบันทึกยอดขายทันที โดยข้อมูลเก็บใน Supabase จริง</p>
         <div className="mt-4 grid gap-2 text-sm font-bold sm:grid-cols-4">
           <div className="rounded-2xl bg-white/10 p-3"><span className="block text-white/50">วันที่</span>{formatThaiDate(today)}</div>
           <div className="rounded-2xl bg-white/10 p-3"><span className="block text-white/50">สาขา</span>{selectedBranch?.name ?? "ไม่ระบุ"}</div>
           <div className="rounded-2xl bg-white/10 p-3"><span className="block text-white/50">ผู้ใช้งาน</span>{profile.full_name} ({profile.role === "owner" ? "Owner" : "Staff"})</div>
-          <div className="rounded-2xl bg-[#ffc400] p-3 text-black"><span className="block text-black/60">ยอดขายวันนี้</span>{moneyFormatter.format(totalSales)}</div>
+          <div className="rounded-2xl bg-[#E60012] p-3 text-white"><span className="block text-black/60">ยอดขายวันนี้</span>{moneyFormatter.format(totalSales)}</div>
         </div>
       </section>
 
@@ -167,7 +167,7 @@ export default async function CounterOrdersPage({ searchParams }: CounterOrdersP
               {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} ({branch.code})</option>)}
             </select>
           </label>
-          <button className="focus-ring mt-3 min-h-12 rounded-2xl bg-[#ffc400] px-5 font-black text-black">ใช้สาขานี้</button>
+          <button className="focus-ring mt-3 min-h-12 rounded-2xl bg-[#E60012] px-5 font-black text-white">ใช้สาขานี้</button>
         </form>
       )}
 
@@ -187,7 +187,7 @@ export default async function CounterOrdersPage({ searchParams }: CounterOrdersP
           <Link href="#accounting-report" className="focus-ring rounded-full bg-black px-4 py-2 text-sm font-black text-white">รายงานส่งบัญชี</Link>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl bg-[#ffc400]/30 p-4 text-center"><div className="text-sm font-bold">ยอดขายรวมวันนี้</div><div className="text-3xl font-black">{moneyFormatter.format(totalSales)}</div></div>
+          <div className="rounded-2xl bg-[#E60012]/30 p-4 text-center"><div className="text-sm font-bold">ยอดขายรวมวันนี้</div><div className="text-3xl font-black">{moneyFormatter.format(totalSales)}</div></div>
           <div className="rounded-2xl bg-black/5 p-4 text-center"><div className="text-sm font-bold">จำนวนออเดอร์วันนี้</div><div className="text-3xl font-black">{numberFormatter.format(activeOrders.length)}</div></div>
           <div className="rounded-2xl bg-black/5 p-4 text-center"><div className="text-sm font-bold">จำนวนห่อรวม</div><div className="text-3xl font-black">{numberFormatter.format(totalQuantity)}</div></div>
         </div>
@@ -198,7 +198,7 @@ export default async function CounterOrdersPage({ searchParams }: CounterOrdersP
               {rollups.map((item) => (
                 <tr key={item.price} className="border-t border-black/10 font-bold"><td className="p-3">{item.itemName}</td><td className="p-3 text-right">{numberFormatter.format(item.price)}</td><td className="p-3 text-right">{numberFormatter.format(item.quantity)}</td><td className="p-3 text-right">{moneyFormatter.format(item.total)}</td></tr>
               ))}
-              <tr className="border-t-2 border-black bg-[#ffc400]/20 text-base font-black"><td className="p-3">รวม</td><td className="p-3" /><td className="p-3 text-right">{numberFormatter.format(totalQuantity)}</td><td className="p-3 text-right">{moneyFormatter.format(totalSales)}</td></tr>
+              <tr className="border-t-2 border-black bg-[#E60012]/20 text-base font-black"><td className="p-3">รวม</td><td className="p-3" /><td className="p-3 text-right">{numberFormatter.format(totalQuantity)}</td><td className="p-3 text-right">{moneyFormatter.format(totalSales)}</td></tr>
             </tbody>
           </table>
         </div>
@@ -242,7 +242,7 @@ export default async function CounterOrdersPage({ searchParams }: CounterOrdersP
         </div>
       </section>
 
-      <section id="accounting-report" className="rounded-[1.75rem] border-4 border-[#ffc400] bg-white p-5 shadow-sm scroll-mt-24">
+      <section id="accounting-report" className="rounded-[1.75rem] border-4 border-[#E60012] bg-white p-5 shadow-sm scroll-mt-24">
         <p className="text-sm font-black text-black/50">รายงานส่งสำนักงานบัญชี</p>
         <h2 className="mt-1 text-2xl font-black">รายงานรายได้หน้าร้าน</h2>
         <div className="mt-3 rounded-2xl bg-black/5 p-4 font-bold">
@@ -257,11 +257,11 @@ export default async function CounterOrdersPage({ searchParams }: CounterOrdersP
               {rollups.map((item) => (
                 <tr key={item.price} className="border-t border-black/10 font-bold"><td className="p-3">{item.itemName}</td><td className="p-3 text-right">{numberFormatter.format(item.price)}</td><td className="p-3 text-right">{numberFormatter.format(item.quantity)}</td><td className="p-3 text-right">{moneyFormatter.format(item.total)}</td></tr>
               ))}
-              <tr className="border-t-2 border-black bg-[#ffc400]/20 text-base font-black"><td className="p-3">รวม</td><td className="p-3" /><td className="p-3 text-right">{numberFormatter.format(totalQuantity)}</td><td className="p-3 text-right">{moneyFormatter.format(totalSales)}</td></tr>
+              <tr className="border-t-2 border-black bg-[#E60012]/20 text-base font-black"><td className="p-3">รวม</td><td className="p-3" /><td className="p-3 text-right">{numberFormatter.format(totalQuantity)}</td><td className="p-3 text-right">{moneyFormatter.format(totalSales)}</td></tr>
             </tbody>
           </table>
         </div>
-        <p className="mt-3 rounded-2xl bg-yellow-50 p-3 text-sm font-bold text-yellow-900">อนาคตรองรับ Export PDF / Excel / CSV โดยรายงานนี้รวมเฉพาะออเดอร์สถานะสำเร็จเท่านั้น</p>
+        <p className="mt-3 rounded-2xl bg-[#FDECEC] p-3 text-sm font-bold text-[#7A0008]">อนาคตรองรับ Export PDF / Excel / CSV โดยรายงานนี้รวมเฉพาะออเดอร์สถานะสำเร็จเท่านั้น</p>
       </section>
     </div>
   );

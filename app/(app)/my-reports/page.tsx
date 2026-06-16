@@ -46,9 +46,9 @@ export default async function MyReportsPage({ searchParams }: MyReportsPageProps
 
   return (
     <div className="space-y-4">
-      <div className="rounded-full bg-[#ffc400]/20 px-4 py-2 text-sm font-black text-black">Debug: MyReportsPage</div>
+      <div className="rounded-full bg-[#E60012]/20 px-4 py-2 text-sm font-black text-black">Debug: MyReportsPage</div>
       <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">
-        <p className="text-sm font-bold text-[#ffc400]">{isOwner(profile) ? "สำหรับเจ้าของร้าน" : "สำหรับพนักงาน"}</p>
+        <p className="text-sm font-bold text-[#E60012]">{isOwner(profile) ? "สำหรับเจ้าของร้าน" : "สำหรับพนักงาน"}</p>
         <h1 className="mt-2 text-3xl font-black">รายงานของฉัน</h1>
         <p className="mt-1 text-sm text-white/80">{isOwner(profile) ? "เห็นรายงานทุกสาขา" : "เห็นเฉพาะสาขาของคุณ"}</p>
       </section>
@@ -66,7 +66,7 @@ export default async function MyReportsPage({ searchParams }: MyReportsPageProps
           <span className="mb-2 block font-black">วันที่สิ้นสุด</span>
           <input className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 px-4 text-lg font-bold" type="date" name="to" defaultValue={to} />
         </label>
-        <button className="focus-ring min-h-14 self-end rounded-2xl bg-[#ffc400] px-6 text-lg font-black text-black shadow-sm">ดูรายงาน</button>
+        <button className="focus-ring min-h-14 self-end rounded-2xl bg-[#E60012] px-6 text-lg font-black text-white shadow-sm">ดูรายงาน</button>
       </form>
 
       <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
@@ -90,7 +90,7 @@ export default async function MyReportsPage({ searchParams }: MyReportsPageProps
             </div>
 
             <div className="space-y-3">
-              <section className="rounded-2xl border border-[#ffc400]/40 bg-[#fff7db] p-3">
+              <section className="rounded-2xl border border-[#E60012]/40 bg-[#fff7db] p-3">
                 <h3 className="text-base font-black text-black">หมวด 1: ยอดขายประจำวัน</h3>
                 <div className="mt-2 grid grid-cols-1 gap-2 text-sm font-bold sm:grid-cols-3">
                   <div className="rounded-xl bg-white p-2">ยอดขายรวม {moneyFormatter.format(report.total_sales)}</div>
@@ -131,7 +131,7 @@ export default async function MyReportsPage({ searchParams }: MyReportsPageProps
 
               <section className="rounded-2xl border border-black/10 bg-black/[0.03] p-3">
                 <h3 className="text-base font-black text-black">หมวด 4: สินค้าคงเหลือปิดร้าน</h3>
-                <div className="mt-2 rounded-xl bg-[#ffc400]/30 p-3 text-sm font-black text-black">
+                <div className="mt-2 rounded-xl bg-[#E60012]/30 p-3 text-sm font-black text-black">
                   รวมไก่คงเหลือทั้งหมด {numberFormatter.format(getRemainingChickenTotal(report))} กิโลกรัม
                 </div>
                 <div className="mt-2 grid grid-cols-1 gap-2 text-sm font-bold sm:grid-cols-2">

@@ -145,7 +145,7 @@ function RemainingInventoryGrid({
     <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
       <h2 className="text-2xl font-black">{title}</h2>
       <p className="mt-1 text-sm font-bold text-black/50">คงเหลือใช้ค่าล่าสุดของแต่ละสาขาในช่วงวันที่เลือก</p>
-      <div className="mt-4 rounded-2xl bg-[#ffc400]/30 p-4 text-center">
+      <div className="mt-4 rounded-2xl bg-[#E60012]/30 p-4 text-center">
         <div className="text-sm font-black">รวมไก่คงเหลือทั้งหมด</div>
         <div className="text-3xl font-black">{numberFormatter.format(sumLatestRemainingChicken(reports))}</div>
         <div className="text-xs font-bold text-black/60">กิโลกรัม</div>
@@ -177,7 +177,7 @@ function QuantityGrid({
       <h2 className="text-2xl font-black">{title}</h2>
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {items.map((item) => (
-          <div key={item.name} className="rounded-2xl bg-[#ffc400]/20 p-3 text-center">
+          <div key={item.name} className="rounded-2xl bg-[#E60012]/20 p-3 text-center">
             <div className="text-sm font-black">{item.label}</div>
             <div className="text-2xl font-black">{numberFormatter.format(sumReports(reports, item.name))}</div>
             <div className="text-xs font-bold text-black/50">{item.unit}</div>
@@ -198,7 +198,7 @@ function InventoryComparisonTable({ title, reports }: { title: string; reports: 
           <p className="rounded-2xl bg-black/[0.04] p-4 text-sm font-bold text-black/60">ไม่มีข้อมูลสำหรับช่วงวันที่นี้</p>
         ) : reports.map((report) => (
           <article key={report.id} className="overflow-hidden rounded-2xl border border-black/10">
-            <div className="bg-[#ffc400]/30 px-3 py-2 text-sm font-black">{formatThaiDate(report.report_date)} • {report.branches?.name ?? report.branch_name}</div>
+            <div className="bg-[#E60012]/30 px-3 py-2 text-sm font-black">{formatThaiDate(report.report_date)} • {report.branches?.name ?? report.branch_name}</div>
             <div className="grid grid-cols-4 bg-black px-3 py-2 text-xs font-black text-white">
               <span>วัตถุดิบ</span>
               <span className="text-right">คำนวณวันนี้</span>
@@ -297,7 +297,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   return (
     <div className="space-y-5">
       <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">
-        <p className="text-sm font-bold text-[#ffc400]">สำหรับเจ้าของร้าน</p>
+        <p className="text-sm font-bold text-[#E60012]">สำหรับเจ้าของร้าน</p>
         <h1 className="mt-2 text-3xl font-black">รายงานสรุปผล</h1>
         <p className="mt-2 text-white/70">ดูภาพรวมทุกสาขาและเลือกดูแยกตามสาขาได้ตามช่วงวันที่</p>
       </section>
@@ -321,14 +321,14 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
           </select>
         </label>
-        <button className="focus-ring min-h-14 self-end rounded-2xl bg-[#ffc400] px-6 text-lg font-black text-black shadow-sm">ดูรายงาน</button>
+        <button className="focus-ring min-h-14 self-end rounded-2xl bg-[#E60012] px-6 text-lg font-black text-white shadow-sm">ดูรายงาน</button>
       </form>
 
       <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
         <p className="text-sm font-bold text-black/50">A. รายงานสรุปทุกสาขา</p>
         <h2 className="text-2xl font-black">{formatThaiDate(from)} - {formatThaiDate(to)}</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <StatCard label="ยอดขายรวม" value={moneyFormatter.format(sumReports(allReports, "total_sales"))} tone="yellow" />
+          <StatCard label="ยอดขายรวม" value={moneyFormatter.format(sumReports(allReports, "total_sales"))} tone="brand" />
           <StatCard label="เงินสดรวม" value={moneyFormatter.format(sumReports(allReports, "cash_sales"))} />
           <StatCard label="เงินโอนรวม" value={moneyFormatter.format(sumReports(allReports, "transfer_sales"))} />
           <StatCard label="จำนวนรายการที่บันทึก" value={numberFormatter.format(allReports.length)} tone="dark" />
@@ -371,7 +371,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         <p className="text-sm font-bold text-black/50">B. รายงานสรุปแยกตามสาขา</p>
         <h2 className="text-2xl font-black">{selectedBranch?.name ?? "ยังไม่มีสาขา"}</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="ยอดขายของสาขา" value={moneyFormatter.format(sumReports(branchReports, "total_sales"))} tone="yellow" />
+          <StatCard label="ยอดขายของสาขา" value={moneyFormatter.format(sumReports(branchReports, "total_sales"))} tone="brand" />
           <StatCard label="เงินสดของสาขา" value={moneyFormatter.format(sumReports(branchReports, "cash_sales"))} />
           <StatCard label="เงินโอนของสาขา" value={moneyFormatter.format(sumReports(branchReports, "transfer_sales"))} />
           <StatCard label="จำนวนรายการที่พนักงานบันทึก" value={numberFormatter.format(branchReports.length)} tone="dark" />

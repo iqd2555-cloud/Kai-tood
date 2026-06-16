@@ -80,10 +80,10 @@ export default async function DashboardPage() {
     <div className="space-y-5">
       <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">
         <div className="flex items-center gap-4">
-          <BrandLogo size={64} priority className="rounded-2xl shadow-lg shadow-[#ffc400]/20" />
+          <BrandLogo size={64} priority className="rounded-2xl shadow-lg shadow-[#E60012]/20" />
           <div className="min-w-0">
-            <p className="text-sm font-bold text-[#ffc400]">ภาพรวมวันนี้</p>
-            <h1 className="truncate text-3xl font-black text-[#ffc400]">{BRAND_NAME}</h1>
+            <p className="text-sm font-bold text-[#E60012]">ภาพรวมวันนี้</p>
+            <h1 className="truncate text-3xl font-black text-[#E60012]">{BRAND_NAME}</h1>
             <p className="text-sm font-bold text-white/80">{BRAND_SUBTITLE}</p>
           </div>
         </div>
@@ -95,7 +95,7 @@ export default async function DashboardPage() {
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="ยอดขายวันนี้" value={moneyFormatter.format(todaySales)} tone="yellow" />
+        <StatCard label="ยอดขายวันนี้" value={moneyFormatter.format(todaySales)} tone="brand" />
         <StatCard label="เงินสด" value={moneyFormatter.format(cashSales)} />
         <StatCard label="โอน" value={moneyFormatter.format(transferSales)} />
         <StatCard label="ยอดขาย 7 วัน" value={moneyFormatter.format(weekSales)} tone="dark" />
@@ -111,7 +111,7 @@ export default async function DashboardPage() {
         </div>
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
           {ingredientTotals.map((item) => (
-            <div key={item.label} className="rounded-2xl bg-[#ffc400]/20 p-3 text-center">
+            <div key={item.label} className="rounded-2xl bg-[#E60012]/20 p-3 text-center">
               <div className="text-sm font-black">{item.label}</div>
               <div className="text-2xl font-black">{numberFormatter.format(item.value)}</div>
               <div className="text-xs font-bold text-black/50">{item.unit}</div>
@@ -143,17 +143,17 @@ export default async function DashboardPage() {
                   <h2 className="text-2xl font-black">{branch.name}</h2>
                   <p className="text-sm font-bold text-black/50">รหัสสาขา {branch.code}</p>
                 </div>
-                <span className={`rounded-full px-3 py-1 text-sm font-black ${report ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-900"}`}>
+                <span className={`rounded-full px-3 py-1 text-sm font-black ${report ? "bg-green-100 text-green-800" : "bg-[#FDECEC] text-[#7A0008]"}`}>
                   {report ? "ส่งแล้ว" : "รอข้อมูล"}
                 </span>
               </div>
               {report ? (
                 <div className="mt-4 space-y-3">
-                  <div className="rounded-2xl bg-[#ffc400]/20 p-4 text-center">
+                  <div className="rounded-2xl bg-[#E60012]/20 p-4 text-center">
                     <div className="text-xs font-bold">ยอดขายรวม</div>
                     <div className="text-3xl font-black">{moneyFormatter.format(report.total_sales)}</div>
                   </div>
-                  <div className="rounded-2xl bg-[#ffc400]/30 p-4 text-center">
+                  <div className="rounded-2xl bg-[#E60012]/30 p-4 text-center">
                     <div className="text-xs font-bold">รวมไก่คงเหลือทั้งหมด</div>
                     <div className="text-3xl font-black">{numberFormatter.format(getRemainingChickenTotal(report))}</div>
                     <div className="text-xs font-bold text-black/60">กิโลกรัม</div>
@@ -168,14 +168,14 @@ export default async function DashboardPage() {
                   </div>
                 </div>
               ) : (
-                <p className="mt-4 rounded-2xl bg-yellow-50 p-4 font-bold text-yellow-900">ยังไม่มีข้อมูลวันนี้</p>
+                <p className="mt-4 rounded-2xl bg-[#FDECEC] p-4 font-bold text-[#7A0008]">ยังไม่มีข้อมูลวันนี้</p>
               )}
             </article>
           );
         })}
       </section>
 
-      <Link href="/daily" className="focus-ring block rounded-3xl bg-[#ffc400] px-5 py-5 text-center text-xl font-black text-black shadow-lg">กรอกข้อมูลประจำวัน</Link>
+      <Link href="/daily" className="focus-ring block rounded-3xl bg-[#E60012] px-5 py-5 text-center text-xl font-black text-white shadow-lg">กรอกข้อมูลประจำวัน</Link>
     </div>
   );
 }
