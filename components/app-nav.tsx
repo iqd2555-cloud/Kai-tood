@@ -3,19 +3,23 @@ import { BrandLogo } from "@/components/brand-logo";
 import { BRAND_NAME, BRAND_SUBTITLE } from "@/lib/brand";
 import { signOut } from "@/app/actions";
 import { canUseStaffCounterOrder } from "@/lib/counter-access";
-import { canAccessMarinationByEmail } from "@/lib/marination-access";
+import { canAccessDailyInput, canAccessMarinationByEmail, canAccessMyReport, isMarinationOnlyStaff } from "@/lib/marination-access";
 import type { Profile } from "@/lib/types";
 
 export function AppNav({ profile }: { profile: Profile }) {
   const isOwner = profile.role === "owner";
   const staffOrderInputEnabled = canUseStaffCounterOrder(profile);
   const canAccessMarination = canAccessMarinationByEmail(profile.email);
+  const marinationOnlyStaff = isMarinationOnlyStaff(profile);
+  const canUseDailyInput = canAccessDailyInput(profile);
+  const canUseMyReport = canAccessMyReport(profile);
+  const homeHref = marinationOnlyStaff ? "/marination" : "/dashboard";
   const ownerIdentity = profile.email || profile.full_name || "ไม่พบชื่อผู้ใช้";
   return (
     <header className="sticky top-0 z-20 border-b border-black/10 bg-[#111111] text-white shadow-lg">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
         <div className="flex min-w-0 flex-col gap-1">
-          <Link href="/dashboard" className="focus-ring flex items-center gap-3 rounded-xl">
+          <Link href={homeHref} className="focus-ring flex items-center gap-3 rounded-xl">
             <BrandLogo size={46} className="rounded-xl" />
             <div className="min-w-0">
               <div className="truncate text-lg font-black leading-tight text-[#ffc400]">{BRAND_NAME}</div>
@@ -30,14 +34,14 @@ export function AppNav({ profile }: { profile: Profile }) {
           )}
         </div>
         <nav className="flex flex-wrap items-center justify-end gap-2 text-sm font-bold">
-          {!isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/daily">กรอกข้อมูล</Link>}
+          {!isOwner && canUseDailyInput && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/daily">กรอกข้อมูล</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/owner-dashboard">สรุปภาพรวม</Link>}
-          {(isOwner || staffOrderInputEnabled) && <Link className="focus-ring rounded-full bg-[#ffc400] px-3 py-2 text-black" href="/counter-orders">นับออเดอร์</Link>}
+          {!marinationOnlyStaff && (isOwner || staffOrderInputEnabled) && <Link className="focus-ring rounded-full bg-[#ffc400] px-3 py-2 text-black" href="/counter-orders">นับออเดอร์</Link>}
           {canAccessMarination && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/marination">โรงหมักไก่</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/reports">รายงาน</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/orders">สั่งของ</Link>}
           {isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/leads">รายชื่อผู้สนใจแฟรนไชส์</Link>}
-          {!isOwner && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/my-reports">รายงานของฉัน</Link>}
+          {!isOwner && canUseMyReport && <Link className="focus-ring rounded-full bg-white/10 px-3 py-2" href="/my-reports">รายงานของฉัน</Link>}
           <form action={signOut}>
             <button className="focus-ring rounded-full bg-[#ffc400] px-3 py-2 font-black text-black">ออก</button>
           </form>

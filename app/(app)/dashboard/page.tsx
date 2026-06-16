@@ -9,6 +9,7 @@ import { formatThaiDate, moneyFormatter, numberFormatter, todayISO, daysAgoISO }
 import { REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS, getRemainingChickenTotal } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch, DailyReport } from "@/lib/types";
+import { isMarinationOnlyStaff } from "@/lib/marination-access";
 
 function sumReports(reports: DailyReport[], field: keyof Pick<DailyReport, "total_sales" | "cash_sales" | "transfer_sales" | "used_bl" | "used_bb" | "used_chicken_skin" | "used_oil" | "used_sticky_rice" | "used_chopped_chicken" | "used_drumstick" | "used_offal">) {
   return reports.reduce((sum, report) => sum + Number(report[field] ?? 0), 0);
@@ -16,6 +17,7 @@ function sumReports(reports: DailyReport[], field: keyof Pick<DailyReport, "tota
 
 export default async function DashboardPage() {
   const profile = await getCurrentProfile();
+  if (isMarinationOnlyStaff(profile)) redirect("/marination");
   const supabase = await createSupabaseServerClient();
   if (!supabase) redirect("/login?setup=supabase");
 

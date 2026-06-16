@@ -5,6 +5,7 @@ import { z } from "zod";
 import { ensureProfileForUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { getDefaultRedirectPathForEmail, getSafeRedirectPathForEmail } from "@/lib/marination-access";
 
 export type AuthFormState = {
   message: string;
@@ -17,10 +18,11 @@ const authSchema = z.object({
   next: z.string().optional().default("/dashboard"),
 });
 
-function normalizeRedirectPath(nextPath: string) {
-  if (!nextPath.startsWith("/") || nextPath.startsWith("//")) return "/dashboard";
-  if (nextPath.startsWith("/login")) return "/dashboard";
-  return nextPath;
+function normalizeRedirectPath(nextPath: string, email?: string) {
+  const defaultPath = getDefaultRedirectPathForEmail(email);
+  if (!nextPath.startsWith("/") || nextPath.startsWith("//")) return defaultPath;
+  if (nextPath.startsWith("/login")) return defaultPath;
+  return getSafeRedirectPathForEmail(email, nextPath);
 }
 
 export async function login(_: AuthFormState, formData: FormData): Promise<AuthFormState> {
@@ -142,7 +144,7 @@ async function completeImmediateLogin(email: string, password: string, next: str
     return { message: profileResult.message, success: "" };
   }
 
-  redirect(normalizeRedirectPath(next));
+  redirect(normalizeRedirectPath(next, email));
 }
 
 export async function signup(_: AuthFormState, formData: FormData): Promise<AuthFormState> {
@@ -216,7 +218,7 @@ export async function signup(_: AuthFormState, formData: FormData): Promise<Auth
       return { message: profileResult.message, success: "" };
     }
 
-    redirect(normalizeRedirectPath(next));
+    redirect(normalizeRedirectPath(next, email));
   }
 
   return {

@@ -4,9 +4,11 @@ import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { todayISO } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch, DailyReport } from "@/lib/types";
+import { canAccessDailyInput } from "@/lib/marination-access";
 
 export default async function DailyPage() {
   const profile = await getCurrentProfile();
+  if (!canAccessDailyInput(profile)) redirect("/marination");
   const supabase = await createSupabaseServerClient();
   if (!supabase) redirect("/login?setup=supabase");
 

@@ -5,6 +5,7 @@ import { formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib
 import { ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS, getRemainingChickenTotal } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { DailyReport } from "@/lib/types";
+import { canAccessMyReport } from "@/lib/marination-access";
 
 type SearchParams = {
   from?: string;
@@ -21,6 +22,7 @@ function isIsoDate(value: string | undefined) {
 
 export default async function MyReportsPage({ searchParams }: MyReportsPageProps) {
   const profile = await getCurrentProfile();
+  if (!canAccessMyReport(profile)) redirect("/marination");
   const supabase = await createSupabaseServerClient();
   if (!supabase) redirect("/login?setup=supabase");
 

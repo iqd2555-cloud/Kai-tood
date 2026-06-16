@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { CounterOrderConsole, StaffCounterOrderInput } from "./counter-order-console";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { canUseStaffCounterOrder } from "@/lib/counter-access";
+import { canAccessOrderCount } from "@/lib/marination-access";
 import { formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch, CounterCancellation, CounterOrder, CounterPriceItem } from "@/lib/types";
@@ -62,6 +63,7 @@ function buildRollups(orders: CounterOrder[]) {
 
 export default async function CounterOrdersPage({ searchParams }: CounterOrdersPageProps) {
   const profile = await getCurrentProfile();
+  if (!canAccessOrderCount(profile)) redirect("/marination");
 
   const staffOrderInputEnabled = canUseStaffCounterOrder(profile);
 
