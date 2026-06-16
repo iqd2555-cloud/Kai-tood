@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fffdf5;
+  --background: #ffffff;
   --foreground: #111111;
+  --brand-red: #E60012;
   --brand-yellow: #ffc400;
   --brand-black: #111111;
   --card: #ffffff;
@@ -39,11 +40,11 @@ textarea {
 .app-shell {
   min-height: 100dvh;
   background:
-    radial-gradient(circle at top left, rgba(255, 196, 0, 0.22), transparent 28rem),
-    #fffdf5;
+    radial-gradient(circle at top left, rgba(230, 0, 18, 0.14), transparent 28rem),
+    #ffffff;
 }
 
 .focus-ring:focus-visible {
-  outline: 3px solid #ffc400;
+  outline: 3px solid #E60012;
   outline-offset: 3px;
 }
