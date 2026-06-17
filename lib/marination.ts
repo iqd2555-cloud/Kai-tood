@@ -17,6 +17,7 @@ export type MarinationStockMovement = {
   note: string | null;
   created_by: string;
   created_at: string;
+  updated_at?: string | null;
 };
 
 export type MarinationPartSummary = {
