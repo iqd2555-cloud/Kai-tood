@@ -17,6 +17,19 @@ type MovementFormState = {
 };
 
 function kg(value: number | null) { return value === null ? "-" : `${numberFormatter.format(value)} กก.`; }
+function calculateSystemBalance(movements: Pick<MarinationStockMovement, "movement_type" | "quantity_kg">[]) {
+  return movements.reduce((balance, movement) => {
+    const quantity = Number(movement.quantity_kg);
+    if (movement.movement_type === "received" || movement.movement_type === "adjustment") return balance + quantity;
+    if (movement.movement_type === "used") return balance - quantity;
+    return balance;
+  }, 0);
+}
+function buildAdjustmentNote(userNote: string, targetBalance: number, currentSystemBalance: number) {
+  const autoNote = `ปรับยอดให้คงเหลือเป็น ${numberFormatter.format(targetBalance)} กก. จากยอดเดิม ${numberFormatter.format(currentSystemBalance)} กก.`;
+  const trimmedNote = userNote.trim();
+  return trimmedNote ? `${trimmedNote} | ${autoNote}` : autoNote;
+}
 function time(value: string) { return new Date(value).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Bangkok" }); }
 
 function initialFormState(selectedDate: string, parts: ChickenPart[]): MovementFormState {
@@ -35,6 +48,10 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
   const partsById = useMemo(() => Object.fromEntries(parts.map((part) => [part.id, part])), [parts]);
   const { summaries, totals } = useMemo(() => buildMarinationSummaries(parts, movements), [parts, movements]);
   const isEditing = editingMovementId !== null;
+  const isAdjustment = formState.movement_type === "adjustment";
+  const isDirectAdjustmentEdit = isEditing && isAdjustment;
+  const selectedPartMovements = useMemo(() => movements.filter((movement) => movement.chicken_part_id === formState.chicken_part_id), [movements, formState.chicken_part_id]);
+  const selectedPartSystemBalance = useMemo(() => calculateSystemBalance(selectedPartMovements), [selectedPartMovements]);
 
   useEffect(() => {
     setMovements(initialMovements);
@@ -94,9 +111,9 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
   async function submitMovement(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
-    const quantity_kg = Number(formState.quantity_kg);
-    if (!Number.isFinite(quantity_kg) || (formState.movement_type !== "adjustment" && quantity_kg < 0) || quantity_kg === 0) {
-      setMessage("กรุณากรอกจำนวนกิโลกรัมให้ถูกต้อง (ปรับยอดใส่ค่าติดลบได้)");
+    const inputQuantityKg = Number(formState.quantity_kg);
+    if (!Number.isFinite(inputQuantityKg) || (isDirectAdjustmentEdit ? inputQuantityKg === 0 : inputQuantityKg < 0 || (!isAdjustment && inputQuantityKg === 0))) {
+      setMessage(isDirectAdjustmentEdit ? "กรุณากรอกค่าเดลต้าปรับยอดที่ไม่ใช่ 0" : isAdjustment ? "กรุณากรอกยอดคงเหลือที่ต้องการให้เป็นตั้งแต่ 0 กก. ขึ้นไป" : "กรุณากรอกจำนวนกิโลกรัมให้มากกว่า 0");
       return;
     }
     const supabase = createSupabaseBrowserClient();
@@ -107,7 +124,7 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
         movement_date: formState.movement_date,
         chicken_part_id: formState.chicken_part_id,
         movement_type: formState.movement_type,
-        quantity_kg,
+        quantity_kg: inputQuantityKg,
         note: formState.note.trim() || null,
         updated_at: new Date().toISOString(),
       }).eq("id", editingMovementId);
@@ -119,14 +136,31 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
       return;
     }
 
-    const { error } = await supabase.from("marination_stock_movements").insert({
+    const insertPayload = {
       movement_date: formState.movement_date,
       chicken_part_id: formState.chicken_part_id,
       movement_type: formState.movement_type,
-      quantity_kg,
-      note: formState.note.trim() || null,
+      quantity_kg: inputQuantityKg,
+      note: formState.note.trim() || null as string | null,
       created_by: userId,
-    });
+    };
+
+    if (isAdjustment) {
+      const { data: currentMovements, error: balanceError } = await supabase
+        .from("marination_stock_movements")
+        .select("movement_type, quantity_kg")
+        .eq("movement_date", formState.movement_date)
+        .eq("chicken_part_id", formState.chicken_part_id)
+        .returns<Pick<MarinationStockMovement, "movement_type" | "quantity_kg">[]>();
+      if (balanceError) { setMessage(`คำนวณยอดคงเหลือปัจจุบันไม่สำเร็จ: ${balanceError.message}`); return; }
+
+      const currentSystemBalance = calculateSystemBalance(currentMovements ?? []);
+      const adjustmentDelta = inputQuantityKg - currentSystemBalance;
+      insertPayload.quantity_kg = adjustmentDelta;
+      insertPayload.note = buildAdjustmentNote(formState.note, inputQuantityKg, currentSystemBalance);
+    }
+
+    const { error } = await supabase.from("marination_stock_movements").insert(insertPayload);
     if (error) { setMessage(`บันทึกไม่สำเร็จ: ${error.message}`); return; }
     setMessage("บันทึกข้อมูลโรงหมักไก่สำเร็จ");
     setFormState(initialFormState(selectedDate, parts));
@@ -192,7 +226,15 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
           <Field label="วันที่"><input className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold shadow-sm" type="date" name="movement_date" value={formState.movement_date} onChange={(event) => updateForm("movement_date", event.target.value)} required /></Field>
           <Field label="ชิ้นส่วนไก่"><select className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold shadow-sm" name="chicken_part_id" value={formState.chicken_part_id} onChange={(event) => updateForm("chicken_part_id", event.target.value)} required>{parts.map(part => <option key={part.id} value={part.id}>{part.name}</option>)}</select></Field>
           <Field label="ประเภทการบันทึก"><select className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold shadow-sm" name="movement_type" value={formState.movement_type} onChange={(event) => updateForm("movement_type", event.target.value as MarinationMovementType)} required>{(Object.keys(movementTypeLabels) as MarinationMovementType[]).map(type => <option key={type} value={type}>{movementTypeLabels[type]}</option>)}</select></Field>
-          <Field label="จำนวนกิโลกรัม"><input className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold shadow-sm" type="number" inputMode="decimal" step="0.01" name="quantity_kg" value={formState.quantity_kg} onChange={(event) => updateForm("quantity_kg", event.target.value)} placeholder="เช่น 30" required /></Field>
+          <Field label={isAdjustment && !isEditing ? "ยอดคงเหลือที่ต้องการให้เป็น" : "จำนวนกิโลกรัม"}>
+            <input className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold shadow-sm" type="number" inputMode="decimal" min={isDirectAdjustmentEdit ? undefined : "0"} step="0.01" name="quantity_kg" value={formState.quantity_kg} onChange={(event) => updateForm("quantity_kg", event.target.value)} placeholder={isAdjustment && !isEditing ? "เช่น ต้องการให้คงเหลือเป็น 50 ให้กรอก 50" : "เช่น 30"} required />
+            {isAdjustment && !isEditing && (
+              <p className="mt-2 rounded-2xl bg-yellow-100 px-3 py-2 text-sm font-black text-yellow-900">
+                ระบบจะตั้งค่ายอดคงเหลือตามระบบให้เท่ากับจำนวนที่กรอก ไม่ใช่บวกเพิ่มจากยอดเดิม
+                <span className="mt-1 block text-yellow-950">ยอดคงเหลือปัจจุบันของวันที่เลือก: {kg(selectedPartSystemBalance)}</span>
+              </p>
+            )}
+          </Field>
           <label className="sm:col-span-2"><span className="mb-2 block font-black">หมายเหตุ</span><textarea className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold shadow-sm min-h-28 py-3" name="note" value={formState.note} onChange={(event) => updateForm("note", event.target.value)} placeholder="เช่น ปรับยอดเพราะชั่งผิด / ตรวจนับรอบเย็น" /></label>
           <div className="grid gap-3 sm:col-span-2 sm:grid-cols-2">
             <button disabled={isPending} className="focus-ring min-h-14 rounded-2xl bg-[#E60012] px-5 text-xl font-black text-white shadow-lg">{isPending ? "กำลังบันทึก..." : isEditing ? "บันทึกการแก้ไข" : "บันทึกข้อมูล"}</button>
