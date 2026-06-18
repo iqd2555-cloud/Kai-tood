@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 import { BRAND_NAME, BRAND_SUBTITLE } from "@/lib/brand";
@@ -86,13 +87,22 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="rounded-[2rem] border border-white/15 bg-white/10 p-3 shadow-2xl shadow-black/40 backdrop-blur sm:p-5">
-              <div className="relative min-h-[23rem] overflow-hidden rounded-[1.5rem] bg-[#111111] shadow-inner">
-                <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(17,17,17,0.1),rgba(122,0,8,0.38)),url('/images/fried-chicken-hero.jpg')] bg-cover bg-center" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-transparent" />
-                <div className="relative flex min-h-[23rem] flex-col justify-end p-5 sm:p-7">
-                  <div className="w-fit rounded-full bg-white px-4 py-2 text-xs font-black text-[#E60012]">FRANCHISE BUSINESS</div>
-                  <h2 className="mt-4 text-3xl font-black text-white">พร้อมเปิดร้านด้วยระบบแบรนด์</h2>
-                  <p className="mt-2 max-w-sm text-sm font-bold leading-6 text-white/78">หากยังไม่มีรูป ระบบจะแสดงเป็นการ์ดไล่สีแดง-ดำ และพร้อมแสดงรูปทันทีเมื่ออัปโหลดไฟล์</p>
+              <div className="rounded-[1.5rem] border border-white/20 bg-white p-2 shadow-xl shadow-black/20 sm:p-3">
+                <div className="relative min-h-[19rem] overflow-hidden rounded-[1.25rem] bg-[#111111] shadow-sm sm:min-h-[24rem] lg:min-h-[29rem]">
+                  <Image
+                    src="/images/AAwebsite.jpg"
+                    alt="หน้าร้านข้าวเหนียวไก่ทอดสำหรับแฟรนไชส์ Kai-tood"
+                    fill
+                    priority
+                    sizes="(min-width: 1024px) 520px, 100vw"
+                    className="object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/68 via-black/15 to-transparent" />
+                  <div className="absolute inset-x-4 bottom-4 rounded-3xl border border-white/20 bg-white/92 p-4 text-[#111111] shadow-lg shadow-black/20 backdrop-blur sm:inset-x-6 sm:bottom-6 sm:p-5">
+                    <div className="w-fit rounded-full bg-[#E60012] px-4 py-2 text-xs font-black text-white">FRANCHISE BUSINESS</div>
+                    <h2 className="mt-3 text-2xl font-black sm:text-3xl">พร้อมเปิดร้านด้วยระบบแบรนด์</h2>
+                    <p className="mt-2 text-sm font-bold leading-6 text-[#555555]">ภาพหน้าร้านจริงในกรอบ mockup ที่แสดงความพร้อมของแฟรนไชส์บนทุกขนาดหน้าจอ</p>
+                  </div>
                 </div>
               </div>
             </div>
