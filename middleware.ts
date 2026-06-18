@@ -6,6 +6,16 @@ const LOGIN_PATH = "/login";
 const DEFAULT_AUTHENTICATED_PATH = "/dashboard";
 const LOGIN_PASSTHROUGH_ERRORS = new Set(["auth", "profile"]);
 
+const publicRoutes = ["/", "/franchise/apply"] as const;
+
+function normalizePathname(pathname: string) {
+  return pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+}
+
+function isPublicRoute(pathname: string) {
+  return publicRoutes.includes(normalizePathname(pathname) as (typeof publicRoutes)[number]);
+}
+
 function isLoginPath(pathname: string) {
   return pathname === LOGIN_PATH || pathname.startsWith(`${LOGIN_PATH}/`);
 }
@@ -54,7 +64,13 @@ function loginCanRenderForAuthenticatedUser(request: NextRequest) {
 }
 
 export async function middleware(request: NextRequest) {
-  const isLogin = isLoginPath(request.nextUrl.pathname);
+  const pathname = request.nextUrl.pathname;
+  const isLogin = isLoginPath(pathname);
+
+  if (isPublicRoute(pathname)) {
+    return NextResponse.next();
+  }
+
   const supabaseEnv = getSupabasePublicEnv();
 
   if (!supabaseEnv) {
