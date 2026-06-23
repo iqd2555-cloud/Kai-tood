@@ -115,7 +115,7 @@ export default async function CounterOrdersPage({ searchParams }: CounterOrdersP
   if (staffOrderInputEnabled) {
     return (
       <div className="space-y-4">
-        <div className="rounded-full bg-[#E60012]/20 px-4 py-2 text-sm font-black text-black">Debug: StaffCounterOrderPage</div>
+        {process.env.NODE_ENV === "development" && <div className="rounded-full bg-[#E60012]/20 px-4 py-2 text-sm font-black text-black">Debug: StaffCounterOrderPage</div>}
         <StaffCounterOrderInput
           branchId={selectedBranchId}
           priceItems={priceItems.map((item) => ({ price: item.price, item_name: item.item_name }))}
@@ -140,10 +140,12 @@ export default async function CounterOrdersPage({ searchParams }: CounterOrdersP
   const totalQuantity = rollups.reduce((sum, item) => sum + item.quantity, 0);
   const cancellations = orders.flatMap((order) => (order.counter_cancellations ?? []).map((cancellation) => ({ ...cancellation, order }))) as (CounterCancellation & { order: CounterOrder })[];
 
-  console.info("accounting_report_branch_debug", {
-    selectedBranchId,
-    reportBranchId: [...new Set(orders.map((order) => order.branch_id))],
-  });
+  if (process.env.NODE_ENV === "development") {
+    console.info("accounting_report_branch_debug", {
+      selectedBranchId,
+      reportBranchId: [...new Set(orders.map((order) => order.branch_id))],
+    });
+  }
 
   return (
     <div className="space-y-5">

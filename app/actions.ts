@@ -115,11 +115,13 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
 
   const canonicalBranchName = branchData?.name ?? payload.branch_name;
 
-  console.info("daily_report_branch_debug", {
-    currentUserEmail: profile.email,
-    profileBranchId: profile.branch_id,
-    reportBranchId: payload.branch_id,
-  });
+  if (process.env.NODE_ENV === "development") {
+    console.info("daily_report_branch_debug", {
+      currentUserEmail: profile.email,
+      profileBranchId: profile.branch_id,
+      reportBranchId: payload.branch_id,
+    });
+  }
 
   const totalReceivedChicken = payload.received_original_chicken + payload.received_spicy_chicken + payload.received_ground_chicken + payload.received_drumstick + payload.received_offal + payload.received_chicken_skin;
 

@@ -46,7 +46,7 @@ export default async function MyReportsPage({ searchParams }: MyReportsPageProps
 
   return (
     <div className="space-y-4">
-      <div className="rounded-full bg-[#E60012]/20 px-4 py-2 text-sm font-black text-black">Debug: MyReportsPage</div>
+      {process.env.NODE_ENV === "development" && <div className="rounded-full bg-[#E60012]/20 px-4 py-2 text-sm font-black text-black">Debug: MyReportsPage</div>}
       <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">
         <p className="text-sm font-bold text-[#E60012]">{isOwner(profile) ? "สำหรับเจ้าของร้าน" : "สำหรับพนักงาน"}</p>
         <h1 className="mt-2 text-3xl font-black">รายงานของฉัน</h1>
