@@ -265,10 +265,12 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const { data: branchReportsData } = await branchReportsQuery.returns<DailyReport[]>();
   const branchReports = branchReportsData ?? [];
 
-  console.info("owner_report_branch_debug", {
-    selectedBranchId,
-    reportBranchId: [...new Set(branchReports.map((report) => report.branch_id))],
-  });
+  if (process.env.NODE_ENV === "development") {
+    console.info("owner_report_branch_debug", {
+      selectedBranchId,
+      reportBranchId: [...new Set(branchReports.map((report) => report.branch_id))],
+    });
+  }
 
   const branchNotes = branchReports
     .filter((report) => typeof report.note === "string" && report.note.trim().length > 0)

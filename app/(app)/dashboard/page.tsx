@@ -71,10 +71,12 @@ export default async function DashboardPage() {
     unit: "กก.",
   }));
 
-  console.info("dashboard_report_branch_debug", {
-    selectedBranchId: isOwner(profile) ? "all" : profile.branch_id,
-    reportBranchId: [...new Set(reports.map((report) => report.branch_id))],
-  });
+  if (process.env.NODE_ENV === "development") {
+    console.info("dashboard_report_branch_debug", {
+      selectedBranchId: isOwner(profile) ? "all" : profile.branch_id,
+      reportBranchId: [...new Set(reports.map((report) => report.branch_id))],
+    });
+  }
 
   return (
     <div className="space-y-5">

@@ -86,10 +86,12 @@ export default async function OwnerDashboardPage() {
     .filter((item) => item.note.length > 0)
     .sort((a, b) => b.reportDate.localeCompare(a.reportDate));
 
-  console.info("owner_summary_branch_debug", {
-    selectedBranchId: "all",
-    reportBranchId: [...new Set((rawBranchNotes ?? []).map((report) => report.branch_id))],
-  });
+  if (process.env.NODE_ENV === "development") {
+    console.info("owner_summary_branch_debug", {
+      selectedBranchId: "all",
+      reportBranchId: [...new Set((rawBranchNotes ?? []).map((report) => report.branch_id))],
+    });
+  }
 
   const rows = (data ?? []).map((row) => {
     const totalSales = pickNumber(row, ["total_sales", "sales_total", "total_revenue", "revenue"]);

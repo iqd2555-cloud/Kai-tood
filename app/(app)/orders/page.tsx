@@ -43,10 +43,12 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
     .returns<DailyReport[]>();
   const reports = reportsData ?? [];
 
-  console.info("orders_report_branch_debug", {
-    selectedBranchId: "all",
-    reportBranchId: [...new Set(reports.map((report) => report.branch_id))],
-  });
+  if (process.env.NODE_ENV === "development") {
+    console.info("orders_report_branch_debug", {
+      selectedBranchId: "all",
+      reportBranchId: [...new Set(reports.map((report) => report.branch_id))],
+    });
+  }
 
   return (
     <div className="space-y-5">

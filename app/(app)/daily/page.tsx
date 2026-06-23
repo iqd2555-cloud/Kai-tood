@@ -16,22 +16,30 @@ export default async function DailyPage() {
 
   const profileIsOwner = isOwner(profile);
   const branchesQuery = supabase.from("branches").select("*").order("name");
-  if (!profileIsOwner && profile.branch_id) branchesQuery.eq("id", profile.branch_id);
+  if (!profileIsOwner && profile.branch_id)
+    branchesQuery.eq("id", profile.branch_id);
   const { data: branchesData } = await branchesQuery.returns<Branch[]>();
   const staffProfileBranch =
     !profileIsOwner && profile.branch_id
-      ? { id: profile.branch_id, name: profile.branch_name ?? profile.branch?.name ?? "สาขาของคุณ" }
+      ? {
+          id: profile.branch_id,
+          name: profile.branch_name ?? profile.branch?.name ?? "สาขาของคุณ",
+        }
       : null;
   const branches = staffProfileBranch
     ? [
         {
-          ...branchesData?.find((branch) => branch.id === staffProfileBranch.id),
+          ...branchesData?.find(
+            (branch) => branch.id === staffProfileBranch.id,
+          ),
           id: staffProfileBranch.id,
           name: staffProfileBranch.name,
         },
       ]
-    : branchesData ?? [];
-  const defaultBranchId = profileIsOwner ? branches[0]?.id ?? "" : profile.branch_id ?? "";
+    : (branchesData ?? []);
+  const defaultBranchId = profileIsOwner
+    ? (branches[0]?.id ?? "")
+    : (profile.branch_id ?? "");
 
   const { data: existingReport } = await supabase
     .from("daily_reports")
@@ -42,13 +50,25 @@ export default async function DailyPage() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-full bg-[#E60012]/20 px-4 py-2 text-sm font-black text-black">Debug: DailyInputPage</div>
+      {process.env.NODE_ENV === "development" && (
+        <div className="rounded-full bg-[#E60012]/20 px-4 py-2 text-sm font-black text-black">
+          Debug: DailyInputPage
+        </div>
+      )}
       <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">
         <p className="text-sm font-bold text-[#E60012]">สำหรับพนักงาน</p>
         <h1 className="mt-2 text-3xl font-black">กรอกข้อมูลประจำวัน</h1>
-        <p className="mt-2 text-white/70">ปุ่มและช่องกรอกขนาดใหญ่ ใช้งานง่ายบนมือถือ Android และ iPhone</p>
+        <p className="mt-2 text-white/70">
+          ปุ่มและช่องกรอกขนาดใหญ่ ใช้งานง่ายบนมือถือ Android และ iPhone
+        </p>
       </section>
-      <DailyForm branches={branches} defaultBranchId={defaultBranchId} reportDate={today} existingReport={existingReport as DailyReport | null} canSelectBranch={profileIsOwner} />
+      <DailyForm
+        branches={branches}
+        defaultBranchId={defaultBranchId}
+        reportDate={today}
+        existingReport={existingReport as DailyReport | null}
+        canSelectBranch={profileIsOwner}
+      />
     </div>
   );
 }
