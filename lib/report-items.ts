@@ -20,6 +20,40 @@ export const LEGACY_RECEIVED_INGREDIENT_ITEMS = [
   { label: "ไก่รับเข้า", name: "received_chicken", unit: "กิโลกรัม" },
 ] as const;
 
+
+export const RECEIVED_CHICKEN_FIELDS = [
+  "received_original_chicken",
+  "received_spicy_chicken",
+  "received_ground_chicken",
+  "received_drumstick",
+  "received_offal",
+  "received_chicken_skin",
+] as const satisfies readonly Extract<ReceivedIngredientField, (typeof INVENTORY_FLOW_ITEMS)[number]["received"]>[];
+
+export type ReceivedChickenField = (typeof RECEIVED_CHICKEN_FIELDS)[number];
+export type ChickenReceivedReport = Partial<Record<ReceivedChickenField | "received_chicken", number | string | null | undefined>>;
+
+function toReportNumber(value: number | string | null | undefined) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+export function getChickenReceivedBreakdown(report: ChickenReceivedReport) {
+  return RECEIVED_CHICKEN_FIELDS.reduce<Record<ReceivedChickenField, number>>((acc, field) => {
+    acc[field] = toReportNumber(report[field]);
+    return acc;
+  }, {} as Record<ReceivedChickenField, number>);
+}
+
+export function calculateChickenReceivedKg(report: ChickenReceivedReport) {
+  const structuredTotal = Object.values(getChickenReceivedBreakdown(report)).reduce((sum, value) => sum + value, 0);
+  return structuredTotal > 0 ? structuredTotal : toReportNumber(report.received_chicken);
+}
+
 export const ORDER_REQUEST_ITEMS = [
   { label: "ไก่ดั้งเดิม", name: "order_original_chicken", unit: "กิโลกรัม" },
   { label: "ไก่เผ็ด", name: "order_spicy_chicken", unit: "กิโลกรัม" },

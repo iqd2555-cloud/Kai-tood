@@ -3,6 +3,7 @@ import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { canUseStaffCounterOrder } from "@/lib/counter-access";
 import { formatThaiDate, moneyFormatter, numberFormatter, todayISO, daysAgoISO } from "@/lib/format";
 import { calculateBranchDailyInsight } from "@/lib/daily-insights";
+import { calculateChickenReceivedKg, getChickenReceivedBreakdown } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 type ProfitRow = Record<string, string | number | null>;
@@ -17,6 +18,7 @@ type BranchNoteRow = {
 type OwnerDashboardSearchParams = Promise<{ date?: string }>;
 type InsightBranchRow = { id: string; name: string; code: string | null };
 type InsightReportRow = {
+  id: string;
   report_date: string;
   branch_id: string;
   cash_sales: number | string | null;
@@ -48,6 +50,8 @@ type InsightReportRow = {
   order_palm_sugar: number | string | null;
   order_other_items: { name?: string; amount?: number | string }[] | null;
   requested_items: string | null;
+  updated_at: string | null;
+  created_at: string | null;
 };
 
 const CHICKEN_COST_PER_KG = 65;
@@ -231,16 +235,30 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
     .returns<InsightBranchRow[]>();
   const { data: insightReports, error: insightReportsError } = await supabase
     .from("daily_reports")
-    .select("report_date,branch_id,cash_sales,transfer_sales,total_sales,received_original_chicken,received_spicy_chicken,received_ground_chicken,received_drumstick,received_offal,received_chicken_skin,received_chicken,used_bl,used_bb,used_chopped_chicken,used_drumstick,used_offal,used_sticky_rice,remaining_chicken,remaining_sticky_rice,order_original_chicken,order_spicy_chicken,order_offal,order_chopped_chicken,order_drumstick,order_chicken_skin,order_sticky_rice,order_oil,order_palm_sugar,order_other_items,requested_items")
+    .select("id,report_date,branch_id,cash_sales,transfer_sales,total_sales,received_original_chicken,received_spicy_chicken,received_ground_chicken,received_drumstick,received_offal,received_chicken_skin,received_chicken,used_bl,used_bb,used_chopped_chicken,used_drumstick,used_offal,used_sticky_rice,remaining_chicken,remaining_sticky_rice,order_original_chicken,order_spicy_chicken,order_offal,order_chopped_chicken,order_drumstick,order_chicken_skin,order_sticky_rice,order_oil,order_palm_sugar,order_other_items,requested_items,updated_at,created_at")
     .eq("report_date", insightDate)
+    .order("updated_at", { ascending: false })
+    .order("created_at", { ascending: false })
     .returns<InsightReportRow[]>();
 
-  const reportsByBranch = new Map((insightReports ?? []).map((report) => [report.branch_id, report]));
+  const duplicateReportBranches = new Set<string>();
+  const reportsByBranch = (insightReports ?? []).reduce<Map<string, InsightReportRow>>((acc, report) => {
+    if (acc.has(report.branch_id)) duplicateReportBranches.add(report.branch_id);
+    if (!acc.has(report.branch_id)) acc.set(report.branch_id, report);
+    return acc;
+  }, new Map());
   const insightBranchCards = (insightBranches ?? []).map((branch) => {
     const report = reportsByBranch.get(branch.id);
-    const chickenReceivedKg = report
-      ? toNumber(report.received_chicken) + toNumber(report.received_original_chicken) + toNumber(report.received_spicy_chicken) + toNumber(report.received_ground_chicken) + toNumber(report.received_drumstick) + toNumber(report.received_offal) + toNumber(report.received_chicken_skin)
-      : 0;
+    const receivedChickenBreakdown = report ? getChickenReceivedBreakdown(report) : null;
+    const chickenReceivedKg = report ? calculateChickenReceivedKg(report) : 0;
+    if (process.env.NODE_ENV === "development" && report) {
+      console.log({
+        branchName: branch.name || branch.code || "ไม่ระบุสาขา",
+        reportDate: report.report_date,
+        receivedChickenBreakdown,
+        branchReceivedTotal: chickenReceivedKg,
+      });
+    }
     const chickenUsedKg = report ? toNumber(report.used_bl) + toNumber(report.used_bb) + toNumber(report.used_chopped_chicken) + toNumber(report.used_drumstick) + toNumber(report.used_offal) : 0;
     const totalSales = report ? toNumber(report.total_sales) || toNumber(report.cash_sales) + toNumber(report.transfer_sales) : 0;
     const base = {
@@ -293,7 +311,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
           <div>
             <p className="text-sm font-black text-[#E60012]">Phase 1</p>
             <h2 className="text-xl font-black">สรุปรายงานอัจฉริยะ</h2>
-            <p className="mt-1 text-xs font-bold text-black/60">ใช้ข้อมูล daily reports และรายการสั่งของที่มีอยู่จริง พร้อม fallback เมื่อยังไม่มีข้อมูล</p>
+            <p className="mt-1 text-xs font-bold text-black/60">ยอดไก่หมักรับเข้าคำนวณจากช่องรับเข้าใน daily reports เท่านั้น ไม่รวมรายการสั่งของหรือ fallback</p>
           </div>
           <form className="flex flex-wrap items-center gap-2" action="/owner-dashboard">
             <input name="date" type="date" defaultValue={insightDate} className="h-11 rounded-2xl border border-black/10 bg-white px-3 text-sm font-bold" />
@@ -320,6 +338,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
           <div className="mt-3 rounded-2xl bg-white p-3 text-black">
             <p className="font-black">ผลตรวจสอบ: {abnormalBranches.length > 0 ? `พบจุดผิดปกติ ${abnormalBranches.length} สาขา` : "วันนี้ยังไม่พบจุดผิดปกติจากความสัมพันธ์ระหว่างยอดขาย ไก่หมัก และข้าวเหนียว"}</p>
             {missingBranches.length > 0 ? <p className="mt-1 text-sm font-bold text-black/60">ยังไม่มีรายงาน: {missingBranches.map((item) => item.branchName).join(", ")}</p> : null}
+            {duplicateReportBranches.size > 0 ? <p className="mt-1 text-sm font-bold text-orange-800">พบรายงานซ้ำในวันเดียวกัน: {insightBranchCards.filter((item) => duplicateReportBranches.has(item.branchId)).map((item) => item.branchName).join(", ")} — ใช้รายการล่าสุดในการคำนวณ</p> : null}
             {abnormalBranches.length > 0 ? <ul className="mt-2 list-disc space-y-1 pl-5 text-sm font-bold">{abnormalBranches.map((item) => <li key={item.branchId}>{item.branchName}: {item.insight.abnormalFlags.join(" / ")}</li>)}</ul> : null}
           </div>
         </article>
