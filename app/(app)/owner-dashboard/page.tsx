@@ -292,7 +292,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
       id: `missing-${item.branchId}`,
       branchName: item.branchName,
       message: "ไม่มีการส่งรายงานจากสาขา",
-      status: "warning" as const,
+      status: "missing" as const,
     })),
     ...abnormalBranches.map((item) => ({
       id: `abnormal-${item.branchId}`,
@@ -301,9 +301,9 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
       status: getIssueStatus(item.insight.abnormalFlags),
     })),
   ];
-  const insightAlertStatus: InsightAlertStatus = alertIssues.some((issue) => issue.status === "critical") ? "critical" : alertIssues.length > 0 ? "warning" : "normal";
-  const insightAlertTitle = alertIssues.length > 0 ? `ผลการตรวจสอบ: พบความผิดปกติ ${alertIssues.length} สาขา` : "ผลการตรวจสอบ: ไม่พบความผิดปกติ";
-  const insightAlertSummary = alertIssues.length > 0 ? "กรุณาตรวจสอบรายละเอียดด้านล่าง" : "ทุกสาขาที่มีรายงานวันนี้อยู่ในเกณฑ์ปกติ";
+  const insightAlertStatus: InsightAlertStatus = alertIssues.some((issue) => issue.status === "critical") ? "critical" : alertIssues.some((issue) => issue.status === "warning") ? "warning" : alertIssues.some((issue) => issue.status === "missing") ? "missing" : "normal";
+  const insightAlertTitle = alertIssues.length > 0 ? `ผลการตรวจสอบ: พบจุดที่ต้องตรวจสอบ ${alertIssues.length} สาขา` : "ผลการตรวจสอบ: ไม่พบความผิดปกติ";
+  const insightAlertSummary = alertIssues.length > 0 ? "กรุณาตรวจสอบรายการสาขาด้านล่าง โดยแถบสีจะแยกระดับสถานะให้ชัดเจน" : "ทุกสาขาที่มีรายงานวันนี้อยู่ในเกณฑ์ปกติ";
   const tomorrowTasks = insightBranchCards.flatMap((item) => {
     const report = item.report;
     if (!report) return [];
@@ -368,23 +368,25 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
 
         <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
           {insightBranchCards.map((item) => {
-            const branchIssueStatus = item.insight.status === "check" ? getIssueStatus(item.insight.abnormalFlags) : item.insight.status === "missing" ? "warning" : "normal";
-            const badgeClass = branchIssueStatus === "normal" ? "bg-green-100 text-green-800" : branchIssueStatus === "warning" ? "bg-orange-100 text-orange-900" : "bg-red-100 text-red-900";
-            const badgeText = branchIssueStatus === "normal" ? "ปกติ" : branchIssueStatus === "warning" ? (item.insight.status === "missing" ? "ยังไม่มีรายงาน" : "ควรตรวจสอบ") : "ผิดปกติ";
+            const branchIssueStatus: InsightAlertStatus = item.insight.status === "check" ? getIssueStatus(item.insight.abnormalFlags) : item.insight.status === "missing" ? "missing" : "normal";
+            const badgeClass = branchIssueStatus === "normal" ? "border-[#86EFAC] bg-[#DFF5E3] text-[#166534]" : branchIssueStatus === "missing" ? "border-[#D1D5DB] bg-[#F3F4F6] text-[#333333]" : branchIssueStatus === "warning" ? "border-[#E0A800] bg-[#FFD54A] text-[#111111]" : "border-[#D9363E] bg-[#FF4D4F] text-white";
+            const cardClass = branchIssueStatus === "normal" ? "border-[#86EFAC] bg-[#F7FFF8]" : branchIssueStatus === "missing" ? "border-[#D1D5DB] bg-[#F3F4F6]" : branchIssueStatus === "warning" ? "border-[#E0A800] bg-[#FFD54A]" : "border-[#D9363E] bg-[#FF4D4F] text-white";
+            const mutedTextClass = branchIssueStatus === "critical" ? "text-white/85" : "text-black/60";
+            const badgeText = branchIssueStatus === "normal" ? "ปกติ" : branchIssueStatus === "missing" ? "ไม่มีรายงาน" : branchIssueStatus === "warning" ? "ต้องตรวจสอบ" : "ผิดปกติ";
             return (
-              <article key={item.branchId} className="rounded-3xl border border-black/10 bg-black/[0.03] p-4">
+              <article key={item.branchId} className={`rounded-3xl border-2 p-4 shadow-sm ${cardClass}`}>
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="text-base font-black">สาขา: {item.branchName}</h3>
-                  <span className={`rounded-full px-3 py-1 text-xs font-black ${badgeClass}`}>{badgeText}</span>
+                  <span className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-black shadow-sm ${badgeClass}`}>{badgeText}</span>
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-sm font-bold">
+                <div className="mt-3 grid grid-cols-1 gap-2 text-sm font-bold sm:grid-cols-2">
                   <p>ยอดขาย: {moneyFormatter.format(item.totalSales)}</p><p>ไก่รับเข้า: {numberFormatter.format(item.chickenReceivedKg)} กก.</p>
                   <p>ไก่ใช้ไป: {numberFormatter.format(item.chickenUsedKg)} กก.</p><p>ไก่คงเหลือ: {numberFormatter.format(item.chickenRemainingKg)} กก.</p>
                   <p>ข้าวเหนียวใช้ไป: {numberFormatter.format(item.stickyRiceUsedKg)} กก.</p><p>ยอดขาย/ไก่ 1 กก.: {item.chickenUsedKg > 0 ? moneyFormatter.format(item.totalSales / item.chickenUsedKg) : "ยังไม่มีข้อมูล"}</p>
                   <p>ไก่ กก.ละ: {item.insight.chickenPacksPerKg === null ? "ยังไม่มีข้อมูล" : `${numberFormatter.format(item.insight.chickenPacksPerKg)} ห่อ`}</p><p>ข้าว กก.ละ: {item.insight.stickyRicePacksPerKg === null ? "ยังไม่มีข้อมูล" : `${numberFormatter.format(item.insight.stickyRicePacksPerKg)} ห่อ`}</p>
                 </div>
-                {item.insight.abnormalFlags.length > 0 ? <ul className={`mt-3 list-disc space-y-1 pl-5 text-sm font-bold ${branchIssueStatus === "critical" ? "text-red-900" : "text-orange-900"}`}>{item.insight.abnormalFlags.map((flag) => <li key={flag}>{flag}</li>)}</ul> : <p className="mt-3 text-sm font-bold text-green-700">ไม่พบจุดผิดปกติ</p>}
-                {item.insight.recommendations.length > 0 ? <p className="mt-2 text-xs font-bold text-black/60">คำแนะนำ: {item.insight.recommendations.join(" / ")}</p> : null}
+                {item.insight.abnormalFlags.length > 0 ? <ul className={`mt-3 rounded-2xl border-2 p-3 pl-8 text-sm font-black leading-relaxed ${branchIssueStatus === "critical" ? "border-white/50 bg-white/15 text-white" : "border-[#E0A800] bg-[#FFF3BF] text-[#111111]"}`}>{item.insight.abnormalFlags.map((flag) => <li key={flag}>{flag}</li>)}</ul> : <p className="mt-3 rounded-2xl border-2 border-[#86EFAC] bg-[#DFF5E3] p-3 text-sm font-black text-[#166534]">ไม่พบจุดผิดปกติ</p>}
+                {item.insight.recommendations.length > 0 ? <p className={`mt-2 text-xs font-bold ${mutedTextClass}`}>คำแนะนำ: {item.insight.recommendations.join(" / ")}</p> : null}
               </article>
             );
           })}
