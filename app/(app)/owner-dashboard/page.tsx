@@ -4,7 +4,7 @@ import { canUseStaffCounterOrder } from "@/lib/counter-access";
 import { formatThaiDate, moneyFormatter, numberFormatter, todayISO, daysAgoISO } from "@/lib/format";
 import { calculateBranchDailyInsight } from "@/lib/daily-insights";
 import { InsightAlertBanner, type InsightAlertIssue, type InsightAlertStatus } from "@/components/insight-alert-banner";
-import { calculateChickenReceivedKg, getChickenReceivedBreakdown } from "@/lib/report-items";
+import { calculateChickenReceivedKg, calculateChickenRemainingKg, getChickenReceivedBreakdown } from "@/lib/report-items";
 import { isReportableBranch } from "@/lib/branches";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -38,8 +38,15 @@ type InsightReportRow = {
   used_chopped_chicken: number | string | null;
   used_drumstick: number | string | null;
   used_offal: number | string | null;
+  used_chicken_skin: number | string | null;
   used_sticky_rice: number | string | null;
   remaining_chicken: number | string | null;
+  remaining_original_chicken: number | string | null;
+  remaining_spicy_chicken: number | string | null;
+  remaining_ground_chicken: number | string | null;
+  remaining_drumstick: number | string | null;
+  remaining_offal: number | string | null;
+  remaining_chicken_skin: number | string | null;
   remaining_sticky_rice: number | string | null;
   order_original_chicken: number | string | null;
   order_spicy_chicken: number | string | null;
@@ -242,7 +249,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
 
   const insightReportsQuery = supabase
     .from("daily_reports")
-    .select("id,report_date,branch_id,cash_sales,transfer_sales,total_sales,received_original_chicken,received_spicy_chicken,received_ground_chicken,received_drumstick,received_offal,received_chicken_skin,received_chicken,used_bl,used_bb,used_chopped_chicken,used_drumstick,used_offal,used_sticky_rice,remaining_chicken,remaining_sticky_rice,order_original_chicken,order_spicy_chicken,order_offal,order_chopped_chicken,order_drumstick,order_chicken_skin,order_sticky_rice,order_oil,order_palm_sugar,order_other_items,requested_items,updated_at,created_at")
+    .select("id,report_date,branch_id,cash_sales,transfer_sales,total_sales,received_original_chicken,received_spicy_chicken,received_ground_chicken,received_drumstick,received_offal,received_chicken_skin,received_chicken,used_bl,used_bb,used_chopped_chicken,used_drumstick,used_offal,used_chicken_skin,used_sticky_rice,remaining_chicken,remaining_original_chicken,remaining_spicy_chicken,remaining_ground_chicken,remaining_drumstick,remaining_offal,remaining_chicken_skin,remaining_sticky_rice,order_original_chicken,order_spicy_chicken,order_offal,order_chopped_chicken,order_drumstick,order_chicken_skin,order_sticky_rice,order_oil,order_palm_sugar,order_other_items,requested_items,updated_at,created_at")
     .eq("report_date", insightDate)
     .order("updated_at", { ascending: false })
     .order("created_at", { ascending: false });
@@ -268,7 +275,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
         branchReceivedTotal: chickenReceivedKg,
       });
     }
-    const chickenUsedKg = report ? toNumber(report.used_bl) + toNumber(report.used_bb) + toNumber(report.used_chopped_chicken) + toNumber(report.used_drumstick) + toNumber(report.used_offal) : 0;
+    const chickenUsedKg = report ? toNumber(report.used_bl) + toNumber(report.used_bb) + toNumber(report.used_chopped_chicken) + toNumber(report.used_drumstick) + toNumber(report.used_offal) + toNumber(report.used_chicken_skin) : 0;
     const totalSales = report ? toNumber(report.total_sales) || toNumber(report.cash_sales) + toNumber(report.transfer_sales) : 0;
     const base = {
       branchId: branch.id,
@@ -276,7 +283,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
       totalSales,
       chickenReceivedKg,
       chickenUsedKg,
-      chickenRemainingKg: report ? toNumber(report.remaining_chicken) : 0,
+      chickenRemainingKg: report ? calculateChickenRemainingKg(report) : 0,
       stickyRiceUsedKg: report ? toNumber(report.used_sticky_rice) : 0,
       stickyRiceRemainingKg: report ? toNumber(report.remaining_sticky_rice) : 0,
       hasReport: Boolean(report),

@@ -4,7 +4,7 @@ import { StatCard } from "@/components/stat-card";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { canUseStaffCounterOrder } from "@/lib/counter-access";
 import { formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib/format";
-import { INVENTORY_FLOW_ITEMS, OPENING_INVENTORY_ITEMS, ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, REMAINING_CHICKEN_FIELDS, REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS, getCalculatedRemaining, getInventoryDifference, getRemainingChickenTotal } from "@/lib/report-items";
+import { INVENTORY_FLOW_ITEMS, OPENING_INVENTORY_ITEMS, ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS, calculateChickenRemainingKg, getCalculatedRemaining, getInventoryDifference } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { isReportableBranch } from "@/lib/branches";
 import type { Branch, DailyReport } from "@/lib/types";
@@ -98,12 +98,12 @@ function sumLatestRemaining(reports: DailyReport[], field: NumericReportField) {
 }
 
 function sumLatestRemainingChicken(reports: DailyReport[]) {
-  return latestReportsByBranch(reports).reduce((sum, report) => sum + getRemainingChickenTotal(report), 0);
+  return latestReportsByBranch(reports).reduce((sum, report) => sum + calculateChickenRemainingKg(report), 0);
 }
 
 function InventoryFlowSummary({ title, reports }: { title: string; reports: DailyReport[] }) {
   const rows = [
-    { label: "ไก่", received: sumReports(reports, "received_chicken"), used: sumChickenUsed(reports), remaining: REMAINING_CHICKEN_FIELDS.reduce((sum, field) => sum + sumLatestRemaining(reports, field), 0), order: sumChickenOrder(reports), unit: "กิโลกรัม" },
+    { label: "ไก่", received: sumReports(reports, "received_chicken"), used: sumChickenUsed(reports), remaining: sumLatestRemainingChicken(reports), order: sumChickenOrder(reports), unit: "กิโลกรัม" },
     { label: "ข้าวเหนียว", received: sumReports(reports, "received_sticky_rice"), used: sumReports(reports, "used_sticky_rice"), remaining: sumLatestRemaining(reports, "remaining_sticky_rice"), order: sumReports(reports, "order_sticky_rice"), unit: "กิโลกรัม" },
     { label: "น้ำมัน", received: sumReports(reports, "received_oil"), used: sumReports(reports, "used_oil"), remaining: sumLatestRemaining(reports, "remaining_oil"), order: sumReports(reports, "order_oil"), unit: "กิโลกรัม" },
   ];
