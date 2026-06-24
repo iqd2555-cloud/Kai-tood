@@ -3,6 +3,7 @@ import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { canUseStaffCounterOrder } from "@/lib/counter-access";
 import { formatThaiDate, moneyFormatter, numberFormatter, todayISO, daysAgoISO } from "@/lib/format";
 import { calculateBranchDailyInsight } from "@/lib/daily-insights";
+import { InsightAlertBanner, type InsightAlertIssue, type InsightAlertStatus } from "@/components/insight-alert-banner";
 import { calculateChickenReceivedKg, getChickenReceivedBreakdown } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -284,6 +285,25 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
   }), { totalSales: 0, chickenReceivedKg: 0, chickenUsedKg: 0, chickenRemainingKg: 0, stickyRiceUsedKg: 0 });
   const abnormalBranches = insightBranchCards.filter((item) => item.insight.status === "check");
   const missingBranches = insightBranchCards.filter((item) => item.insight.status === "missing");
+  const criticalFlagKeywords = ["ไม่สัมพันธ์กัน", "ติดลบ", "ยอดขายมากกว่า 0", "ใช้ไก่เยอะผิดปกติ", "ไม่มีใช้ไก่เลย"];
+  const getIssueStatus = (messages: string[]): InsightAlertStatus => messages.some((message) => criticalFlagKeywords.some((keyword) => message.includes(keyword))) ? "critical" : "warning";
+  const alertIssues: InsightAlertIssue[] = [
+    ...missingBranches.map((item) => ({
+      id: `missing-${item.branchId}`,
+      branchName: item.branchName,
+      message: "ไม่มีการส่งรายงานจากสาขา",
+      status: "warning" as const,
+    })),
+    ...abnormalBranches.map((item) => ({
+      id: `abnormal-${item.branchId}`,
+      branchName: item.branchName,
+      message: item.insight.abnormalFlags.join(" / "),
+      status: getIssueStatus(item.insight.abnormalFlags),
+    })),
+  ];
+  const insightAlertStatus: InsightAlertStatus = alertIssues.some((issue) => issue.status === "critical") ? "critical" : alertIssues.length > 0 ? "warning" : "normal";
+  const insightAlertTitle = alertIssues.length > 0 ? `ผลการตรวจสอบ: พบความผิดปกติ ${alertIssues.length} สาขา` : "ผลการตรวจสอบ: ไม่พบความผิดปกติ";
+  const insightAlertSummary = alertIssues.length > 0 ? "กรุณาตรวจสอบรายละเอียดด้านล่าง" : "ทุกสาขาที่มีรายงานวันนี้อยู่ในเกณฑ์ปกติ";
   const tomorrowTasks = insightBranchCards.flatMap((item) => {
     const report = item.report;
     if (!report) return [];
@@ -335,18 +355,22 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
             <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ข้าวเหนียวใช้ไป</p><p className="font-black">{numberFormatter.format(insightTotals.stickyRiceUsedKg)} กก.</p></div>
             <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ยอดขายต่อไก่ 1 กก.</p><p className="font-black">{insightTotals.chickenUsedKg > 0 ? moneyFormatter.format(insightTotals.totalSales / insightTotals.chickenUsedKg) : "ยังไม่มีข้อมูล"}</p></div>
           </div>
-          <div className="mt-3 rounded-2xl bg-white p-3 text-black">
-            <p className="font-black">ผลตรวจสอบ: {abnormalBranches.length > 0 ? `พบจุดผิดปกติ ${abnormalBranches.length} สาขา` : "วันนี้ยังไม่พบจุดผิดปกติจากความสัมพันธ์ระหว่างยอดขาย ไก่หมัก และข้าวเหนียว"}</p>
-            {missingBranches.length > 0 ? <p className="mt-1 text-sm font-bold text-black/60">ยังไม่มีรายงาน: {missingBranches.map((item) => item.branchName).join(", ")}</p> : null}
-            {duplicateReportBranches.size > 0 ? <p className="mt-1 text-sm font-bold text-orange-800">พบรายงานซ้ำในวันเดียวกัน: {insightBranchCards.filter((item) => duplicateReportBranches.has(item.branchId)).map((item) => item.branchName).join(", ")} — ใช้รายการล่าสุดในการคำนวณ</p> : null}
-            {abnormalBranches.length > 0 ? <ul className="mt-2 list-disc space-y-1 pl-5 text-sm font-bold">{abnormalBranches.map((item) => <li key={item.branchId}>{item.branchName}: {item.insight.abnormalFlags.join(" / ")}</li>)}</ul> : null}
-          </div>
+          <InsightAlertBanner
+            className="mt-3"
+            title={insightAlertTitle}
+            status={insightAlertStatus}
+            summary={insightAlertSummary}
+            helperText={missingBranches.length > 0 ? `ยังไม่มีรายงาน: ${missingBranches.map((item) => item.branchName).join(", ")}` : undefined}
+            issues={alertIssues}
+          />
+          {duplicateReportBranches.size > 0 ? <p className="mt-3 rounded-2xl bg-orange-50 p-3 text-sm font-bold text-orange-900">พบรายงานซ้ำในวันเดียวกัน: {insightBranchCards.filter((item) => duplicateReportBranches.has(item.branchId)).map((item) => item.branchName).join(", ")} — ใช้รายการล่าสุดในการคำนวณ</p> : null}
         </article>
 
         <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
           {insightBranchCards.map((item) => {
-            const badgeClass = item.insight.status === "normal" ? "bg-green-100 text-green-800" : item.insight.status === "missing" ? "bg-gray-100 text-gray-700" : "bg-orange-100 text-orange-900";
-            const badgeText = item.insight.status === "normal" ? "ปกติ" : item.insight.status === "missing" ? "ยังไม่มีรายงาน" : "ควรตรวจสอบ";
+            const branchIssueStatus = item.insight.status === "check" ? getIssueStatus(item.insight.abnormalFlags) : item.insight.status === "missing" ? "warning" : "normal";
+            const badgeClass = branchIssueStatus === "normal" ? "bg-green-100 text-green-800" : branchIssueStatus === "warning" ? "bg-orange-100 text-orange-900" : "bg-red-100 text-red-900";
+            const badgeText = branchIssueStatus === "normal" ? "ปกติ" : branchIssueStatus === "warning" ? (item.insight.status === "missing" ? "ยังไม่มีรายงาน" : "ควรตรวจสอบ") : "ผิดปกติ";
             return (
               <article key={item.branchId} className="rounded-3xl border border-black/10 bg-black/[0.03] p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -359,7 +383,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
                   <p>ข้าวเหนียวใช้ไป: {numberFormatter.format(item.stickyRiceUsedKg)} กก.</p><p>ยอดขาย/ไก่ 1 กก.: {item.chickenUsedKg > 0 ? moneyFormatter.format(item.totalSales / item.chickenUsedKg) : "ยังไม่มีข้อมูล"}</p>
                   <p>ไก่ กก.ละ: {item.insight.chickenPacksPerKg === null ? "ยังไม่มีข้อมูล" : `${numberFormatter.format(item.insight.chickenPacksPerKg)} ห่อ`}</p><p>ข้าว กก.ละ: {item.insight.stickyRicePacksPerKg === null ? "ยังไม่มีข้อมูล" : `${numberFormatter.format(item.insight.stickyRicePacksPerKg)} ห่อ`}</p>
                 </div>
-                {item.insight.abnormalFlags.length > 0 ? <ul className="mt-3 list-disc space-y-1 pl-5 text-sm font-bold text-orange-900">{item.insight.abnormalFlags.map((flag) => <li key={flag}>{flag}</li>)}</ul> : <p className="mt-3 text-sm font-bold text-green-700">ไม่พบจุดผิดปกติ</p>}
+                {item.insight.abnormalFlags.length > 0 ? <ul className={`mt-3 list-disc space-y-1 pl-5 text-sm font-bold ${branchIssueStatus === "critical" ? "text-red-900" : "text-orange-900"}`}>{item.insight.abnormalFlags.map((flag) => <li key={flag}>{flag}</li>)}</ul> : <p className="mt-3 text-sm font-bold text-green-700">ไม่พบจุดผิดปกติ</p>}
                 {item.insight.recommendations.length > 0 ? <p className="mt-2 text-xs font-bold text-black/60">คำแนะนำ: {item.insight.recommendations.join(" / ")}</p> : null}
               </article>
             );
