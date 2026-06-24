@@ -5,6 +5,7 @@ import { formatThaiDate, moneyFormatter, numberFormatter, todayISO, daysAgoISO }
 import { calculateBranchDailyInsight } from "@/lib/daily-insights";
 import { InsightAlertBanner, type InsightAlertIssue, type InsightAlertStatus } from "@/components/insight-alert-banner";
 import { calculateChickenReceivedKg, getChickenReceivedBreakdown } from "@/lib/report-items";
+import { isReportableBranch } from "@/lib/branches";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 type ProfitRow = Record<string, string | number | null>;
@@ -13,11 +14,11 @@ type BranchNoteRow = {
   report_date: string;
   branch_id: string;
   note: string | null;
-  branches: { name: string } | null;
+  branches: { name: string; code: string | null; is_active?: boolean | null } | null;
 };
 
 type OwnerDashboardSearchParams = Promise<{ date?: string }>;
-type InsightBranchRow = { id: string; name: string; code: string | null };
+type InsightBranchRow = { id: string; name: string; code: string | null; is_active?: boolean | null };
 type InsightReportRow = {
   id: string;
   report_date: string;
@@ -121,7 +122,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
 
   const { data: rawBranchNotes, error: branchNotesError } = await supabase
     .from("daily_reports")
-    .select("report_date,branch_id,note,branches(name)")
+    .select("report_date,branch_id,note,branches(name,code,is_active)")
     .not("note", "is", null)
     .returns<BranchNoteRow[]>();
   if (branchNotesError) {
@@ -135,7 +136,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
       branchName: item.branches?.name?.trim() || "ไม่ระบุสาขา",
       note: item.note?.trim() ?? "",
     }))
-    .filter((item) => item.note.length > 0)
+    .filter((item) => item.note.length > 0 && isReportableBranch(rawBranchNotes?.find((note) => note.branch_id === item.branchId)?.branches))
     .sort((a, b) => b.reportDate.localeCompare(a.reportDate));
 
   if (process.env.NODE_ENV === "development") {
@@ -145,7 +146,9 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
     });
   }
 
-  const rows = (data ?? []).map((row) => {
+  const rows = (data ?? [])
+    .filter((row) => isReportableBranch({ name: pickBranchName(row), code: typeof row.branch_code === "string" ? row.branch_code : null }))
+    .map((row) => {
     const totalSales = pickNumber(row, ["total_sales", "sales_total", "total_revenue", "revenue"]);
     const chickenCostRaw = pickNumber(row, ["chicken_cost", "cost_chicken", "total_chicken_cost"]);
     const chickenKg = pickNumber(row, ["chicken_kg", "total_chicken_kg", "raw_chicken_kg"]);
@@ -231,16 +234,21 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
 
   const { data: insightBranches, error: insightBranchesError } = await supabase
     .from("branches")
-    .select("id,name,code")
+    .select("id,name,code,is_active")
+    .eq("is_active", true)
     .order("name")
     .returns<InsightBranchRow[]>();
-  const { data: insightReports, error: insightReportsError } = await supabase
+  const activeInsightBranchIds = (insightBranches ?? []).filter(isReportableBranch).map((branch) => branch.id);
+
+  const insightReportsQuery = supabase
     .from("daily_reports")
     .select("id,report_date,branch_id,cash_sales,transfer_sales,total_sales,received_original_chicken,received_spicy_chicken,received_ground_chicken,received_drumstick,received_offal,received_chicken_skin,received_chicken,used_bl,used_bb,used_chopped_chicken,used_drumstick,used_offal,used_sticky_rice,remaining_chicken,remaining_sticky_rice,order_original_chicken,order_spicy_chicken,order_offal,order_chopped_chicken,order_drumstick,order_chicken_skin,order_sticky_rice,order_oil,order_palm_sugar,order_other_items,requested_items,updated_at,created_at")
     .eq("report_date", insightDate)
     .order("updated_at", { ascending: false })
-    .order("created_at", { ascending: false })
-    .returns<InsightReportRow[]>();
+    .order("created_at", { ascending: false });
+
+  if (activeInsightBranchIds.length > 0) insightReportsQuery.in("branch_id", activeInsightBranchIds);
+  const { data: insightReports, error: insightReportsError } = await insightReportsQuery.returns<InsightReportRow[]>();
 
   const duplicateReportBranches = new Set<string>();
   const reportsByBranch = (insightReports ?? []).reduce<Map<string, InsightReportRow>>((acc, report) => {
@@ -248,7 +256,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
     if (!acc.has(report.branch_id)) acc.set(report.branch_id, report);
     return acc;
   }, new Map());
-  const insightBranchCards = (insightBranches ?? []).map((branch) => {
+  const insightBranchCards = (insightBranches ?? []).filter(isReportableBranch).map((branch) => {
     const report = reportsByBranch.get(branch.id);
     const receivedChickenBreakdown = report ? getChickenReceivedBreakdown(report) : null;
     const chickenReceivedKg = report ? calculateChickenReceivedKg(report) : 0;

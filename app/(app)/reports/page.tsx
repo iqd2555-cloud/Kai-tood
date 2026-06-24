@@ -6,6 +6,7 @@ import { canUseStaffCounterOrder } from "@/lib/counter-access";
 import { formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib/format";
 import { INVENTORY_FLOW_ITEMS, OPENING_INVENTORY_ITEMS, ORDER_REQUEST_ITEMS, RECEIVED_INGREDIENT_ITEMS, REMAINING_CHICKEN_FIELDS, REMAINING_INVENTORY_ITEMS, USED_INGREDIENT_ITEMS, getCalculatedRemaining, getInventoryDifference, getRemainingChickenTotal } from "@/lib/report-items";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { isReportableBranch } from "@/lib/branches";
 import type { Branch, DailyReport } from "@/lib/types";
 
 type SearchParams = {
@@ -238,8 +239,9 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const from = isIsoDate(params.from) ? params.from! : today;
   const to = isIsoDate(params.to) ? params.to! : today;
 
-  const { data: branchesData } = await supabase.from("branches").select("*").order("name").returns<Branch[]>();
-  const branches = branchesData ?? [];
+  const { data: branchesData } = await supabase.from("branches").select("*").eq("is_active", true).order("name").returns<Branch[]>();
+  const branches = (branchesData ?? []).filter(isReportableBranch);
+  const activeBranchIds = branches.map((branch) => branch.id);
   const selectedBranchId = branches.some((branch) => branch.id === params.branch_id) ? params.branch_id : branches[0]?.id;
 
   const reportSelect = "*, branches(name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold)";
@@ -249,6 +251,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     .select(reportSelect)
     .gte("report_date", from)
     .lte("report_date", to)
+    .in("branch_id", activeBranchIds.length > 0 ? activeBranchIds : ["00000000-0000-0000-0000-000000000000"])
     .order("report_date", { ascending: false })
     .returns<DailyReport[]>();
   const allReports = allReportsData ?? [];
@@ -258,6 +261,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     .select(reportSelect)
     .gte("report_date", from)
     .lte("report_date", to)
+    .in("branch_id", activeBranchIds.length > 0 ? activeBranchIds : ["00000000-0000-0000-0000-000000000000"])
     .order("report_date", { ascending: false });
 
   if (selectedBranchId) branchReportsQuery.eq("branch_id", selectedBranchId);

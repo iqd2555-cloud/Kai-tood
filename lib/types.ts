@@ -7,6 +7,7 @@ export type Branch = {
   low_chicken_threshold: number;
   low_sticky_rice_threshold: number;
   low_oil_threshold: number;
+  is_active?: boolean | null;
 };
 
 export type Profile = {
