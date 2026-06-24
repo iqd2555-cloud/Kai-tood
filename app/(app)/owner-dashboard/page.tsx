@@ -4,7 +4,7 @@ import { canUseStaffCounterOrder } from "@/lib/counter-access";
 import { formatThaiDate, moneyFormatter, numberFormatter, todayISO, daysAgoISO } from "@/lib/format";
 import { calculateBranchDailyInsight } from "@/lib/daily-insights";
 import { InsightAlertBanner, type InsightAlertIssue, type InsightAlertStatus } from "@/components/insight-alert-banner";
-import { calculateChickenReceivedKg, calculateChickenRemainingKg, getChickenReceivedBreakdown } from "@/lib/report-items";
+import { calculateBranchIngredientSummary, getChickenOpeningBreakdown, getChickenReceivedBreakdown, getChickenRemainingBreakdown } from "@/lib/report-items";
 import { isReportableBranch } from "@/lib/branches";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -26,6 +26,13 @@ type InsightReportRow = {
   cash_sales: number | string | null;
   transfer_sales: number | string | null;
   total_sales: number | string | null;
+  opening_original_chicken: number | string | null;
+  opening_spicy_chicken: number | string | null;
+  opening_ground_chicken: number | string | null;
+  opening_drumstick: number | string | null;
+  opening_offal: number | string | null;
+  opening_chicken_skin: number | string | null;
+  opening_sticky_rice: number | string | null;
   received_original_chicken: number | string | null;
   received_spicy_chicken: number | string | null;
   received_ground_chicken: number | string | null;
@@ -48,6 +55,7 @@ type InsightReportRow = {
   remaining_offal: number | string | null;
   remaining_chicken_skin: number | string | null;
   remaining_sticky_rice: number | string | null;
+  received_sticky_rice: number | string | null;
   order_original_chicken: number | string | null;
   order_spicy_chicken: number | string | null;
   order_offal: number | string | null;
@@ -249,7 +257,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
 
   const insightReportsQuery = supabase
     .from("daily_reports")
-    .select("id,report_date,branch_id,cash_sales,transfer_sales,total_sales,received_original_chicken,received_spicy_chicken,received_ground_chicken,received_drumstick,received_offal,received_chicken_skin,received_chicken,used_bl,used_bb,used_chopped_chicken,used_drumstick,used_offal,used_chicken_skin,used_sticky_rice,remaining_chicken,remaining_original_chicken,remaining_spicy_chicken,remaining_ground_chicken,remaining_drumstick,remaining_offal,remaining_chicken_skin,remaining_sticky_rice,order_original_chicken,order_spicy_chicken,order_offal,order_chopped_chicken,order_drumstick,order_chicken_skin,order_sticky_rice,order_oil,order_palm_sugar,order_other_items,requested_items,updated_at,created_at")
+    .select("id,report_date,branch_id,cash_sales,transfer_sales,total_sales,opening_original_chicken,opening_spicy_chicken,opening_ground_chicken,opening_drumstick,opening_offal,opening_chicken_skin,opening_sticky_rice,received_original_chicken,received_spicy_chicken,received_ground_chicken,received_drumstick,received_offal,received_chicken_skin,received_chicken,received_sticky_rice,used_bl,used_bb,used_chopped_chicken,used_drumstick,used_offal,used_chicken_skin,used_sticky_rice,remaining_chicken,remaining_original_chicken,remaining_spicy_chicken,remaining_ground_chicken,remaining_drumstick,remaining_offal,remaining_chicken_skin,remaining_sticky_rice,order_original_chicken,order_spicy_chicken,order_offal,order_chopped_chicken,order_drumstick,order_chicken_skin,order_sticky_rice,order_oil,order_palm_sugar,order_other_items,requested_items,updated_at,created_at")
     .eq("report_date", insightDate)
     .order("updated_at", { ascending: false })
     .order("created_at", { ascending: false });
@@ -265,27 +273,26 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
   }, new Map());
   const insightBranchCards = (insightBranches ?? []).filter(isReportableBranch).map((branch) => {
     const report = reportsByBranch.get(branch.id);
-    const receivedChickenBreakdown = report ? getChickenReceivedBreakdown(report) : null;
-    const chickenReceivedKg = report ? calculateChickenReceivedKg(report) : 0;
+    const ingredientSummary = report ? calculateBranchIngredientSummary(report) : calculateBranchIngredientSummary({});
     if (process.env.NODE_ENV === "development" && report) {
       console.log({
         branchName: branch.name || branch.code || "ไม่ระบุสาขา",
-        reportDate: report.report_date,
-        receivedChickenBreakdown,
-        branchReceivedTotal: chickenReceivedKg,
+        chickenOpeningBreakdown: getChickenOpeningBreakdown(report),
+        chickenReceivedBreakdown: getChickenReceivedBreakdown(report),
+        chickenRemainingBreakdown: getChickenRemainingBreakdown(report),
+        chickenUsedByStockKg: ingredientSummary.chickenUsedByStockKg,
       });
     }
-    const chickenUsedKg = report ? toNumber(report.used_bl) + toNumber(report.used_bb) + toNumber(report.used_chopped_chicken) + toNumber(report.used_drumstick) + toNumber(report.used_offal) + toNumber(report.used_chicken_skin) : 0;
     const totalSales = report ? toNumber(report.total_sales) || toNumber(report.cash_sales) + toNumber(report.transfer_sales) : 0;
     const base = {
       branchId: branch.id,
       branchName: branch.name || branch.code || "ไม่ระบุสาขา",
       totalSales,
-      chickenReceivedKg,
-      chickenUsedKg,
-      chickenRemainingKg: report ? calculateChickenRemainingKg(report) : 0,
-      stickyRiceUsedKg: report ? toNumber(report.used_sticky_rice) : 0,
-      stickyRiceRemainingKg: report ? toNumber(report.remaining_sticky_rice) : 0,
+      chickenReceivedKg: ingredientSummary.chickenReceivedKg,
+      chickenUsedKg: ingredientSummary.chickenUsedByStockKg,
+      chickenRemainingKg: ingredientSummary.chickenRemainingKg,
+      stickyRiceUsedKg: ingredientSummary.stickyRiceUsedByStockKg,
+      stickyRiceRemainingKg: ingredientSummary.stickyRiceRemainingKg,
       hasReport: Boolean(report),
       report,
     };
@@ -346,7 +353,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
           <div>
             <p className="text-sm font-black text-[#E60012]">Phase 1</p>
             <h2 className="text-xl font-black">สรุปรายงานอัจฉริยะ</h2>
-            <p className="mt-1 text-xs font-bold text-black/60">ยอดไก่หมักรับเข้าคำนวณจากช่องรับเข้าใน daily reports เท่านั้น ไม่รวมรายการสั่งของหรือ fallback</p>
+            <p className="mt-1 text-xs font-bold text-black/60">ยอดไก่รับเข้า ใช้ไปตามสต๊อก และคงเหลือ คำนวณจากสูตรเดียวกับรายละเอียดสาขาเท่านั้น</p>
           </div>
           <form className="flex flex-wrap items-center gap-2" action="/owner-dashboard">
             <input name="date" type="date" defaultValue={insightDate} className="h-11 rounded-2xl border border-black/10 bg-white px-3 text-sm font-bold" />
@@ -365,7 +372,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
           <div className="mt-3 grid grid-cols-2 gap-2 text-sm md:grid-cols-3">
             <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ยอดขายรวม</p><p className="font-black">{moneyFormatter.format(insightTotals.totalSales)}</p></div>
             <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ไก่หมักรับเข้า</p><p className="font-black">{numberFormatter.format(insightTotals.chickenReceivedKg)} กก.</p></div>
-            <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ไก่หมักใช้ไป</p><p className="font-black">{numberFormatter.format(insightTotals.chickenUsedKg)} กก.</p></div>
+            <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ไก่ใช้ไปตามสต๊อก</p><p className="font-black">{numberFormatter.format(insightTotals.chickenUsedKg)} กก.</p></div>
             <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ไก่หมักคงเหลือ</p><p className="font-black">{numberFormatter.format(insightTotals.chickenRemainingKg)} กก.</p></div>
             <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ข้าวเหนียวใช้ไป</p><p className="font-black">{numberFormatter.format(insightTotals.stickyRiceUsedKg)} กก.</p></div>
             <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ยอดขายต่อไก่ 1 กก.</p><p className="font-black">{insightTotals.chickenUsedKg > 0 ? moneyFormatter.format(insightTotals.totalSales / insightTotals.chickenUsedKg) : "ยังไม่มีข้อมูล"}</p></div>
@@ -396,7 +403,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
                 </div>
                 <div className="mt-3 grid grid-cols-1 gap-2 text-sm font-bold sm:grid-cols-2">
                   <p>ยอดขาย: {moneyFormatter.format(item.totalSales)}</p><p>ไก่รับเข้า: {numberFormatter.format(item.chickenReceivedKg)} กก.</p>
-                  <p>ไก่ใช้ไป: {numberFormatter.format(item.chickenUsedKg)} กก.</p><p>ไก่คงเหลือ: {numberFormatter.format(item.chickenRemainingKg)} กก.</p>
+                  <p>ไก่ใช้ไปตามสต๊อก: {numberFormatter.format(item.chickenUsedKg)} กก.</p><p>ไก่คงเหลือ: {numberFormatter.format(item.chickenRemainingKg)} กก.</p>
                   <p>ข้าวเหนียวใช้ไป: {numberFormatter.format(item.stickyRiceUsedKg)} กก.</p><p>ยอดขาย/ไก่ 1 กก.: {item.chickenUsedKg > 0 ? moneyFormatter.format(item.totalSales / item.chickenUsedKg) : "ยังไม่มีข้อมูล"}</p>
                   <p>ไก่ กก.ละ: {item.insight.chickenPacksPerKg === null ? "ยังไม่มีข้อมูล" : `${numberFormatter.format(item.insight.chickenPacksPerKg)} ห่อ`}</p><p>ข้าว กก.ละ: {item.insight.stickyRicePacksPerKg === null ? "ยังไม่มีข้อมูล" : `${numberFormatter.format(item.insight.stickyRicePacksPerKg)} ห่อ`}</p>
                 </div>

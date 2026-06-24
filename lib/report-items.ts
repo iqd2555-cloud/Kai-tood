@@ -84,6 +84,65 @@ export const REMAINING_CHICKEN_FIELDS = [
 export type RemainingChickenField = (typeof REMAINING_CHICKEN_FIELDS)[number];
 export type ChickenRemainingReport = Partial<Record<RemainingChickenField, number | string | null | undefined>>;
 
+
+export const OPENING_CHICKEN_FIELDS = [
+  "opening_original_chicken",
+  "opening_spicy_chicken",
+  "opening_ground_chicken",
+  "opening_drumstick",
+  "opening_offal",
+  "opening_chicken_skin",
+] as const satisfies readonly OpeningInventoryField[];
+
+export type OpeningChickenField = (typeof OPENING_CHICKEN_FIELDS)[number];
+export type BranchIngredientSummaryReport = Partial<Record<
+  OpeningChickenField | ReceivedChickenField | RemainingChickenField | "received_chicken" | "opening_sticky_rice" | "received_sticky_rice" | "remaining_sticky_rice",
+  number | string | null | undefined
+>>;
+
+function round1(value: number) {
+  return Math.round((Number.isFinite(value) ? value : 0) * 10) / 10;
+}
+
+function sumReportFields<T extends string>(report: Partial<Record<T, number | string | null | undefined>>, fields: readonly T[]) {
+  return fields.reduce((sum, field) => sum + toReportNumber(report[field]), 0);
+}
+
+function mapReportFields<T extends string>(report: Partial<Record<T, number | string | null | undefined>>, fields: readonly T[]) {
+  return fields.reduce<Record<T, number>>((acc, field) => {
+    acc[field] = round1(toReportNumber(report[field]));
+    return acc;
+  }, {} as Record<T, number>);
+}
+
+export function getChickenOpeningBreakdown(report: BranchIngredientSummaryReport) {
+  return mapReportFields(report, OPENING_CHICKEN_FIELDS);
+}
+
+export function getChickenRemainingBreakdown(report: BranchIngredientSummaryReport) {
+  return mapReportFields(report, REMAINING_CHICKEN_FIELDS);
+}
+
+export function calculateBranchIngredientSummary(report: BranchIngredientSummaryReport) {
+  const chickenOpeningKg = round1(sumReportFields(report, OPENING_CHICKEN_FIELDS));
+  const chickenReceivedKg = round1(calculateChickenReceivedKg(report));
+  const chickenRemainingKg = round1(sumReportFields(report, REMAINING_CHICKEN_FIELDS));
+  const stickyRiceOpeningKg = round1(toReportNumber(report.opening_sticky_rice));
+  const stickyRiceReceivedKg = round1(toReportNumber(report.received_sticky_rice));
+  const stickyRiceRemainingKg = round1(toReportNumber(report.remaining_sticky_rice));
+
+  return {
+    chickenOpeningKg,
+    chickenReceivedKg,
+    chickenRemainingKg,
+    chickenUsedByStockKg: round1(chickenOpeningKg + chickenReceivedKg - chickenRemainingKg),
+    stickyRiceOpeningKg,
+    stickyRiceReceivedKg,
+    stickyRiceRemainingKg,
+    stickyRiceUsedByStockKg: round1(stickyRiceOpeningKg + stickyRiceReceivedKg - stickyRiceRemainingKg),
+  };
+}
+
 export function calculateChickenRemainingKg(report: ChickenRemainingReport) {
   return REMAINING_CHICKEN_FIELDS.reduce((sum, field) => sum + toReportNumber(report[field]), 0);
 }

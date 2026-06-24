@@ -55,7 +55,7 @@ export function calculateBranchDailyInsight(report: BranchDailyInsightInput, opt
     recommendations.push("ติดตามให้สาขาส่งรายงานประจำวันก่อนสรุปยอด");
   }
   if (chickenUsedKg > 0 && chickenPacksPerKg !== null && chickenPacksPerKg < chickenMinimum) {
-    abnormalFlags.push("ยอดขายกับปริมาณไก่หมักที่ใช้ไปไม่สัมพันธ์กัน ไก่ 1 กก. ได้ต่ำกว่ามาตรฐานที่ยอมรับได้");
+    abnormalFlags.push("ยอดขายกับปริมาณไก่ใช้ไปตามสต๊อกไม่สัมพันธ์กัน ไก่ 1 กก. ได้ต่ำกว่ามาตรฐานที่ยอมรับได้");
     recommendations.push("ควรตรวจสอบการชั่งไก่ การบันทึกยอดขาย หรือการห่อสินค้า");
   }
   if (stickyRiceUsedKg > 0 && stickyRicePacksPerKg !== null && stickyRicePacksPerKg < stickyRiceMinimum) {
