@@ -10,7 +10,6 @@ import {
   ORDER_REQUEST_ITEMS,
   RECEIVED_INGREDIENT_ITEMS,
   REMAINING_INVENTORY_ITEMS,
-  USED_INGREDIENT_ITEMS,
 } from "@/lib/report-items";
 import { moneyFormatter } from "@/lib/format";
 import { SubmitButton } from "./submit-button";
@@ -34,6 +33,7 @@ const InventoryInputSection = memo(function InventoryInputSection({
   columns = "sm:grid-cols-2",
   existingReport,
   onInventoryChange,
+  readOnly = false,
 }: {
   id?: string;
   title: string;
@@ -42,6 +42,7 @@ const InventoryInputSection = memo(function InventoryInputSection({
   columns?: string;
   existingReport?: DailyReport | null;
   onInventoryChange: (name: string, value: number) => void;
+  readOnly?: boolean;
 }) {
   return (
     <section
@@ -60,6 +61,7 @@ const InventoryInputSection = memo(function InventoryInputSection({
             onChange={(event) =>
               onInventoryChange(item.name, toInputNumber(event.target.value))
             }
+            readOnly={readOnly}
           />
         ))}
       </div>
@@ -67,59 +69,57 @@ const InventoryInputSection = memo(function InventoryInputSection({
   );
 });
 
-const InventorySummary = memo(function InventorySummary({
+const UsedByStockSummary = memo(function UsedByStockSummary({
   inventoryValues,
+  hasPreviousReport,
 }: {
   inventoryValues: InventoryValues;
+  hasPreviousReport: boolean;
 }) {
   const rows = useMemo(
     () =>
       INVENTORY_FLOW_ITEMS.map((item) => {
-        const calculated =
+        const usedByStock =
           (inventoryValues[item.opening] ?? 0) +
           (inventoryValues[item.received] ?? 0) -
-          (inventoryValues[item.used] ?? 0);
-        const actual = inventoryValues[item.remaining] ?? 0;
-        return {
-          label: item.label,
-          calculated,
-          actual,
-          difference: actual - calculated,
-        };
+          (inventoryValues[item.remaining] ?? 0);
+        return { ...item, usedByStock };
       }),
     [inventoryValues],
   );
 
   return (
     <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
-      <h2 className="text-2xl font-black">คงเหลือคำนวณวันนี้</h2>
+      <h2 className="text-2xl font-black">3. วัตถุดิบใช้ไปตามสต๊อก — ระบบคำนวณอัตโนมัติ</h2>
       <p className="mt-1 text-sm font-bold text-black/50">
-        สูตร: ยกมา + รับเข้า - ใช้ไป และเทียบกับสินค้าคงเหลือปิดร้านที่กรอกจริง
+        ระบบคำนวณจากยอดคงเหลือเมื่อวาน + รับเข้าวันนี้ - คงเหลือวันนี้
       </p>
-      <div className="mt-4 overflow-hidden rounded-2xl border border-black/10">
-        <div className="grid grid-cols-4 bg-black px-3 py-2 text-xs font-black text-white">
-          <span>วัตถุดิบ</span>
-          <span className="text-right">คำนวณวันนี้</span>
-          <span className="text-right">ปิดร้านจริง</span>
-          <span className="text-right">ส่วนต่าง</span>
-        </div>
+      {!hasPreviousReport && (
+        <p className="mt-3 rounded-2xl bg-yellow-100 px-4 py-3 text-sm font-black text-yellow-900">
+          ไม่พบยอดคงเหลือจากเมื่อวาน ระบบใช้ค่า 0 ชั่วคราว
+        </p>
+      )}
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {rows.map((row) => (
-          <div
-            key={row.label}
-            className="grid grid-cols-4 border-t border-black/10 px-3 py-3 text-xs font-bold sm:text-sm"
-          >
-            <span>{row.label}</span>
-            <span className="text-right">
-              {row.calculated.toLocaleString("th-TH")}
-            </span>
-            <span className="text-right">
-              {row.actual.toLocaleString("th-TH")}
-            </span>
-            <span
-              className={`text-right font-black ${row.difference === 0 ? "text-green-700" : "text-red-700"}`}
-            >
-              {row.difference.toLocaleString("th-TH")}
-            </span>
+          <div key={row.used} className="rounded-2xl border-2 border-black/10 bg-black/[0.02] p-4">
+            <input type="hidden" name={row.used} value={row.usedByStock} />
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-black">{row.label}</p>
+                <p className="text-xs font-bold text-black/50">
+                  {inventoryValues[row.opening] ?? 0} + {inventoryValues[row.received] ?? 0} - {inventoryValues[row.remaining] ?? 0}
+                </p>
+              </div>
+              <div className={`text-right text-2xl font-black ${row.usedByStock < 0 ? "text-red-700" : "text-black"}`}>
+                {row.usedByStock.toLocaleString("th-TH")}
+                <span className="ml-1 text-sm">{row.unit}</span>
+              </div>
+            </div>
+            {row.usedByStock < 0 && (
+              <p className="mt-2 text-sm font-black text-red-700">
+                ตัวเลขติดลบ กรุณาตรวจสอบยอดรับเข้าและคงเหลือวันนี้
+              </p>
+            )}
           </div>
         ))}
       </div>
@@ -132,12 +132,14 @@ export function DailyForm({
   defaultBranchId,
   reportDate,
   existingReport,
+  previousReport,
   canSelectBranch,
 }: {
   branches: DailyFormBranch[];
   defaultBranchId: string;
   reportDate: string;
   existingReport?: DailyReport | null;
+  previousReport?: DailyReport | null;
   canSelectBranch: boolean;
 }) {
   const [state, formAction] = useActionState(saveDailyReport, null);
@@ -162,9 +164,8 @@ export function DailyForm({
     () => {
       const values: InventoryValues = {};
       for (const item of INVENTORY_FLOW_ITEMS) {
-        values[item.opening] = Number(existingReport?.[item.opening] ?? 0);
+        values[item.opening] = Number(previousReport?.[item.remaining] ?? 0);
         values[item.received] = Number(existingReport?.[item.received] ?? 0);
-        values[item.used] = Number(existingReport?.[item.used] ?? 0);
         values[item.remaining] = Number(existingReport?.[item.remaining] ?? 0);
       }
       return values;
@@ -198,6 +199,14 @@ export function DailyForm({
       ),
     [otherOrderItems],
   );
+
+  const openingSnapshot = useMemo(() => {
+    const values: Partial<DailyReport> = {};
+    for (const item of INVENTORY_FLOW_ITEMS) {
+      values[item.opening] = Number(previousReport?.[item.remaining] ?? 0);
+    }
+    return values as DailyReport;
+  }, [previousReport]);
 
   return (
     <form action={formAction} className="space-y-5">
@@ -247,10 +256,11 @@ export function DailyForm({
       <InventoryInputSection
         id="opening-inventory"
         title="0. ยกมา / คงเหลือจากเมื่อวาน"
-        description="กรอกจำนวนวัตถุดิบที่ยกมาจากเมื่อวานให้ครบทุกประเภท เพื่อใช้คำนวณคงเหลือวันนี้"
+        description="ระบบดึงยอดคงเหลือของวัตถุดิบแต่ละรายการจากรายงานล่าสุดของวันก่อนหน้า"
         items={OPENING_INVENTORY_ITEMS}
-        existingReport={existingReport}
+        existingReport={openingSnapshot}
         onInventoryChange={setInventoryField}
+        readOnly
       />
 
       <InventoryInputSection
@@ -305,26 +315,18 @@ export function DailyForm({
         </div>
       </section>
 
-      <InventoryInputSection
-        title="3. วัตถุดิบใช้ไป"
-        description="กรอกเฉพาะตัวเลขจำนวนกิโลกรัมที่ใช้ไปในวันนี้หรือรอบนี้"
-        items={USED_INGREDIENT_ITEMS}
-        existingReport={existingReport}
-        onInventoryChange={setInventoryField}
-      />
+      <UsedByStockSummary inventoryValues={inventoryValues} hasPreviousReport={Boolean(previousReport)} />
 
       <InventoryInputSection
-        title="4. สินค้าคงเหลือ"
+        title="4. สินค้าคงเหลือวันนี้"
         description="กรอกจำนวนคงเหลือปลายวันด้วยมือเพื่อใช้ตรวจสอบสต๊อกของแต่ละสาขา"
         items={REMAINING_INVENTORY_ITEMS}
         existingReport={existingReport}
         onInventoryChange={setInventoryField}
       />
 
-      <InventorySummary inventoryValues={inventoryValues} />
-
       <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
-        <h2 className="text-2xl font-black">5. รายการสั่งของ</h2>
+        <h2 className="text-2xl font-black">5. รายการสั่งวัตถุดิบเพิ่ม</h2>
         <p className="mt-1 text-sm font-bold text-black/50">
           เลือกรายการไว้ให้แล้ว พนักงานกรอกเฉพาะจำนวนที่ต้องการสั่ง
         </p>

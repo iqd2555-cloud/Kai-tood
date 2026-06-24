@@ -1,11 +1,11 @@
 import type { ChangeEventHandler } from "react";
 
-export function NumberField({ label, name, defaultValue = 0, step = "0.01", onChange }: { label: string; name: string; defaultValue?: number; step?: string; onChange?: ChangeEventHandler<HTMLInputElement> }) {
+export function NumberField({ label, name, defaultValue = 0, step = "0.01", onChange, readOnly = false }: { label: string; name: string; defaultValue?: number; step?: string; onChange?: ChangeEventHandler<HTMLInputElement>; readOnly?: boolean }) {
   return (
     <label className="block">
       <span className="mb-2 block text-base font-black text-black">{label}</span>
       <input
-        className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-xl font-bold shadow-sm"
+        className={`focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 px-4 text-xl font-bold shadow-sm ${readOnly ? "bg-black/[0.04] text-black/70" : "bg-white"}`}
         type="number"
         inputMode="decimal"
         min="0"
@@ -13,6 +13,7 @@ export function NumberField({ label, name, defaultValue = 0, step = "0.01", onCh
         name={name}
         defaultValue={defaultValue}
         onChange={onChange}
+        readOnly={readOnly}
       />
     </label>
   );

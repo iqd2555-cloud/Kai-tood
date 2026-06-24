@@ -450,7 +450,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
       </section>
 
       <section className="rounded-3xl bg-white p-4 shadow-sm">
-        <h2 className="text-lg font-black">หมวด 2: วัตถุดิบใช้ไป</h2>
+        <h2 className="text-lg font-black">หมวด 2: วัตถุดิบใช้ไปตามสต๊อก</h2>
         <div className="mt-3 grid grid-cols-1 gap-2">
           <div className="rounded-2xl bg-black/5 p-3 text-sm font-bold">รวมกิโลไก่ (เดือนนี้): {chickenKgMonth.toFixed(2)} กก.</div>
           <div className="rounded-2xl bg-black/5 p-3 text-sm font-bold">ต้นทุนไก่ (65 บาท/กก.): {moneyFormatter.format(chickenCostMonth)}</div>
