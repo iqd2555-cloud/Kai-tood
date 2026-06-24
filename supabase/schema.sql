@@ -10,6 +10,7 @@ create table public.branches (
   low_chicken_threshold numeric not null default 5,
   low_sticky_rice_threshold numeric not null default 5,
   low_oil_threshold numeric not null default 2,
+  is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
 
@@ -126,8 +127,8 @@ with check (public.current_profile_role() = 'owner' or branch_id = public.curren
 
 alter publication supabase_realtime add table public.daily_reports;
 
-insert into public.branches (name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold)
-values ('สาขาหลัก', 'MAIN', 5, 5, 2)
+insert into public.branches (name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold, is_active)
+values ('สาขาหลัก', 'MAIN', 5, 5, 2, false)
 on conflict (code) do nothing;
 
 insert into public.branches (name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold)
@@ -145,8 +146,8 @@ as $$
 declare
   default_branch_id uuid;
 begin
-  insert into public.branches (name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold)
-  values ('สาขาหลัก', 'MAIN', 5, 5, 2)
+  insert into public.branches (name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold, is_active)
+  values ('สาขาหลัก', 'MAIN', 5, 5, 2, false)
   on conflict (code) do update
   set name = excluded.name
   returning id into default_branch_id;
@@ -283,6 +284,7 @@ select
   count(*)::integer as report_count
 from public.daily_reports dr
 join public.branches b on b.id = dr.branch_id
+where b.is_active = true
 group by dr.report_date, dr.branch_id, b.name, b.code;
 
 grant select on public.daily_report_rollups to authenticated;
@@ -348,7 +350,9 @@ as $$
     count(distinct dr.branch_id)::integer as branch_count,
     count(*)::integer as report_count
   from public.daily_reports dr
-  where dr.report_date between p_from and p_to;
+  join public.branches b on b.id = dr.branch_id
+  where dr.report_date between p_from and p_to
+    and b.is_active = true;
 $$;
 
 grant execute on function public.owner_dashboard_totals(date, date) to authenticated;-- Owner Test Mode: front-counter order module for เหนียวไก่เยอะโคตร
