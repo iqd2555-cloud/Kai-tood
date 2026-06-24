@@ -48,6 +48,15 @@ export default async function DailyPage() {
     .eq("branch_id", defaultBranchId)
     .maybeSingle();
 
+  const { data: previousReport } = await supabase
+    .from("daily_reports")
+    .select("*")
+    .eq("branch_id", defaultBranchId)
+    .lt("report_date", today)
+    .order("report_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   return (
     <div className="space-y-5">
       {process.env.NODE_ENV === "development" && (
@@ -67,6 +76,7 @@ export default async function DailyPage() {
         defaultBranchId={defaultBranchId}
         reportDate={today}
         existingReport={existingReport as DailyReport | null}
+        previousReport={previousReport as DailyReport | null}
         canSelectBranch={profileIsOwner}
       />
     </div>

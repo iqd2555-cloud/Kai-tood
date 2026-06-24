@@ -344,7 +344,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
 
       <QuantityGrid title="ยกมา / คงเหลือจากเมื่อวานรวมทุกสาขา" items={OPENING_INVENTORY_ITEMS} reports={allReports} />
       <QuantityGrid title="วัตถุดิบรับเข้ารวมทุกสาขา" items={RECEIVED_INGREDIENT_ITEMS} reports={allReports} />
-      <QuantityGrid title="วัตถุดิบใช้ไปรวมทุกสาขา" items={USED_INGREDIENT_ITEMS} reports={allReports} />
+      <QuantityGrid title="วัตถุดิบใช้ไปตามสต๊อกรวมทุกสาขา" items={USED_INGREDIENT_ITEMS} reports={allReports} />
       <RemainingInventoryGrid title="สินค้าคงเหลือรวมทุกสาขา" reports={allReports} />
       <QuantityGrid title="รายการสั่งวัตถุดิบเพิ่มรวมทุกสาขา" items={ORDER_REQUEST_ITEMS} reports={allReports} />
       <InventoryFlowSummary title="ระบบรายงานวัตถุดิบรวมทุกสาขา" reports={allReports} />
@@ -386,7 +386,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
 
       <QuantityGrid title={`ยกมา / คงเหลือจากเมื่อวานของ${selectedBranch?.name ?? "สาขา"}`} items={OPENING_INVENTORY_ITEMS} reports={branchReports} />
       <QuantityGrid title={`วัตถุดิบรับเข้าของ${selectedBranch?.name ?? "สาขา"}`} items={RECEIVED_INGREDIENT_ITEMS} reports={branchReports} />
-      <QuantityGrid title={`วัตถุดิบใช้ไปของ${selectedBranch?.name ?? "สาขา"}`} items={USED_INGREDIENT_ITEMS} reports={branchReports} />
+      <QuantityGrid title={`วัตถุดิบใช้ไปตามสต๊อกของ${selectedBranch?.name ?? "สาขา"}`} items={USED_INGREDIENT_ITEMS} reports={branchReports} />
       <RemainingInventoryGrid title={`สินค้าคงเหลือของ${selectedBranch?.name ?? "สาขา"}`} reports={branchReports} />
       <QuantityGrid title={`รายการสั่งวัตถุดิบเพิ่มของ${selectedBranch?.name ?? "สาขา"}`} items={ORDER_REQUEST_ITEMS} reports={branchReports} />
       <InventoryFlowSummary title={`ระบบรายงานวัตถุดิบของ${selectedBranch?.name ?? "สาขา"}`} reports={branchReports} />
