@@ -4,7 +4,7 @@ import { canUseStaffCounterOrder } from "@/lib/counter-access";
 import { formatThaiDate, ingredientKgFormatter, moneyFormatter, numberFormatter, todayISO, daysAgoISO } from "@/lib/format";
 import { calculateBranchDailyInsight } from "@/lib/daily-insights";
 import { InsightAlertBanner, type InsightAlertIssue, type InsightAlertStatus } from "@/components/insight-alert-banner";
-import { calculateBranchIngredientSummary, calculateOverallIngredientSummary, getChickenOpeningBreakdown, getChickenReceivedBreakdown, getChickenRemainingBreakdown } from "@/lib/report-items";
+import { calculateOverallDashboardSummary, normalizeDashboardReports } from "@/lib/dashboard/inventory-summary";
 import { isReportableBranch } from "@/lib/branches";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -268,60 +268,50 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
   if (activeInsightBranchIds.length > 0) insightReportsQuery.in("branch_id", activeInsightBranchIds);
   const { data: insightReports, error: insightReportsError } = await insightReportsQuery.returns<InsightReportRow[]>();
 
-  const duplicateReportBranches = new Set<string>();
-  const reportsByBranch = (insightReports ?? []).reduce<Map<string, InsightReportRow>>((acc, report) => {
-    if (acc.has(report.branch_id)) duplicateReportBranches.add(report.branch_id);
-    if (!acc.has(report.branch_id)) acc.set(report.branch_id, report);
+  const reportCountsByBranch = (insightReports ?? []).reduce<Map<string, number>>((acc, report) => {
+    acc.set(report.branch_id, (acc.get(report.branch_id) ?? 0) + 1);
     return acc;
   }, new Map());
-  const insightBranchCards = (insightBranches ?? []).filter(isReportableBranch).map((branch) => {
-    const report = reportsByBranch.get(branch.id);
-    const ingredientSummary = calculateBranchIngredientSummary(report ?? {}, {
-      branchId: branch.id,
-      branchName: branch.name || branch.code || "ไม่ระบุสาขา",
-      reportDate: insightDate,
-      hasReport: Boolean(report),
-    });
-    if (process.env.NODE_ENV === "development" && report) {
-      console.log({
-        branchName: branch.name || branch.code || "ไม่ระบุสาขา",
-        chickenOpeningBreakdown: getChickenOpeningBreakdown(report),
-        chickenReceivedBreakdown: getChickenReceivedBreakdown(report),
-        chickenRemainingBreakdown: getChickenRemainingBreakdown(report),
-        chickenUsedByStockKg: ingredientSummary.chickenUsedByStockKg,
-      });
-    }
-    const totalSales = report ? toNumber(report.total_sales) || toNumber(report.cash_sales) + toNumber(report.transfer_sales) : 0;
+  const duplicateReportBranches = new Set([...reportCountsByBranch.entries()].filter(([, count]) => count > 1).map(([branchId]) => branchId));
+  const branchDashboardSummaries = normalizeDashboardReports(insightReports ?? [], insightBranches ?? [], insightDate);
+  const reportsByBranch = (insightReports ?? []).reduce<Map<string, InsightReportRow>>((acc, report) => {
+    const current = acc.get(report.branch_id);
+    const reportTime = String(report.updated_at || report.created_at || "");
+    const currentTime = String(current?.updated_at || current?.created_at || "");
+    if (!current || reportTime > currentTime) acc.set(report.branch_id, report);
+    return acc;
+  }, new Map());
+  const overallSummary = calculateOverallDashboardSummary(branchDashboardSummaries, insightDate);
+  const insightBranchCards = overallSummary.branchSummaries.map((summary) => {
+    const report = reportsByBranch.get(summary.branchId);
     const base = {
-      branchId: ingredientSummary.branchId,
-      branchName: ingredientSummary.branchName,
-      totalSales,
-      chickenReceivedKg: ingredientSummary.chickenReceivedKg,
-      chickenUsedKg: ingredientSummary.chickenUsedByStockKg,
-      chickenRemainingKg: ingredientSummary.chickenRemainingKg,
-      stickyRiceUsedKg: ingredientSummary.stickyRiceUsedByStockKg,
-      stickyRiceRemainingKg: ingredientSummary.stickyRiceRemainingKg,
-      hasReport: Boolean(report),
+      branchId: summary.branchId,
+      branchName: summary.branchName,
+      totalSales: summary.totalSales,
+      chickenReceivedKg: summary.chickenReceivedKg,
+      chickenUsedKg: summary.chickenUsedByStockKg,
+      chickenRemainingKg: summary.chickenRemainingKg,
+      stickyRiceUsedKg: summary.stickyRiceUsedByStockKg,
+      stickyRiceRemainingKg: summary.stickyRiceRemainingKg,
+      hasReport: summary.hasReport,
       report,
-      ingredientSummary,
+      summary,
     };
     return { ...base, insight: calculateBranchDailyInsight(base) };
   });
-  const branchIngredientSummaries = insightBranchCards.map((item) => item.ingredientSummary);
-  const overallSummary = calculateOverallIngredientSummary(branchIngredientSummaries);
-  const totalSalesWithReports = insightBranchCards.reduce((sum, item) => sum + (item.hasReport ? item.totalSales : 0), 0);
   const insightTotals = {
-    totalSales: totalSalesWithReports,
+    totalSales: overallSummary.totalSales,
     chickenReceivedKg: overallSummary.chickenReceivedKg,
     chickenUsedKg: overallSummary.chickenUsedByStockKg,
     chickenRemainingKg: overallSummary.chickenRemainingKg,
     stickyRiceUsedKg: overallSummary.stickyRiceUsedByStockKg,
+    salesPerChickenKg: overallSummary.salesPerChickenKg,
   };
 
   if (process.env.NODE_ENV === "development") {
     console.log("ingredient summary debug", {
       selectedDate: insightDate,
-      branchSummaries: branchIngredientSummaries,
+      branchSummaries: branchDashboardSummaries,
       overallSummary,
     });
   }
@@ -395,7 +385,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
             <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ไก่ใช้ไปตามสต๊อก</p><p className="font-black">{ingredientKgFormatter.format(insightTotals.chickenUsedKg)} กก.</p></div>
             <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ไก่คงเหลือรวม</p><p className="font-black">{ingredientKgFormatter.format(insightTotals.chickenRemainingKg)} กก.</p></div>
             <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ข้าวเหนียวใช้ไปตามสต๊อก</p><p className="font-black">{ingredientKgFormatter.format(insightTotals.stickyRiceUsedKg)} กก.</p></div>
-            <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ยอดขายต่อไก่ 1 กก.</p><p className="font-black">{insightTotals.chickenUsedKg > 0 ? moneyFormatter.format(insightTotals.totalSales / insightTotals.chickenUsedKg) : "ยังไม่มีข้อมูล"}</p></div>
+            <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ยอดขายต่อไก่ 1 กก.</p><p className="font-black">{insightTotals.salesPerChickenKg === null ? "ยังไม่มีข้อมูล" : moneyFormatter.format(insightTotals.salesPerChickenKg)}</p></div>
           </div>
           <InsightAlertBanner
             className="mt-3"
@@ -424,7 +414,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
                 <div className="mt-3 grid grid-cols-1 gap-2 text-sm font-bold sm:grid-cols-2">
                   <p>ยอดขาย: {moneyFormatter.format(item.totalSales)}</p><p>ไก่รับเข้า: {ingredientKgFormatter.format(item.chickenReceivedKg)} กก.</p>
                   <p>ไก่ใช้ไปตามสต๊อก: {ingredientKgFormatter.format(item.chickenUsedKg)} กก.</p><p>ไก่คงเหลือรวม: {ingredientKgFormatter.format(item.chickenRemainingKg)} กก.</p>
-                  <p>ข้าวเหนียวใช้ไปตามสต๊อก: {ingredientKgFormatter.format(item.stickyRiceUsedKg)} กก.</p><p>ยอดขาย/ไก่ 1 กก.: {item.chickenUsedKg > 0 ? moneyFormatter.format(item.totalSales / item.chickenUsedKg) : "ยังไม่มีข้อมูล"}</p>
+                  <p>ข้าวเหนียวใช้ไปตามสต๊อก: {ingredientKgFormatter.format(item.stickyRiceUsedKg)} กก.</p><p>ยอดขาย/ไก่ 1 กก.: {item.summary.salesPerChickenKg === null ? "ยังไม่มีข้อมูล" : moneyFormatter.format(item.summary.salesPerChickenKg)}</p>
                   <p>ไก่ กก.ละ: {item.insight.chickenPacksPerKg === null ? "ยังไม่มีข้อมูล" : `${numberFormatter.format(item.insight.chickenPacksPerKg)} ห่อ`}</p><p>ข้าว กก.ละ: {item.insight.stickyRicePacksPerKg === null ? "ยังไม่มีข้อมูล" : `${numberFormatter.format(item.insight.stickyRicePacksPerKg)} ห่อ`}</p>
                 </div>
                 {item.insight.abnormalFlags.length > 0 ? <ul className={`mt-3 rounded-2xl border-2 p-3 pl-8 text-sm font-black leading-relaxed ${branchIssueStatus === "critical" ? "border-white/50 bg-white/15 text-white" : "border-[#E0A800] bg-[#FFF3BF] text-[#111111]"}`}>{item.insight.abnormalFlags.map((flag) => <li key={flag}>{flag}</li>)}</ul> : <p className="mt-3 rounded-2xl border-2 border-[#86EFAC] bg-[#DFF5E3] p-3 text-sm font-black text-[#166534]">ไม่พบจุดผิดปกติ</p>}
