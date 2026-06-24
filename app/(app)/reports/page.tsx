@@ -77,8 +77,12 @@ function sumReports(reports: DailyReport[], field: NumericReportField) {
   return reports.reduce((sum, report) => sum + Number(report[field] ?? 0), 0);
 }
 
+function sumIngredientSummaryField(reports: DailyReport[], field: "chickenUsedByStockKg" | "stickyRiceUsedByStockKg" | "oilUsedByStockKg" | "chickenReceivedKg" | "stickyRiceReceivedKg" | "oilReceivedKg") {
+  return reports.reduce((sum, report) => sum + calculateBranchIngredientSummary(report)[field], 0);
+}
+
 function sumChickenUsedByStock(reports: DailyReport[]) {
-  return reports.reduce((sum, report) => sum + calculateBranchIngredientSummary(report).chickenUsedByStockKg, 0);
+  return sumIngredientSummaryField(reports, "chickenUsedByStockKg");
 }
 
 function sumChickenOrder(reports: DailyReport[]) {
@@ -103,9 +107,9 @@ function sumLatestRemainingChicken(reports: DailyReport[]) {
 
 function InventoryFlowSummary({ title, reports }: { title: string; reports: DailyReport[] }) {
   const rows = [
-    { label: "ไก่", received: reports.reduce((sum, report) => sum + calculateBranchIngredientSummary(report).chickenReceivedKg, 0), used: sumChickenUsedByStock(reports), remaining: sumLatestRemainingChicken(reports), order: sumChickenOrder(reports), unit: "กิโลกรัม" },
-    { label: "ข้าวเหนียว", received: sumReports(reports, "received_sticky_rice"), used: sumReports(reports, "used_sticky_rice"), remaining: sumLatestRemaining(reports, "remaining_sticky_rice"), order: sumReports(reports, "order_sticky_rice"), unit: "กิโลกรัม" },
-    { label: "น้ำมัน", received: sumReports(reports, "received_oil"), used: sumReports(reports, "used_oil"), remaining: sumLatestRemaining(reports, "remaining_oil"), order: sumReports(reports, "order_oil"), unit: "กิโลกรัม" },
+    { label: "ไก่", received: sumIngredientSummaryField(reports, "chickenReceivedKg"), used: sumChickenUsedByStock(reports), remaining: sumLatestRemainingChicken(reports), order: sumChickenOrder(reports), unit: "กิโลกรัม" },
+    { label: "ข้าวเหนียว", received: sumIngredientSummaryField(reports, "stickyRiceReceivedKg"), used: sumIngredientSummaryField(reports, "stickyRiceUsedByStockKg"), remaining: sumLatestRemaining(reports, "remaining_sticky_rice"), order: sumReports(reports, "order_sticky_rice"), unit: "กิโลกรัม" },
+    { label: "น้ำมัน", received: sumIngredientSummaryField(reports, "oilReceivedKg"), used: sumIngredientSummaryField(reports, "oilUsedByStockKg"), remaining: sumLatestRemaining(reports, "remaining_oil"), order: sumReports(reports, "order_oil"), unit: "กิโลกรัม" },
   ];
 
   return (
@@ -204,11 +208,10 @@ function UsedByStockQuantityGrid({
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {INVENTORY_FLOW_ITEMS.map((item) => {
           const total = reports.reduce((sum, report) => {
-            const opening = Number(report[item.opening] ?? 0);
-            const received = Number(report[item.received] ?? 0);
-            const remaining = Number(report[item.remaining] ?? 0);
-            const usedByStock = (Number.isFinite(opening) ? opening : 0) + (Number.isFinite(received) ? received : 0) - (Number.isFinite(remaining) ? remaining : 0);
-            return sum + Math.round(usedByStock * 10) / 10;
+            const summary = calculateBranchIngredientSummary(report);
+            if (item.label === "ข้าวเหนียว") return sum + summary.stickyRiceUsedByStockKg;
+            if (item.label === "น้ำมัน") return sum + summary.oilUsedByStockKg;
+            return sum + (summary.chickenBreakdown.usedByStock[item.opening] ?? 0);
           }, 0);
           return (
             <div key={item.label} className="rounded-2xl bg-[#E60012]/20 p-3 text-center">

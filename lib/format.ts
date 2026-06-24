@@ -8,6 +8,11 @@ export const numberFormatter = new Intl.NumberFormat("th-TH", {
   maximumFractionDigits: 2,
 });
 
+export const ingredientKgFormatter = new Intl.NumberFormat("th-TH", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
+
 const THAI_TIME_ZONE = "Asia/Bangkok";
 
 function thaiDateParts(date = new Date()) {

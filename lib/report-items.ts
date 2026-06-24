@@ -33,7 +33,7 @@ export const RECEIVED_CHICKEN_FIELDS = [
 export type ReceivedChickenField = (typeof RECEIVED_CHICKEN_FIELDS)[number];
 export type ChickenReceivedReport = Partial<Record<ReceivedChickenField | "received_chicken", number | string | null | undefined>>;
 
-function toReportNumber(value: number | string | null | undefined) {
+export function toReportNumber(value: number | string | null | undefined) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
   if (typeof value === "string" && value.trim()) {
     const parsed = Number(value);
@@ -95,12 +95,74 @@ export const OPENING_CHICKEN_FIELDS = [
 ] as const satisfies readonly OpeningInventoryField[];
 
 export type OpeningChickenField = (typeof OPENING_CHICKEN_FIELDS)[number];
+export const STICKY_RICE_FIELDS = {
+  opening: "opening_sticky_rice",
+  received: "received_sticky_rice",
+  remaining: "remaining_sticky_rice",
+} as const;
+
+export const OIL_FIELDS = {
+  opening: "opening_oil",
+  received: "received_oil",
+  remaining: "remaining_oil",
+} as const;
+
+type IngredientNumber = number | string | null | undefined;
+
 export type BranchIngredientSummaryReport = Partial<Record<
-  OpeningChickenField | ReceivedChickenField | RemainingChickenField | "received_chicken" | "opening_sticky_rice" | "received_sticky_rice" | "remaining_sticky_rice",
-  number | string | null | undefined
+  | OpeningChickenField
+  | ReceivedChickenField
+  | RemainingChickenField
+  | "received_chicken"
+  | (typeof STICKY_RICE_FIELDS)[keyof typeof STICKY_RICE_FIELDS]
+  | (typeof OIL_FIELDS)[keyof typeof OIL_FIELDS]
+  | "branch_id"
+  | "branchId"
+  | "branch_name"
+  | "branchName"
+  | "report_date"
+  | "reportDate",
+  IngredientNumber
 >>;
 
-function round1(value: number) {
+export type IngredientBreakdown = {
+  opening: Record<string, number>;
+  received: Record<string, number>;
+  remaining: Record<string, number>;
+  usedByStock: Record<string, number>;
+};
+
+export type BranchIngredientSummary = {
+  branchId: string;
+  branchName: string;
+  reportDate: string;
+  hasReport: boolean;
+  chickenOpeningKg: number;
+  chickenReceivedKg: number;
+  chickenUsedByStockKg: number;
+  chickenRemainingKg: number;
+  stickyRiceOpeningKg: number;
+  stickyRiceReceivedKg: number;
+  stickyRiceUsedByStockKg: number;
+  stickyRiceRemainingKg: number;
+  oilOpeningKg: number;
+  oilReceivedKg: number;
+  oilUsedByStockKg: number;
+  oilRemainingKg: number;
+  chickenBreakdown: IngredientBreakdown;
+  warnings: string[];
+};
+
+export type OverallIngredientSummary = Omit<
+  BranchIngredientSummary,
+  "branchId" | "branchName" | "reportDate" | "hasReport" | "warnings"
+> & {
+  reportBranchCount: number;
+  missingBranchCount: number;
+  warnings: string[];
+};
+
+export function roundIngredientNumber(value: number) {
   return Math.round((Number.isFinite(value) ? value : 0) * 10) / 10;
 }
 
@@ -110,7 +172,7 @@ function sumReportFields<T extends string>(report: Partial<Record<T, number | st
 
 function mapReportFields<T extends string>(report: Partial<Record<T, number | string | null | undefined>>, fields: readonly T[]) {
   return fields.reduce<Record<T, number>>((acc, field) => {
-    acc[field] = round1(toReportNumber(report[field]));
+    acc[field] = roundIngredientNumber(toReportNumber(report[field]));
     return acc;
   }, {} as Record<T, number>);
 }
@@ -123,23 +185,84 @@ export function getChickenRemainingBreakdown(report: BranchIngredientSummaryRepo
   return mapReportFields(report, REMAINING_CHICKEN_FIELDS);
 }
 
-export function calculateBranchIngredientSummary(report: BranchIngredientSummaryReport) {
-  const chickenOpeningKg = round1(sumReportFields(report, OPENING_CHICKEN_FIELDS));
-  const chickenReceivedKg = round1(calculateChickenReceivedKg(report));
-  const chickenRemainingKg = round1(sumReportFields(report, REMAINING_CHICKEN_FIELDS));
-  const stickyRiceOpeningKg = round1(toReportNumber(report.opening_sticky_rice));
-  const stickyRiceReceivedKg = round1(toReportNumber(report.received_sticky_rice));
-  const stickyRiceRemainingKg = round1(toReportNumber(report.remaining_sticky_rice));
+function makeUsedByStockBreakdown(opening: Record<string, number>, received: Record<string, number>, remaining: Record<string, number>) {
+  return Object.keys(opening).reduce<Record<string, number>>((acc, field) => {
+    acc[field] = roundIngredientNumber((opening[field] ?? 0) + (received[field.replace("opening_", "received_")] ?? 0) - (remaining[field.replace("opening_", "remaining_")] ?? 0));
+    return acc;
+  }, {});
+}
+
+export function calculateBranchIngredientSummary(report: BranchIngredientSummaryReport = {}, options: { branchId?: string; branchName?: string; reportDate?: string; hasReport?: boolean } = {}): BranchIngredientSummary {
+  const hasReport = options.hasReport ?? Object.keys(report).length > 0;
+  const branchId = String(options.branchId ?? report.branchId ?? report.branch_id ?? "");
+  const branchName = String(options.branchName ?? report.branchName ?? report.branch_name ?? "ไม่ระบุสาขา");
+  const reportDate = String(options.reportDate ?? report.reportDate ?? report.report_date ?? "");
+  const chickenOpeningBreakdown = getChickenOpeningBreakdown(report);
+  const chickenReceivedBreakdown = getChickenReceivedBreakdown(report);
+  const chickenRemainingBreakdown = getChickenRemainingBreakdown(report);
+  const chickenOpeningKg = roundIngredientNumber(sumReportFields(report, OPENING_CHICKEN_FIELDS));
+  const chickenReceivedKg = roundIngredientNumber(Object.values(chickenReceivedBreakdown).reduce((sum, value) => sum + value, 0));
+  const chickenRemainingKg = roundIngredientNumber(sumReportFields(report, REMAINING_CHICKEN_FIELDS));
+  const stickyRiceOpeningKg = roundIngredientNumber(toReportNumber(report.opening_sticky_rice));
+  const stickyRiceReceivedKg = roundIngredientNumber(toReportNumber(report.received_sticky_rice));
+  const stickyRiceRemainingKg = roundIngredientNumber(toReportNumber(report.remaining_sticky_rice));
+  const oilOpeningKg = roundIngredientNumber(toReportNumber(report.opening_oil));
+  const oilReceivedKg = roundIngredientNumber(toReportNumber(report.received_oil));
+  const oilRemainingKg = roundIngredientNumber(toReportNumber(report.remaining_oil));
+  const warnings: string[] = [];
+
+  if (!hasReport) warnings.push("ไม่มีรายงาน");
+  if (toReportNumber(report.received_chicken) > 0 && chickenReceivedKg === 0) warnings.push("พบเฉพาะ field เก่า received_chicken แต่ไม่มีรับเข้าไก่แยกประเภท จึงไม่รวมเป็นกลุ่มไก่");
 
   return {
+    branchId,
+    branchName,
+    reportDate,
+    hasReport,
     chickenOpeningKg,
     chickenReceivedKg,
     chickenRemainingKg,
-    chickenUsedByStockKg: round1(chickenOpeningKg + chickenReceivedKg - chickenRemainingKg),
+    chickenUsedByStockKg: roundIngredientNumber(chickenOpeningKg + chickenReceivedKg - chickenRemainingKg),
     stickyRiceOpeningKg,
     stickyRiceReceivedKg,
     stickyRiceRemainingKg,
-    stickyRiceUsedByStockKg: round1(stickyRiceOpeningKg + stickyRiceReceivedKg - stickyRiceRemainingKg),
+    stickyRiceUsedByStockKg: roundIngredientNumber(stickyRiceOpeningKg + stickyRiceReceivedKg - stickyRiceRemainingKg),
+    oilOpeningKg,
+    oilReceivedKg,
+    oilRemainingKg,
+    oilUsedByStockKg: roundIngredientNumber(oilOpeningKg + oilReceivedKg - oilRemainingKg),
+    chickenBreakdown: {
+      opening: chickenOpeningBreakdown,
+      received: chickenReceivedBreakdown,
+      remaining: chickenRemainingBreakdown,
+      usedByStock: makeUsedByStockBreakdown(chickenOpeningBreakdown, chickenReceivedBreakdown, chickenRemainingBreakdown),
+    },
+    warnings,
+  };
+}
+
+export function calculateOverallIngredientSummary(branchSummaries: BranchIngredientSummary[]): OverallIngredientSummary {
+  const reportSummaries = branchSummaries.filter((summary) => summary.hasReport);
+  const sum = (key: keyof Pick<BranchIngredientSummary, "chickenOpeningKg" | "chickenReceivedKg" | "chickenUsedByStockKg" | "chickenRemainingKg" | "stickyRiceOpeningKg" | "stickyRiceReceivedKg" | "stickyRiceUsedByStockKg" | "stickyRiceRemainingKg" | "oilOpeningKg" | "oilReceivedKg" | "oilUsedByStockKg" | "oilRemainingKg">) =>
+    roundIngredientNumber(reportSummaries.reduce((total, summary) => total + summary[key], 0));
+
+  return {
+    chickenOpeningKg: sum("chickenOpeningKg"),
+    chickenReceivedKg: sum("chickenReceivedKg"),
+    chickenUsedByStockKg: sum("chickenUsedByStockKg"),
+    chickenRemainingKg: sum("chickenRemainingKg"),
+    stickyRiceOpeningKg: sum("stickyRiceOpeningKg"),
+    stickyRiceReceivedKg: sum("stickyRiceReceivedKg"),
+    stickyRiceUsedByStockKg: sum("stickyRiceUsedByStockKg"),
+    stickyRiceRemainingKg: sum("stickyRiceRemainingKg"),
+    oilOpeningKg: sum("oilOpeningKg"),
+    oilReceivedKg: sum("oilReceivedKg"),
+    oilUsedByStockKg: sum("oilUsedByStockKg"),
+    oilRemainingKg: sum("oilRemainingKg"),
+    chickenBreakdown: { opening: {}, received: {}, remaining: {}, usedByStock: {} },
+    reportBranchCount: reportSummaries.length,
+    missingBranchCount: branchSummaries.length - reportSummaries.length,
+    warnings: branchSummaries.flatMap((summary) => summary.warnings.map((warning) => `${summary.branchName}: ${warning}`)),
   };
 }
 

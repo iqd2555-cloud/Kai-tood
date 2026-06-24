@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { canUseStaffCounterOrder } from "@/lib/counter-access";
-import { formatThaiDate, moneyFormatter, numberFormatter, todayISO, daysAgoISO } from "@/lib/format";
+import { formatThaiDate, ingredientKgFormatter, moneyFormatter, numberFormatter, todayISO, daysAgoISO } from "@/lib/format";
 import { calculateBranchDailyInsight } from "@/lib/daily-insights";
 import { InsightAlertBanner, type InsightAlertIssue, type InsightAlertStatus } from "@/components/insight-alert-banner";
-import { calculateBranchIngredientSummary, getChickenOpeningBreakdown, getChickenReceivedBreakdown, getChickenRemainingBreakdown } from "@/lib/report-items";
+import { calculateBranchIngredientSummary, calculateOverallIngredientSummary, getChickenOpeningBreakdown, getChickenReceivedBreakdown, getChickenRemainingBreakdown } from "@/lib/report-items";
 import { isReportableBranch } from "@/lib/branches";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -56,6 +56,9 @@ type InsightReportRow = {
   remaining_chicken_skin: number | string | null;
   remaining_sticky_rice: number | string | null;
   received_sticky_rice: number | string | null;
+  opening_oil: number | string | null;
+  received_oil: number | string | null;
+  remaining_oil: number | string | null;
   order_original_chicken: number | string | null;
   order_spicy_chicken: number | string | null;
   order_offal: number | string | null;
@@ -257,7 +260,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
 
   const insightReportsQuery = supabase
     .from("daily_reports")
-    .select("id,report_date,branch_id,cash_sales,transfer_sales,total_sales,opening_original_chicken,opening_spicy_chicken,opening_ground_chicken,opening_drumstick,opening_offal,opening_chicken_skin,opening_sticky_rice,received_original_chicken,received_spicy_chicken,received_ground_chicken,received_drumstick,received_offal,received_chicken_skin,received_chicken,received_sticky_rice,used_bl,used_bb,used_chopped_chicken,used_drumstick,used_offal,used_chicken_skin,used_sticky_rice,remaining_chicken,remaining_original_chicken,remaining_spicy_chicken,remaining_ground_chicken,remaining_drumstick,remaining_offal,remaining_chicken_skin,remaining_sticky_rice,order_original_chicken,order_spicy_chicken,order_offal,order_chopped_chicken,order_drumstick,order_chicken_skin,order_sticky_rice,order_oil,order_palm_sugar,order_other_items,requested_items,updated_at,created_at")
+    .select("id,report_date,branch_id,cash_sales,transfer_sales,total_sales,opening_original_chicken,opening_spicy_chicken,opening_ground_chicken,opening_drumstick,opening_offal,opening_chicken_skin,opening_sticky_rice,received_original_chicken,received_spicy_chicken,received_ground_chicken,received_drumstick,received_offal,received_chicken_skin,received_chicken,received_sticky_rice,used_bl,used_bb,used_chopped_chicken,used_drumstick,used_offal,used_chicken_skin,used_sticky_rice,remaining_chicken,remaining_original_chicken,remaining_spicy_chicken,remaining_ground_chicken,remaining_drumstick,remaining_offal,remaining_chicken_skin,remaining_sticky_rice,opening_oil,received_oil,remaining_oil,order_original_chicken,order_spicy_chicken,order_offal,order_chopped_chicken,order_drumstick,order_chicken_skin,order_sticky_rice,order_oil,order_palm_sugar,order_other_items,requested_items,updated_at,created_at")
     .eq("report_date", insightDate)
     .order("updated_at", { ascending: false })
     .order("created_at", { ascending: false });
@@ -273,7 +276,12 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
   }, new Map());
   const insightBranchCards = (insightBranches ?? []).filter(isReportableBranch).map((branch) => {
     const report = reportsByBranch.get(branch.id);
-    const ingredientSummary = report ? calculateBranchIngredientSummary(report) : calculateBranchIngredientSummary({});
+    const ingredientSummary = calculateBranchIngredientSummary(report ?? {}, {
+      branchId: branch.id,
+      branchName: branch.name || branch.code || "ไม่ระบุสาขา",
+      reportDate: insightDate,
+      hasReport: Boolean(report),
+    });
     if (process.env.NODE_ENV === "development" && report) {
       console.log({
         branchName: branch.name || branch.code || "ไม่ระบุสาขา",
@@ -285,8 +293,8 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
     }
     const totalSales = report ? toNumber(report.total_sales) || toNumber(report.cash_sales) + toNumber(report.transfer_sales) : 0;
     const base = {
-      branchId: branch.id,
-      branchName: branch.name || branch.code || "ไม่ระบุสาขา",
+      branchId: ingredientSummary.branchId,
+      branchName: ingredientSummary.branchName,
       totalSales,
       chickenReceivedKg: ingredientSummary.chickenReceivedKg,
       chickenUsedKg: ingredientSummary.chickenUsedByStockKg,
@@ -295,16 +303,28 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
       stickyRiceRemainingKg: ingredientSummary.stickyRiceRemainingKg,
       hasReport: Boolean(report),
       report,
+      ingredientSummary,
     };
     return { ...base, insight: calculateBranchDailyInsight(base) };
   });
-  const insightTotals = insightBranchCards.reduce((acc, item) => ({
-    totalSales: acc.totalSales + item.totalSales,
-    chickenReceivedKg: acc.chickenReceivedKg + item.chickenReceivedKg,
-    chickenUsedKg: acc.chickenUsedKg + item.chickenUsedKg,
-    chickenRemainingKg: acc.chickenRemainingKg + item.chickenRemainingKg,
-    stickyRiceUsedKg: acc.stickyRiceUsedKg + item.stickyRiceUsedKg,
-  }), { totalSales: 0, chickenReceivedKg: 0, chickenUsedKg: 0, chickenRemainingKg: 0, stickyRiceUsedKg: 0 });
+  const branchIngredientSummaries = insightBranchCards.map((item) => item.ingredientSummary);
+  const overallSummary = calculateOverallIngredientSummary(branchIngredientSummaries);
+  const totalSalesWithReports = insightBranchCards.reduce((sum, item) => sum + (item.hasReport ? item.totalSales : 0), 0);
+  const insightTotals = {
+    totalSales: totalSalesWithReports,
+    chickenReceivedKg: overallSummary.chickenReceivedKg,
+    chickenUsedKg: overallSummary.chickenUsedByStockKg,
+    chickenRemainingKg: overallSummary.chickenRemainingKg,
+    stickyRiceUsedKg: overallSummary.stickyRiceUsedByStockKg,
+  };
+
+  if (process.env.NODE_ENV === "development") {
+    console.log("ingredient summary debug", {
+      selectedDate: insightDate,
+      branchSummaries: branchIngredientSummaries,
+      overallSummary,
+    });
+  }
   const abnormalBranches = insightBranchCards.filter((item) => item.insight.status === "check");
   const missingBranches = insightBranchCards.filter((item) => item.insight.status === "missing");
   const criticalFlagKeywords = ["ไม่สัมพันธ์กัน", "ติดลบ", "ยอดขายมากกว่า 0", "ใช้ไก่เยอะผิดปกติ", "ไม่มีใช้ไก่เลย"];
@@ -325,7 +345,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
   ];
   const insightAlertStatus: InsightAlertStatus = alertIssues.some((issue) => issue.status === "critical") ? "critical" : alertIssues.some((issue) => issue.status === "warning") ? "warning" : alertIssues.some((issue) => issue.status === "missing") ? "missing" : "normal";
   const insightAlertTitle = alertIssues.length > 0 ? `ผลการตรวจสอบ: พบจุดที่ต้องตรวจสอบ ${alertIssues.length} สาขา` : "ผลการตรวจสอบ: ไม่พบความผิดปกติ";
-  const insightAlertSummary = alertIssues.length > 0 ? "กรุณาตรวจสอบรายการสาขาด้านล่าง โดยแถบสีจะแยกระดับสถานะให้ชัดเจน" : "ทุกสาขาที่มีรายงานวันนี้อยู่ในเกณฑ์ปกติ";
+  const insightAlertSummary = alertIssues.length > 0 ? "กรุณาตรวจสอบรายการสาขาด้านล่าง โดยแถบสีจะแยกระดับสถานะให้ชัดเจน" : "ทุกสาขาที่มีรายงานวันนี้อยู่ในเกณฑ์ปกติ และสรุปภาพรวมรวมเฉพาะสาขา active ที่มีรายงาน";
   const tomorrowTasks = insightBranchCards.flatMap((item) => {
     const report = item.report;
     if (!report) return [];
@@ -371,10 +391,10 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
           <h3 className="mt-1 text-lg font-black">ภาพรวมทุกสาขา</h3>
           <div className="mt-3 grid grid-cols-2 gap-2 text-sm md:grid-cols-3">
             <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ยอดขายรวม</p><p className="font-black">{moneyFormatter.format(insightTotals.totalSales)}</p></div>
-            <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ไก่หมักรับเข้า</p><p className="font-black">{numberFormatter.format(insightTotals.chickenReceivedKg)} กก.</p></div>
-            <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ไก่ใช้ไปตามสต๊อก</p><p className="font-black">{numberFormatter.format(insightTotals.chickenUsedKg)} กก.</p></div>
-            <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ไก่หมักคงเหลือ</p><p className="font-black">{numberFormatter.format(insightTotals.chickenRemainingKg)} กก.</p></div>
-            <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ข้าวเหนียวใช้ไป</p><p className="font-black">{numberFormatter.format(insightTotals.stickyRiceUsedKg)} กก.</p></div>
+            <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ไก่รับเข้า</p><p className="font-black">{ingredientKgFormatter.format(insightTotals.chickenReceivedKg)} กก.</p></div>
+            <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ไก่ใช้ไปตามสต๊อก</p><p className="font-black">{ingredientKgFormatter.format(insightTotals.chickenUsedKg)} กก.</p></div>
+            <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ไก่คงเหลือรวม</p><p className="font-black">{ingredientKgFormatter.format(insightTotals.chickenRemainingKg)} กก.</p></div>
+            <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ข้าวเหนียวใช้ไปตามสต๊อก</p><p className="font-black">{ingredientKgFormatter.format(insightTotals.stickyRiceUsedKg)} กก.</p></div>
             <div className="rounded-2xl bg-white/10 p-3"><p className="text-white/60">ยอดขายต่อไก่ 1 กก.</p><p className="font-black">{insightTotals.chickenUsedKg > 0 ? moneyFormatter.format(insightTotals.totalSales / insightTotals.chickenUsedKg) : "ยังไม่มีข้อมูล"}</p></div>
           </div>
           <InsightAlertBanner
@@ -402,9 +422,9 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
                   <span className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-black shadow-sm ${badgeClass}`}>{badgeText}</span>
                 </div>
                 <div className="mt-3 grid grid-cols-1 gap-2 text-sm font-bold sm:grid-cols-2">
-                  <p>ยอดขาย: {moneyFormatter.format(item.totalSales)}</p><p>ไก่รับเข้า: {numberFormatter.format(item.chickenReceivedKg)} กก.</p>
-                  <p>ไก่ใช้ไปตามสต๊อก: {numberFormatter.format(item.chickenUsedKg)} กก.</p><p>ไก่คงเหลือ: {numberFormatter.format(item.chickenRemainingKg)} กก.</p>
-                  <p>ข้าวเหนียวใช้ไป: {numberFormatter.format(item.stickyRiceUsedKg)} กก.</p><p>ยอดขาย/ไก่ 1 กก.: {item.chickenUsedKg > 0 ? moneyFormatter.format(item.totalSales / item.chickenUsedKg) : "ยังไม่มีข้อมูล"}</p>
+                  <p>ยอดขาย: {moneyFormatter.format(item.totalSales)}</p><p>ไก่รับเข้า: {ingredientKgFormatter.format(item.chickenReceivedKg)} กก.</p>
+                  <p>ไก่ใช้ไปตามสต๊อก: {ingredientKgFormatter.format(item.chickenUsedKg)} กก.</p><p>ไก่คงเหลือรวม: {ingredientKgFormatter.format(item.chickenRemainingKg)} กก.</p>
+                  <p>ข้าวเหนียวใช้ไปตามสต๊อก: {ingredientKgFormatter.format(item.stickyRiceUsedKg)} กก.</p><p>ยอดขาย/ไก่ 1 กก.: {item.chickenUsedKg > 0 ? moneyFormatter.format(item.totalSales / item.chickenUsedKg) : "ยังไม่มีข้อมูล"}</p>
                   <p>ไก่ กก.ละ: {item.insight.chickenPacksPerKg === null ? "ยังไม่มีข้อมูล" : `${numberFormatter.format(item.insight.chickenPacksPerKg)} ห่อ`}</p><p>ข้าว กก.ละ: {item.insight.stickyRicePacksPerKg === null ? "ยังไม่มีข้อมูล" : `${numberFormatter.format(item.insight.stickyRicePacksPerKg)} ห่อ`}</p>
                 </div>
                 {item.insight.abnormalFlags.length > 0 ? <ul className={`mt-3 rounded-2xl border-2 p-3 pl-8 text-sm font-black leading-relaxed ${branchIssueStatus === "critical" ? "border-white/50 bg-white/15 text-white" : "border-[#E0A800] bg-[#FFF3BF] text-[#111111]"}`}>{item.insight.abnormalFlags.map((flag) => <li key={flag}>{flag}</li>)}</ul> : <p className="mt-3 rounded-2xl border-2 border-[#86EFAC] bg-[#DFF5E3] p-3 text-sm font-black text-[#166534]">ไม่พบจุดผิดปกติ</p>}
