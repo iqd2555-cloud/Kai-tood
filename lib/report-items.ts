@@ -82,10 +82,13 @@ export const REMAINING_CHICKEN_FIELDS = [
 ] as const satisfies readonly RemainingInventoryField[];
 
 export type RemainingChickenField = (typeof REMAINING_CHICKEN_FIELDS)[number];
+export type ChickenRemainingReport = Partial<Record<RemainingChickenField, number | string | null | undefined>>;
 
-export function getRemainingChickenTotal(report: Pick<DailyReport, RemainingChickenField>) {
-  return REMAINING_CHICKEN_FIELDS.reduce((sum, field) => sum + Number(report[field] ?? 0), 0);
+export function calculateChickenRemainingKg(report: ChickenRemainingReport) {
+  return REMAINING_CHICKEN_FIELDS.reduce((sum, field) => sum + toReportNumber(report[field]), 0);
 }
+
+export const getRemainingChickenTotal = calculateChickenRemainingKg;
 
 export function getCalculatedRemaining(report: DailyReport, item: (typeof INVENTORY_FLOW_ITEMS)[number]) {
   return Number(report[item.opening] ?? 0) + Number(report[item.received] ?? 0) - Number(report[item.used] ?? 0);
