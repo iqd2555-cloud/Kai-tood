@@ -699,3 +699,56 @@ grant execute on function public.create_counter_order(uuid, numeric, integer) to
 grant execute on function public.cancel_latest_counter_order(uuid, text) to authenticated;
 grant execute on function public.print_order(uuid) to authenticated;
 grant execute on function public.reprint_order(uuid) to authenticated;
+
+-- Cash Flow Center
+create type public.cash_flow_direction as enum ('in', 'out');
+create type public.cash_flow_status as enum ('pending_in', 'received', 'pending_out', 'paid', 'cancelled', 'overdue');
+create type public.cash_flow_source as enum ('auto', 'manual');
+
+create table public.cash_flow_categories (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  direction text not null check (direction in ('in', 'out', 'both')),
+  sort_order integer not null default 100,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table public.cash_flow_money_channels (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  opening_balance numeric not null default 0,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table public.cash_flow_entries (
+  id uuid primary key default gen_random_uuid(),
+  transaction_date date not null,
+  due_date date,
+  direction public.cash_flow_direction not null,
+  status public.cash_flow_status not null,
+  category_id uuid references public.cash_flow_categories(id),
+  description text not null,
+  amount numeric not null check (amount > 0),
+  money_channel_id uuid references public.cash_flow_money_channels(id),
+  branch_id uuid references public.branches(id),
+  source public.cash_flow_source not null default 'manual',
+  source_ref text,
+  attachment_url text,
+  created_by uuid references public.profiles(id),
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (source, source_ref)
+);
+
+create table public.cash_flow_entry_audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  entry_id uuid not null references public.cash_flow_entries(id) on delete cascade,
+  action text not null,
+  old_data jsonb,
+  new_data jsonb,
+  changed_by uuid default auth.uid(),
+  changed_at timestamptz not null default now()
+);
