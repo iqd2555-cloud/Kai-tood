@@ -7,7 +7,7 @@ import { formatThaiDate, moneyFormatter, todayISO } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch } from "@/lib/types";
 
-type SearchParams = { from?: string; to?: string; branch_id?: string; status?: string; category_id?: string; money_channel_id?: string };
+type SearchParams = { from?: string; to?: string; branch_id?: string; status?: string; category_id?: string; money_channel_id?: string; sync_message?: string; sync_ok?: string };
 type PageProps = { searchParams?: Promise<SearchParams> };
 
 function sum(entries: CashFlowEntry[], type: "income" | "expense", predicate: (entry: CashFlowEntry) => boolean) {
@@ -47,25 +47,30 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
   if (params?.status) query = query.eq("status", params.status);
   if (params?.category_id) query = query.eq("category", params.category_id);
   if (params?.money_channel_id) query = query.eq("payment_method", params.money_channel_id);
-  const { data, error: entriesError } = await query.returns<CashFlowEntry[]>();
+  const [{ data, error: entriesError }, { data: dashboardData, error: dashboardError }] = await Promise.all([
+    query.returns<CashFlowEntry[]>(),
+    supabase.from("cash_flow_entries").select("transaction_date,due_date,type,status,amount").returns<CashFlowEntry[]>(),
+  ]);
   const entries = data ?? [];
-  const loadError = entriesError ? "ไม่สามารถโหลดข้อมูล Cash Flow ได้" : null;
+  const dashboardEntries = dashboardData ?? [];
+  const loadError = entriesError ? `ไม่สามารถโหลดข้อมูล Cash Flow ได้: ${entriesError.message}` : dashboardError ? `ไม่สามารถโหลด Dashboard Cash Flow ได้: ${dashboardError.message}` : null;
   const openingBalance = (channels ?? []).reduce((total, channel) => total + Number(channel.opening_balance ?? 0), 0);
-  const actualInToday = sum(entries, "income", (entry) => entry.transaction_date === today && entry.status === "received");
-  const actualOutToday = sum(entries, "expense", (entry) => entry.transaction_date === today && entry.status === "paid");
-  const actualIn = sum(entries, "income", (entry) => isActualStatus(entry.status));
-  const actualOut = sum(entries, "expense", (entry) => isActualStatus(entry.status));
+  const actualInToday = sum(dashboardEntries, "income", (entry) => entry.transaction_date === today && entry.status === "received");
+  const actualOutToday = sum(dashboardEntries, "expense", (entry) => entry.transaction_date === today && entry.status === "paid");
+  const actualIn = sum(dashboardEntries, "income", (entry) => isActualStatus(entry.status));
+  const actualOut = sum(dashboardEntries, "expense", (entry) => isActualStatus(entry.status));
   const currentBalance = openingBalance + actualIn - actualOut;
-  const pendingIn = sum(entries, "income", (entry) => isPendingStatus(entry.status));
-  const pendingOut = sum(entries, "expense", (entry) => isPendingStatus(entry.status));
+  const pendingIn = sum(dashboardEntries, "income", (entry) => entry.status === "pending_receive");
+  const pendingOut = sum(dashboardEntries, "expense", (entry) => entry.status === "pending_pay");
   const urgentPayables = entries.filter((entry) => entry.type === "expense" && isPendingStatus(entry.status)).slice(0, 5);
   const followReceivables = entries.filter((entry) => entry.type === "income" && isPendingStatus(entry.status)).slice(0, 5);
 
   return <div className="space-y-5">
     <section className="rounded-[2rem] bg-[#111] p-5 text-white shadow-lg">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm font-black text-[#FFD43B]">Cash Flow Center</p><h1 className="text-3xl font-black">ศูนย์บริหารกระแสเงินสด</h1><p className="mt-2 text-sm font-bold text-white/70">ดูเงินจริง รอรับ รอจ่าย และคาดการณ์ 7/15/30 วัน แบบไม่ซับซ้อนเหมือนบัญชีภาษี</p></div><form action={async () => { "use server"; await syncDailySalesToCashFlow(); }}><button className="focus-ring rounded-full bg-[#FFD43B] px-5 py-3 font-black text-black">ซิงก์ยอดขายอัตโนมัติ</button></form></div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm font-black text-[#FFD43B]">Cash Flow Center</p><h1 className="text-3xl font-black">ศูนย์บริหารกระแสเงินสด</h1><p className="mt-2 text-sm font-bold text-white/70">ดูเงินจริง รอรับ รอจ่าย และคาดการณ์ 7/15/30 วัน แบบไม่ซับซ้อนเหมือนบัญชีภาษี</p></div><form action={async (formData: FormData) => { "use server"; const result = await syncDailySalesToCashFlow(formData); const message = encodeURIComponent(result.message); redirect(`/cash-flow?from=${formData.get("from")}&to=${formData.get("to")}&sync_ok=${result.ok ? "1" : "0"}&sync_message=${message}`); }} className="flex flex-col gap-2 sm:items-end"><input type="hidden" name="from" value={from}/><input type="hidden" name="to" value={to}/><button className="focus-ring rounded-full bg-[#FFD43B] px-5 py-3 font-black text-black">ซิงก์ยอดขายอัตโนมัติ</button><p className="text-xs font-bold text-white/60">ใช้ช่วงวันที่ที่เลือก หรืออย่างน้อยย้อนหลัง 30 วัน</p></form></div>
     </section>
 
+    {params?.sync_message && <div className={`rounded-2xl border p-4 font-black ${params.sync_ok === "1" ? "border-green-200 bg-green-50 text-green-700" : "border-red-200 bg-red-50 text-red-700"}`}>{decodeURIComponent(params.sync_message)}</div>}
     {loadError && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 font-black text-red-700">{loadError}</div>}
 
     <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
