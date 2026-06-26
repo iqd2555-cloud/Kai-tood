@@ -1,22 +1,23 @@
 import type { Branch, Profile } from "@/lib/types";
 
-export type CashFlowDirection = "in" | "out";
-export type CashFlowStatus = "pending_in" | "received" | "pending_out" | "paid" | "cancelled" | "overdue";
-export type CashFlowSource = "auto" | "manual";
+export type CashFlowType = "income" | "expense";
+export type CashFlowStatus = "pending_receive" | "received" | "pending_pay" | "paid" | "cancelled" | "overdue";
+export type CashFlowSource = "manual" | "sales" | "stock" | "marinade" | "franchise" | "other";
 
 export type CashFlowEntry = {
   id: string;
   transaction_date: string;
   due_date: string | null;
-  direction: CashFlowDirection;
+  type: CashFlowType;
   status: CashFlowStatus;
-  category_id: string | null;
+  category: string | null;
   description: string;
   amount: number;
-  money_channel_id: string | null;
+  payment_method: string | null;
   branch_id: string | null;
+  department: string | null;
   source: CashFlowSource;
-  source_ref: string | null;
+  source_ref_id: string | null;
   attachment_url: string | null;
   note: string | null;
   created_by: string | null;
@@ -24,42 +25,26 @@ export type CashFlowEntry = {
   updated_at: string;
   branches?: Pick<Branch, "name" | "code"> | null;
   profiles?: Pick<Profile, "full_name"> | null;
-  cash_flow_categories?: CashFlowCategory | null;
-  cash_flow_money_channels?: CashFlowMoneyChannel | null;
 };
 
-export type CashFlowCategory = {
-  id: string;
-  name: string;
-  direction: CashFlowDirection | "both";
-  sort_order: number;
-  is_active: boolean;
-};
-
-export type CashFlowMoneyChannel = {
-  id: string;
-  name: string;
-  opening_balance: number;
-  is_active: boolean;
-};
+export type CashFlowCategory = { id: string; name: string; direction: CashFlowType | "both"; sort_order: number; is_active: boolean };
+export type CashFlowMoneyChannel = { id: string; name: string; opening_balance: number; is_active: boolean };
 
 export const CASH_FLOW_STATUS_LABEL: Record<CashFlowStatus, string> = {
-  pending_in: "รอรับ",
+  pending_receive: "รอรับ",
   received: "รับแล้ว",
-  pending_out: "รอจ่าย",
+  pending_pay: "รอจ่าย",
   paid: "จ่ายแล้ว",
   cancelled: "ยกเลิก",
   overdue: "ค้างชำระ",
 };
 
-export const CASH_FLOW_DIRECTION_LABEL: Record<CashFlowDirection, string> = {
-  in: "รับ",
-  out: "จ่าย",
-};
+export const CASH_FLOW_TYPE_LABEL: Record<CashFlowType, string> = { income: "รับ", expense: "จ่าย" };
+export const CASH_FLOW_SOURCE_LABEL: Record<CashFlowSource, string> = { manual: "บันทึกเอง", sales: "ยอดขาย", stock: "สต็อก", marinade: "โรงหมัก", franchise: "แฟรนไชส์", other: "อื่น ๆ" };
 
 export const DEFAULT_CASH_FLOW_CATEGORIES = [
-  ["ยอดขายหน้าร้าน", "in"], ["รายรับแฟรนไชส์", "in"], ["ขายวัตถุดิบให้สาขา", "in"], ["คอร์ส/หนังสือ/บริการ", "in"], ["เติมเงินเข้ากิจการ", "in"], ["รับเงินคืน", "in"],
-  ["ซื้อไก่สด", "out"], ["ซื้อวัตถุดิบ", "out"], ["โรงหมัก", "out"], ["ขนส่ง", "out"], ["ค่าแรง", "out"], ["ซื้ออุปกรณ์", "out"], ["หน้าร้าน", "out"], ["ส่วนกลาง", "out"], ["ค่าเช่า", "out"], ["ค่าไฟ", "out"], ["ค่าน้ำ", "out"], ["ค่าโทรศัพท์/อินเทอร์เน็ต", "out"], ["ค่าเดินทาง", "out"], ["ค่าโฆษณา", "out"], ["ค่าซ่อมอุปกรณ์", "out"], ["จ่ายหนี้", "out"], ["ถอนเงินออกจากกิจการ", "out"], ["ค่าใช้จ่ายจิปาถะ", "out"], ["รายการอื่น ๆ", "both"],
+  ["ยอดขายหน้าร้าน", "income"], ["รายรับแฟรนไชส์", "income"], ["ขายวัตถุดิบให้สาขา", "income"], ["คอร์ส/หนังสือ/บริการ", "income"], ["เติมเงินเข้ากิจการ", "income"], ["รับเงินคืน", "income"],
+  ["ซื้อไก่สด", "expense"], ["ซื้อวัตถุดิบ", "expense"], ["โรงหมัก", "expense"], ["ขนส่ง", "expense"], ["ค่าแรง", "expense"], ["ซื้ออุปกรณ์", "expense"], ["หน้าร้าน", "expense"], ["ส่วนกลาง", "expense"], ["ค่าเช่า", "expense"], ["ค่าไฟ", "expense"], ["ค่าน้ำ", "expense"], ["ค่าโทรศัพท์/อินเทอร์เน็ต", "expense"], ["ค่าเดินทาง", "expense"], ["ค่าโฆษณา", "expense"], ["ค่าซ่อมอุปกรณ์", "expense"], ["จ่ายหนี้", "expense"], ["ถอนเงินออกจากกิจการ", "expense"], ["ค่าใช้จ่ายจิปาถะ", "expense"], ["รายการอื่น ๆ", "both"],
 ] as const;
 
 export const DEFAULT_CASH_FLOW_CHANNELS = ["เงินสด", "ธนาคาร", "โอน", "อื่น ๆ"] as const;
@@ -71,10 +56,5 @@ export function addDaysISO(isoDate: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
-export function isActualStatus(status: CashFlowStatus) {
-  return status === "received" || status === "paid";
-}
-
-export function isPendingStatus(status: CashFlowStatus) {
-  return status === "pending_in" || status === "pending_out" || status === "overdue";
-}
+export function isActualStatus(status: CashFlowStatus) { return status === "received" || status === "paid"; }
+export function isPendingStatus(status: CashFlowStatus) { return status === "pending_receive" || status === "pending_pay" || status === "overdue"; }
