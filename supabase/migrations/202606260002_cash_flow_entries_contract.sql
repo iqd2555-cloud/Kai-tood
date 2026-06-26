@@ -123,9 +123,9 @@ begin
       transaction_date, due_date, type, status, category, description, amount,
       payment_method, branch_id, department, source, source_ref_id, created_by, note
     ) values (
-      new.report_date, new.report_date, 'income', 'received', 'ยอดขายหน้าร้าน',
-      'ยอดขายสาขา ' || coalesce(new.branch_name, ''), new.total_sales,
-      'รวมทุกช่องทาง', new.branch_id, 'หน้าร้าน', 'sales', new.id::text, new.submitted_by,
+      new.report_date, new.report_date, 'income', 'received', 'sales_revenue',
+      'ยอดขายหน้าร้านประจำวันที่ ' || new.report_date::text || case when new.branch_name is null then '' else ' (' || new.branch_name || ')' end, new.total_sales,
+      'cash_or_transfer', new.branch_id, 'หน้าร้าน', 'sales', new.id::text, new.submitted_by,
       'สร้างอัตโนมัติจาก daily_reports'
     )
     on conflict (source, source_ref_id) do update set
