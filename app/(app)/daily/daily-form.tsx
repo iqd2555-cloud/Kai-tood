@@ -25,6 +25,45 @@ type ReportItem = {
 
 const toInputNumber = (value: string) => Number(value || 0);
 
+type QuickOrderParseResult = {
+  fields: Partial<Record<(typeof ORDER_REQUEST_ITEMS)[number]["name"], number>>;
+  otherItems: { name: string; amount: number }[];
+  infoLines: string[];
+};
+
+const QUICK_ORDER_PATTERNS: { field?: (typeof ORDER_REQUEST_ITEMS)[number]["name"]; otherName?: string; pattern: RegExp }[] = [
+  { field: "order_original_chicken", pattern: /(?:\bBL\b|บีแอล)(?!\s*skin)[^\d\n]*(\d+(?:\.\d+)?)/i },
+  { field: "order_spicy_chicken", pattern: /(?:\bBB\b|บีบี)[^\d\n]*(\d+(?:\.\d+)?)/i },
+  { field: "order_chicken_skin", pattern: /(?:BL\s*skin|หนังไก่)[^\d\n]*(\d+(?:\.\d+)?)/i },
+  { field: "order_offal", pattern: /(?:ตับ\s*c|ตับc|ดึงดีตับแตก|เครื่องใน)[^\d\n]*(\d+(?:\.\d+)?)/i },
+  { field: "order_chopped_chicken", pattern: /ไก่สับ[^\d\n]*(\d+(?:\.\d+)?)/i },
+  { otherName: "ปีกบนชำรุด", pattern: /ปีกบนชำรุด[^\d\n]*(\d+(?:\.\d+)?)/i },
+];
+
+function parseQuickOrderMessage(message: string): QuickOrderParseResult {
+  const fields: QuickOrderParseResult["fields"] = {};
+  const otherItems: QuickOrderParseResult["otherItems"] = [];
+  const infoLines = message
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) =>
+      line &&
+      !QUICK_ORDER_PATTERNS.some(({ pattern }) => pattern.test(line)) &&
+      !/^วันที่\s*/i.test(line),
+    );
+
+  for (const item of QUICK_ORDER_PATTERNS) {
+    const match = message.match(item.pattern);
+    const amount = Number(match?.[1] ?? 0);
+    if (!amount) continue;
+    if (item.field) fields[item.field] = amount;
+    if (item.otherName) otherItems.push({ name: item.otherName, amount });
+  }
+
+  return { fields, otherItems, infoLines };
+}
+
+
 const InventoryInputSection = memo(function InventoryInputSection({
   id,
   title,
@@ -184,6 +223,16 @@ export function DailyForm({
   const handleTransferSalesChange = useCallback<
     ChangeEventHandler<HTMLInputElement>
   >((event) => setTransferSales(toInputNumber(event.target.value)), []);
+  const [quickOrderMessage, setQuickOrderMessage] = useState("");
+  const [quickOrderFeedback, setQuickOrderFeedback] = useState("");
+  const [orderFieldValues, setOrderFieldValues] = useState(() =>
+    Object.fromEntries(
+      ORDER_REQUEST_ITEMS.map((item) => [
+        item.name,
+        Number(existingReport?.[item.name] ?? 0),
+      ]),
+    ) as Record<(typeof ORDER_REQUEST_ITEMS)[number]["name"], number>,
+  );
   const [otherOrderItems, setOtherOrderItems] = useState<
     { name: string; amount: number }[]
   >(
@@ -192,6 +241,27 @@ export function DailyForm({
       ? existingReport.order_other_items
       : [{ name: "", amount: 0 }],
   );
+  const applyQuickOrderMessage = useCallback(() => {
+    const parsed = parseQuickOrderMessage(quickOrderMessage);
+    setOrderFieldValues((prev) => ({ ...prev, ...parsed.fields }));
+    setOtherOrderItems((prev) => {
+      const kept = prev.filter((item) => item.name.trim() && item.amount > 0);
+      const merged = [...kept];
+      for (const item of parsed.otherItems) {
+        const existingIndex = merged.findIndex((entry) => entry.name === item.name);
+        if (existingIndex >= 0) merged[existingIndex] = item;
+        else merged.push(item);
+      }
+      return merged.length > 0 ? merged : [{ name: "", amount: 0 }];
+    });
+    const filledCount = Object.keys(parsed.fields).length + parsed.otherItems.length;
+    setQuickOrderFeedback(
+      filledCount > 0
+        ? `ดึงรายการได้ ${filledCount.toLocaleString("th-TH")} รายการ${parsed.infoLines.length ? ` — ข้อมูลจัดส่ง/ลูกค้า: ${parsed.infoLines.join(" • ")}` : ""}`
+        : "ยังไม่พบรายการที่ระบบรู้จัก กรุณากรอกเองหรือเพิ่มเป็นรายการอื่นๆ",
+    );
+  }, [quickOrderMessage]);
+
   const serializedOtherOrderItems = useMemo(
     () =>
       JSON.stringify(
@@ -331,6 +401,27 @@ export function DailyForm({
           เลือกรายการไว้ให้แล้ว พนักงานกรอกเฉพาะจำนวนที่ต้องการสั่ง
         </p>
         <div className="mt-4 space-y-3">
+          <div className="rounded-2xl border-2 border-dashed border-[#E60012]/30 bg-[#E60012]/5 p-3">
+            <label className="block">
+              <span className="mb-2 block text-sm font-black text-black/70">วางข้อความสั่งของจาก LINE / แชต</span>
+              <textarea
+                className="focus-ring min-h-32 w-full rounded-2xl border-2 border-black/10 bg-white px-4 py-3 text-base font-bold shadow-sm"
+                value={quickOrderMessage}
+                onChange={(event) => setQuickOrderMessage(event.target.value)}
+                placeholder={"เช่น BL scrap 70 กก.\nBB scrap 30 กก.\nตับc 70 กก.\nรถพี่เจี๊ยบ"}
+              />
+            </label>
+            <button
+              type="button"
+              className="focus-ring mt-3 min-h-12 rounded-2xl bg-black px-5 text-base font-black text-white"
+              onClick={applyQuickOrderMessage}
+            >
+              ดึงรายการเข้าฟอร์ม
+            </button>
+            {quickOrderFeedback && (
+              <p className="mt-2 rounded-xl bg-white px-3 py-2 text-sm font-black text-black/70">{quickOrderFeedback}</p>
+            )}
+          </div>
           {ORDER_REQUEST_ITEMS.map((item) => (
             <label
               key={item.name}
@@ -346,7 +437,13 @@ export function DailyForm({
                 min="0"
                 step="0.01"
                 name={item.name}
-                defaultValue={Number(existingReport?.[item.name] ?? 0)}
+                value={orderFieldValues[item.name] || ""}
+                onChange={(event) =>
+                  setOrderFieldValues((prev) => ({
+                    ...prev,
+                    [item.name]: Number(event.target.value || 0),
+                  }))
+                }
                 aria-label={`จำนวน${item.label}`}
               />
               <span className="w-20 text-sm font-black text-black/60">
