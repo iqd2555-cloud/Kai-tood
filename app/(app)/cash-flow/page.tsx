@@ -7,7 +7,7 @@ import { formatThaiDate, moneyFormatter, todayISO } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch } from "@/lib/types";
 
-type SearchParams = { from?: string; to?: string; branch_id?: string; status?: string; category_id?: string; money_channel_id?: string; sync_message?: string; sync_ok?: string };
+type SearchParams = { from?: string; to?: string; branch_id?: string; status?: string; category_id?: string; money_channel_id?: string; sync_message?: string; sync_ok?: string; cash_flow_message?: string; cash_flow_ok?: string };
 type PageProps = { searchParams?: Promise<SearchParams> };
 
 function sum(entries: CashFlowEntry[], type: "income" | "expense", predicate: (entry: CashFlowEntry) => boolean) {
@@ -72,6 +72,7 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
     </section>
 
     {params?.sync_message && <div className={`rounded-2xl border p-4 font-black ${params.sync_ok === "1" ? "border-green-200 bg-green-50 text-green-700" : "border-red-200 bg-red-50 text-red-700"}`}>{decodeURIComponent(params.sync_message)}</div>}
+    {params?.cash_flow_message && <div className={`rounded-2xl border p-4 font-black ${params.cash_flow_ok === "1" ? "border-green-200 bg-green-50 text-green-700" : "border-red-200 bg-red-50 text-red-700"}`}>{decodeURIComponent(params.cash_flow_message)}</div>}
     {loadError && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 font-black text-red-700">{loadError}</div>}
 
     <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -90,7 +91,7 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
       <div className="rounded-[1.75rem] border border-black/10 bg-white p-5"><h2 className="text-xl font-black">รายการรับที่ควรติดตาม</h2>{followReceivables.map((e)=><p key={e.id} className="mt-3 flex justify-between gap-3 rounded-2xl bg-yellow-50 p-3 text-sm font-bold"><span>{e.description}<br/><span className="text-black/50">ครบกำหนด {formatThaiDate(e.due_date ?? e.transaction_date)}</span></span><span>{moneyFormatter.format(e.amount)}</span></p>)}</div>
     </section>
 
-    <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm"><h2 className="text-2xl font-black">บันทึกรายการเอง</h2><form action={async (formData: FormData) => { "use server"; await saveCashFlowEntry(null, formData); }} className="mt-4 grid gap-3 sm:grid-cols-2">
+    <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm"><h2 className="text-2xl font-black">บันทึกรายการเอง</h2><form action={async (formData: FormData) => { "use server"; const result = await saveCashFlowEntry(null, formData); const message = encodeURIComponent(result.message); redirect(`/cash-flow?from=${formData.get("transaction_date")}&to=${formData.get("transaction_date")}&cash_flow_ok=${result.ok ? "1" : "0"}&cash_flow_message=${message}`); }} className="mt-4 grid gap-3 sm:grid-cols-2">
       <Field label="วันที่ทำรายการ"><input className={inputClass()} type="date" name="transaction_date" defaultValue={today}/></Field><Field label="วันที่ครบกำหนด"><input className={inputClass()} type="date" name="due_date" defaultValue={today}/></Field>
       <Field label="ประเภท"><select className={inputClass()} name="type"><option value="income">รับ</option><option value="expense">จ่าย</option></select></Field><Field label="สถานะ"><select className={inputClass()} name="status"><option value="received">รับแล้ว</option><option value="paid">จ่ายแล้ว</option><option value="pending_receive">รอรับ</option><option value="pending_pay">รอจ่าย</option><option value="overdue">ค้างชำระ</option><option value="cancelled">ยกเลิก</option></select></Field>
       <Field label="หมวดหมู่"><select className={inputClass()} name="category"><option value="">ไม่ระบุ</option>{categories?.map((c)=><option key={c.id} value={c.name}>{c.name}</option>)}</select></Field><Field label="ช่องทางเงิน"><select className={inputClass()} name="payment_method"><option value="">ไม่ระบุ</option>{channels?.map((c)=><option key={c.id} value={c.name}>{c.name}</option>)}</select></Field>
