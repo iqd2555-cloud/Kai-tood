@@ -162,11 +162,35 @@ export async function signOut() {
   redirect("/login");
 }
 
+const typeMap = { "รับ": "income", "จ่าย": "expense", income: "income", expense: "expense" } as const;
+const statusMap = {
+  "รับแล้ว": "received",
+  "จ่ายแล้ว": "paid",
+  "รอรับ": "pending_receive",
+  "รอจ่าย": "pending_pay",
+  "ยกเลิก": "cancelled",
+  "ค้างชำระ": "overdue",
+  pending_receive: "pending_receive",
+  received: "received",
+  pending_pay: "pending_pay",
+  paid: "paid",
+  cancelled: "cancelled",
+  overdue: "overdue",
+} as const;
+
 const cashFlowEntrySchema = z.object({
   transaction_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")),
-  type: z.enum(["income", "expense"]),
-  status: z.enum(["pending_receive", "received", "pending_pay", "paid", "cancelled", "overdue"]),
+  type: z.string().transform((value, ctx) => {
+    const mapped = typeMap[value as keyof typeof typeMap];
+    if (!mapped) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "ประเภท Cash Flow ไม่ถูกต้อง" }); return z.NEVER; }
+    return mapped;
+  }),
+  status: z.string().transform((value, ctx) => {
+    const mapped = statusMap[value as keyof typeof statusMap];
+    if (!mapped) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: "สถานะ Cash Flow ไม่ถูกต้อง" }); return z.NEVER; }
+    return mapped;
+  }),
   category: z.string().max(200).optional().default(""),
   description: z.string().min(1).max(500),
   amount: z.coerce.number().positive(),
@@ -277,8 +301,12 @@ export async function saveCashFlowEntry(_: unknown, formData: FormData) {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์" };
   const { error } = await supabase.from("cash_flow_entries").insert({
-    ...payload,
-    due_date: payload.due_date || null,
+    transaction_date: payload.transaction_date,
+    due_date: payload.due_date || payload.transaction_date,
+    type: payload.type,
+    status: payload.status,
+    description: payload.description,
+    amount: Number(payload.amount),
     category: payload.category || null,
     payment_method: payload.payment_method || null,
     branch_id: payload.branch_id || null,
@@ -287,7 +315,7 @@ export async function saveCashFlowEntry(_: unknown, formData: FormData) {
     attachment_url: payload.attachment_url || null,
     note: payload.note || null,
     source: "manual",
-    created_by: profile.id,
+    created_by: profile.id || null,
   });
   if (error) return { ok: false, message: error.message };
   revalidatePath("/cash-flow");
