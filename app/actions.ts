@@ -125,7 +125,7 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
 
   const totalReceivedChicken = payload.received_original_chicken + payload.received_spicy_chicken + payload.received_ground_chicken + payload.received_drumstick + payload.received_offal + payload.received_chicken_skin;
 
-  const { error } = await supabase.from("daily_reports").upsert(
+  const { data: savedReport, error } = await supabase.from("daily_reports").upsert(
     {
       ...payload,
       received_chicken: totalReceivedChicken,
@@ -137,15 +137,28 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
       updated_at: new Date().toISOString(),
     },
     { onConflict: "branch_id,report_date" },
-  );
+  ).select("id, report_date, branch_id, total_sales, branch_name").single();
 
   if (error) return { ok: false, message: error.message };
+
+  if (profile.role === "owner" && savedReport?.id) {
+    const { error: cashFlowError } = await upsertSalesCashFlowEntry(supabase, {
+      id: savedReport.id,
+      report_date: savedReport.report_date,
+      branch_id: savedReport.branch_id,
+      total_sales: savedReport.total_sales,
+      branch_name: savedReport.branch_name,
+      created_by: profile.id,
+    });
+    if (cashFlowError) return { ok: false, message: `บันทึกยอดขายสำเร็จ แต่ซิงก์ Cash Flow ไม่สำเร็จ: ${cashFlowError}` };
+  }
 
   revalidatePath("/dashboard");
   revalidatePath("/daily");
   revalidatePath("/history");
   revalidatePath("/orders");
   revalidatePath("/reports");
+  revalidatePath("/cash-flow");
   return { ok: true, message: "บันทึกข้อมูลเรียบร้อย" };
 }
 
@@ -158,17 +171,41 @@ export async function signOut() {
 const cashFlowEntrySchema = z.object({
   transaction_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")),
-  direction: z.enum(["in", "out"]),
-  status: z.enum(["pending_in", "received", "pending_out", "paid", "cancelled", "overdue"]),
-  category_id: z.string().uuid().optional().or(z.literal("")),
+  type: z.enum(["income", "expense"]),
+  status: z.enum(["pending_receive", "received", "pending_pay", "paid", "cancelled", "overdue"]),
+  category: z.string().max(200).optional().default(""),
   description: z.string().min(1).max(500),
   amount: z.coerce.number().positive(),
-  money_channel_id: z.string().uuid().optional().or(z.literal("")),
+  payment_method: z.string().max(100).optional().default(""),
   branch_id: z.string().uuid().optional().or(z.literal("")),
-  source_ref: z.string().max(200).optional().default(""),
+  department: z.string().max(200).optional().default(""),
+  source_ref_id: z.string().max(200).optional().default(""),
   attachment_url: z.string().max(1000).optional().default(""),
   note: z.string().max(2000).optional().default(""),
 });
+
+type SalesCashFlowReport = { id: string; report_date: string; branch_id: string | null; total_sales: number | string | null; branch_name?: string | null; created_by: string | null };
+
+async function upsertSalesCashFlowEntry(supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>, report: SalesCashFlowReport) {
+  const amount = Number(report.total_sales ?? 0);
+  if (amount <= 0) return { error: null as string | null };
+  const { error } = await supabase.from("cash_flow_entries").upsert({
+    transaction_date: report.report_date,
+    due_date: report.report_date,
+    type: "income",
+    status: "received",
+    category: "ยอดขายหน้าร้าน",
+    description: `ยอดขายสาขา${report.branch_name ? ` ${report.branch_name}` : ""}`,
+    amount,
+    payment_method: "รวมทุกช่องทาง",
+    branch_id: report.branch_id,
+    department: "หน้าร้าน",
+    source: "sales",
+    source_ref_id: report.id,
+    created_by: report.created_by,
+  }, { onConflict: "source,source_ref_id" });
+  return { error: error?.message ?? null };
+}
 
 export async function saveCashFlowEntry(_: unknown, formData: FormData) {
   const profile = await getCurrentProfile();
@@ -181,10 +218,11 @@ export async function saveCashFlowEntry(_: unknown, formData: FormData) {
   const { error } = await supabase.from("cash_flow_entries").insert({
     ...payload,
     due_date: payload.due_date || null,
-    category_id: payload.category_id || null,
-    money_channel_id: payload.money_channel_id || null,
+    category: payload.category || null,
+    payment_method: payload.payment_method || null,
     branch_id: payload.branch_id || null,
-    source_ref: payload.source_ref || null,
+    department: payload.department || null,
+    source_ref_id: payload.source_ref_id || null,
     attachment_url: payload.attachment_url || null,
     note: payload.note || null,
     source: "manual",
@@ -200,20 +238,11 @@ export async function syncDailySalesToCashFlow() {
   if (profile.role !== "owner") return { ok: false, message: "เฉพาะเจ้าของร้านเท่านั้น" };
   const supabase = await createSupabaseServerClient();
   if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์" };
-  const { data: reports, error } = await supabase.from("daily_reports").select("id, report_date, branch_id, cash_sales, transfer_sales, total_sales, updated_at, branches(name)").order("report_date", { ascending: false }).limit(120);
+  const { data: reports, error } = await supabase.from("daily_reports").select("id, report_date, branch_id, total_sales, branch_name").order("report_date", { ascending: false }).limit(120);
   if (error) return { ok: false, message: error.message };
-  const { data: salesCategory } = await supabase.from("cash_flow_categories").select("id").eq("name", "ยอดขายหน้าร้าน").maybeSingle();
-  const { data: cashChannel } = await supabase.from("cash_flow_money_channels").select("id").eq("name", "เงินสด").maybeSingle();
-  const { data: transferChannel } = await supabase.from("cash_flow_money_channels").select("id").eq("name", "โอน").maybeSingle();
-  const branchName = (branches: unknown) => (Array.isArray(branches) ? branches[0]?.name : (branches as { name?: string } | null)?.name) ?? "สาขา";
-  const rows = (reports ?? []).flatMap((report) => [
-    Number(report.cash_sales) > 0 ? { transaction_date: report.report_date, due_date: report.report_date, direction: "in", status: "received", category_id: salesCategory?.id ?? null, description: `ยอดขายเงินสด ${branchName(report.branches)}`, amount: report.cash_sales, money_channel_id: cashChannel?.id ?? null, branch_id: report.branch_id, source: "auto", source_ref: `daily_reports:${report.id}:cash`, created_by: profile.id } : null,
-    Number(report.transfer_sales) > 0 ? { transaction_date: report.report_date, due_date: report.report_date, direction: "in", status: "received", category_id: salesCategory?.id ?? null, description: `ยอดขายโอน ${branchName(report.branches)}`, amount: report.transfer_sales, money_channel_id: transferChannel?.id ?? null, branch_id: report.branch_id, source: "auto", source_ref: `daily_reports:${report.id}:transfer`, created_by: profile.id } : null,
-  ]).filter((row): row is NonNullable<typeof row> => Boolean(row));
-  if (rows.length) {
-    const { error: upsertError } = await supabase.from("cash_flow_entries").upsert(rows, { onConflict: "source,source_ref" });
-    if (upsertError) return { ok: false, message: upsertError.message };
-  }
+  const results = await Promise.all((reports ?? []).map((report) => upsertSalesCashFlowEntry(supabase, { ...report, created_by: profile.id })));
+  const failed = results.find((result) => result.error);
+  if (failed?.error) return { ok: false, message: failed.error };
   revalidatePath("/cash-flow");
-  return { ok: true, message: `ซิงก์ยอดขาย ${rows.length} รายการแล้ว` };
+  return { ok: true, message: `ซิงก์ยอดขาย ${(reports ?? []).length} รายการแล้ว` };
 }
