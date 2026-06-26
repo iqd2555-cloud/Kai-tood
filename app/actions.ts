@@ -243,17 +243,18 @@ export async function syncSalesReportToCashFlow(salesReportId: string, existingC
     branch_id: report.branch_id,
     amount,
     category: "sales_revenue",
-    payment_method: "cash_or_transfer",
+    payment_method: "unspecified",
     department: "หน้าร้าน",
     description: `ยอดขายหน้าร้านประจำวันที่ ${report.report_date}${report.branch_name ? ` (${report.branch_name})` : ""}`,
     created_by: createdBy ?? report.submitted_by,
     note: "สร้าง/อัปเดตอัตโนมัติจาก daily_reports",
   };
 
-  const write = existingEntry
-    ? supabase.from("cash_flow_entries").update({ ...cashFlowPayload, updated_at: new Date().toISOString() }).eq("id", existingEntry.id).select("id").single()
-    : supabase.from("cash_flow_entries").insert(cashFlowPayload).select("id").single();
-  const { data: entry, error: writeError } = await write;
+  const { data: entry, error: writeError } = await supabase
+    .from("cash_flow_entries")
+    .upsert({ ...cashFlowPayload, updated_at: new Date().toISOString() }, { onConflict: "source,source_ref_id" })
+    .select("id")
+    .single();
   if (writeError) {
     console.error("syncSalesReportToCashFlow", { salesReportId, branch_id: report.branch_id, sales_date: report.report_date, total_sales: amount, error: writeError });
     return { ok: false, action: "error", entryId: null, message: readableSupabaseError(writeError.message, "เขียน cash_flow_entries ไม่สำเร็จ") };
