@@ -271,7 +271,7 @@ export async function syncSalesReportToCashFlow(salesReportId: string, existingC
     department: "หน้าร้าน",
     description: `ยอดขายหน้าร้านประจำวันที่ ${report.report_date}${report.branch_name ? ` (${report.branch_name})` : ""}`,
     created_by: createdBy ?? report.submitted_by,
-    note: "สร้าง/อัปเดตอัตโนมัติจาก daily_reports",
+    note: "สร้างอัตโนมัติจากรายงานยอดขายพนักงาน",
   };
 
   const { data: entry, error: writeError } = await supabase
