@@ -220,7 +220,6 @@ function logSalesCashFlowSync(event: string, details: Record<string, unknown>) {
 
 function readableSupabaseError(message: string, fallback: string) {
   if (/permission denied|row-level security|rls/i.test(message)) return `${fallback}: ไม่มีสิทธิ์อ่าน/เขียนข้อมูล (${message})`;
-  if (/relation .* does not exist|schema cache|Could not find the table/i.test(message)) return `${fallback}: ไม่พบตารางที่ต้องใช้ (${message})`;
   return `${fallback}: ${message}`;
 }
 

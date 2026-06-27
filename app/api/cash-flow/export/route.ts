@@ -16,13 +16,13 @@ export async function GET(request: Request) {
   if (!supabase) return NextResponse.json({ error: "Supabase is not configured" }, { status: 500 });
   const { data, error } = await supabase
     .from("cash_flow_entries")
-    .select("transaction_date,due_date,type,status,category,description,amount,payment_method,branch_id,department,source,source_ref_id,note")
+    .select("transaction_date,due_date,type,status,category,payment_method,branch_id,department,source,source_ref_id,amount,description,note")
     .gte("transaction_date", from)
     .lte("transaction_date", to)
     .order("transaction_date", { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  const header = ["วันที่ทำรายการ", "วันที่ครบกำหนด", "ประเภท", "สถานะ", "หมวดหมู่", "รายละเอียด", "จำนวนเงิน", "ช่องทางเงิน", "สาขา/หน่วยงาน", "แหล่งที่มา", "อ้างอิง", "หมายเหตุ"];
-  const rows = (data ?? []).map((entry) => [entry.transaction_date, entry.due_date, entry.type, entry.status, entry.category, entry.description, entry.amount, entry.payment_method, entry.branch_id ?? entry.department ?? "", entry.source, entry.source_ref_id, entry.note]);
+  const header = ["วันที่ทำรายการ", "วันที่ครบกำหนด", "ประเภท", "สถานะ", "หมวดหมู่", "ช่องทางเงิน", "สาขา", "แผนก", "แหล่งที่มา", "อ้างอิง", "จำนวนเงิน", "รายละเอียด", "หมายเหตุ"];
+  const rows = (data ?? []).map((entry) => [entry.transaction_date, entry.due_date, entry.type, entry.status, entry.category, entry.payment_method, entry.branch_id, entry.department, entry.source, entry.source_ref_id, entry.amount, entry.description, entry.note]);
   const csv = [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
   return new NextResponse(`\uFEFF${csv}`, {
     headers: {
