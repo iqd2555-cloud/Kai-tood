@@ -180,6 +180,7 @@ const statusMap = {
 } as const;
 
 const cashFlowEntrySchema = z.object({
+  entry_id: z.string().uuid().optional().or(z.literal("")),
   transaction_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")),
   type: z.string().transform((value, ctx) => {
@@ -368,7 +369,6 @@ export async function saveCashFlowEntry(_: unknown, formData: FormData) {
   const parsed = cashFlowEntrySchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, message: "กรุณาตรวจสอบข้อมูล Cash Flow" };
   const payload = parsed.data;
-  const isIncome = payload.type === "income";
   const description = (payload.description || payload.custom_category_name).trim();
   const note = (payload.note || payload.custom_category_name).trim();
   if (!description) return { ok: false, message: "กรุณากรอกรายละเอียดรายการ" };
@@ -386,11 +386,11 @@ export async function saveCashFlowEntry(_: unknown, formData: FormData) {
   if (categoryError) return { ok: false, message: categoryError.message };
   if (!selectedCategory?.code) return { ok: false, message: "หมวดหมู่ไม่ตรงกับประเภทรายการ รับ/จ่าย" };
 
-  const { error } = await supabase.from("cash_flow_entries").insert({
+  const entryPayload = {
     transaction_date: payload.transaction_date,
     due_date: payload.due_date || payload.transaction_date,
     type: payload.type,
-    status: isIncome ? "received" : "paid",
+    status: payload.status,
     description,
     amount: Number(payload.amount),
     category: payload.category || null,
@@ -400,12 +400,29 @@ export async function saveCashFlowEntry(_: unknown, formData: FormData) {
     source_ref_id: payload.source_ref_id || null,
     attachment_url: payload.attachment_url || null,
     note: note || null,
-    source: "manual",
     created_by: profile.id || null,
-  });
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = payload.entry_id
+    ? await supabase.from("cash_flow_entries").update(entryPayload).eq("id", payload.entry_id)
+    : await supabase.from("cash_flow_entries").insert({ ...entryPayload, source: "manual" });
   if (error) return { ok: false, message: error.message };
   revalidatePath("/cash-flow");
-  return { ok: true, message: "บันทึกรายการ Cash Flow เรียบร้อย" };
+  return { ok: true, message: payload.entry_id ? "แก้ไขรายการ Cash Flow เรียบร้อย" : "บันทึกรายการ Cash Flow เรียบร้อย" };
+}
+
+export async function deleteCashFlowEntry(formData: FormData) {
+  const profile = await getCurrentProfile();
+  if (profile.role !== "owner") return { ok: false, message: "เฉพาะเจ้าของร้านเท่านั้น" };
+  const entryId = String(formData.get("entry_id") ?? "");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(entryId)) return { ok: false, message: "ไม่พบรายการที่ต้องการลบ" };
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์" };
+  const { error } = await supabase.from("cash_flow_entries").delete().eq("id", entryId);
+  if (error) return { ok: false, message: error.message };
+  revalidatePath("/cash-flow");
+  return { ok: true, message: "ลบรายการ Cash Flow เรียบร้อย" };
 }
 
 export async function syncSalesToCashFlow(formData?: FormData) {

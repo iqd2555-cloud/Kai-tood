@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
-import { saveCashFlowEntry, syncSalesToCashFlow } from "@/app/actions";
+import { deleteCashFlowEntry, saveCashFlowEntry, syncSalesToCashFlow } from "@/app/actions";
 import { CashFlowManualForm } from "@/components/cash-flow-manual-form";
 import { StatCard } from "@/components/stat-card";
 import { getCurrentProfile } from "@/lib/auth";
-import { addDaysISO, CASH_FLOW_SOURCE_LABEL, CASH_FLOW_STATUS_LABEL, CASH_FLOW_TYPE_LABEL, isActualStatus, isPendingStatus, type CashFlowEntry } from "@/lib/cash-flow";
-import { formatThaiDate, moneyFormatter, todayISO } from "@/lib/format";
+import { addDaysISO, CASH_FLOW_STATUS_LABEL, isActualStatus, isPendingStatus, type CashFlowEntry } from "@/lib/cash-flow";
+import { formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch } from "@/lib/types";
 
@@ -42,10 +42,6 @@ function safeThaiDate(value: string | null | undefined) {
   return isISODate(value) ? formatThaiDate(value) : "-";
 }
 
-function cashFlowLabel<T extends string>(labels: Record<T, string>, value: string | null | undefined, fallback = "-") {
-  return value && value in labels ? labels[value as T] : fallback;
-}
-
 function readableLoadError(error: unknown) {
   const message = error instanceof Error ? error.message : typeof error === "object" && error && "message" in error ? String(error.message) : String(error || "ไม่ทราบสาเหตุ");
   if (/permission denied|row-level security|rls|jwt/i.test(message)) return `โหลด Cash Flow ไม่สำเร็จ: สิทธิ์ Supabase/RLS ไม่อนุญาต (${message})`;
@@ -58,6 +54,10 @@ function forecast(entries: CashFlowEntry[], currentBalance: number, toDate: stri
   return currentBalance + expectedIn - expectedOut;
 }
 
+function plainAmount(entry: CashFlowEntry) {
+  const amount = numberFormatter.format(Number(entry.amount ?? 0));
+  return entry.type === "expense" ? `-${amount}` : amount;
+}
 
 function inputClass() { return "focus-ring min-h-12 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-base font-bold shadow-sm"; }
 
@@ -152,12 +152,12 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
     </section>
 
     <section className="grid gap-4 lg:grid-cols-2">
-      <div className="rounded-[1.75rem] border border-black/10 bg-white p-5"><h2 className="text-xl font-black">รายการจ่ายเร่งด่วน</h2>{urgentPayables.map((e)=><p key={e.id} className="mt-3 flex justify-between gap-3 rounded-2xl bg-red-50 p-3 text-sm font-bold"><span>{e.description}<br/><span className="text-black/50">ครบกำหนด {safeThaiDate(e.due_date ?? e.transaction_date)}</span></span><span>{moneyFormatter.format(e.amount)}</span></p>)}</div>
-      <div className="rounded-[1.75rem] border border-black/10 bg-white p-5"><h2 className="text-xl font-black">รายการรับที่ควรติดตาม</h2>{followReceivables.map((e)=><p key={e.id} className="mt-3 flex justify-between gap-3 rounded-2xl bg-yellow-50 p-3 text-sm font-bold"><span>{e.description}<br/><span className="text-black/50">ครบกำหนด {safeThaiDate(e.due_date ?? e.transaction_date)}</span></span><span>{moneyFormatter.format(e.amount)}</span></p>)}</div>
+      <div className="rounded-[1.75rem] border border-black/10 bg-white p-5"><h2 className="text-xl font-black">รายการจ่ายเร่งด่วน</h2>{urgentPayables.map((e)=><p key={e.id} className="mt-3 flex justify-between gap-3 rounded-2xl bg-red-50 p-3 text-sm font-bold"><span>{e.description}<br/><span className="text-black/50">ครบกำหนด {safeThaiDate(e.due_date ?? e.transaction_date)}</span></span><span className="text-red-600">{plainAmount(e)}</span></p>)}</div>
+      <div className="rounded-[1.75rem] border border-black/10 bg-white p-5"><h2 className="text-xl font-black">รายการรับที่ควรติดตาม</h2>{followReceivables.map((e)=><p key={e.id} className="mt-3 flex justify-between gap-3 rounded-2xl bg-yellow-50 p-3 text-sm font-bold"><span>{e.description}<br/><span className="text-black/50">ครบกำหนด {safeThaiDate(e.due_date ?? e.transaction_date)}</span></span><span className="text-green-700">{plainAmount(e)}</span></p>)}</div>
     </section>
 
-    <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm"><h2 className="text-2xl font-black">บันทึกรายการเอง</h2><CashFlowManualForm today={today} branches={branches as Branch[]} categories={categories} action={async (formData: FormData) => { "use server"; const result = await saveCashFlowEntry(null, formData); const message = encodeURIComponent(result.message); redirect(`/cash-flow?from=${formData.get("transaction_date")}&to=${formData.get("transaction_date")}&cash_flow_ok=${result.ok ? "1" : "0"}&cash_flow_message=${message}`); }} /></section>
+    <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm"><h2 className="text-2xl font-black">บันทึกรายการเอง</h2><CashFlowManualForm today={today} branches={branches as Branch[]} categories={categories} entries={entries} branchNameById={Object.fromEntries(branchNameById)} categoryNameByCode={Object.fromEntries(categoryNameByCode)} saveAction={async (formData: FormData) => { "use server"; const result = await saveCashFlowEntry(null, formData); const message = encodeURIComponent(result.message); const selectedDate = formData.get("transaction_date"); redirect(`/cash-flow?from=${selectedDate}&to=${selectedDate}&cash_flow_ok=${result.ok ? "1" : "0"}&cash_flow_message=${message}`); }} deleteAction={async (formData: FormData) => { "use server"; const result = await deleteCashFlowEntry(formData); const message = encodeURIComponent(result.message); const selectedDate = formData.get("transaction_date") ?? today; redirect(`/cash-flow?from=${selectedDate}&to=${selectedDate}&cash_flow_ok=${result.ok ? "1" : "0"}&cash_flow_message=${message}`); }} /></section>
 
-    <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm"><div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><h2 className="text-2xl font-black">รายการ Cash Flow</h2><a className="rounded-full bg-black px-4 py-2 text-center text-sm font-black text-white" href={`/api/cash-flow/export?from=${from}&to=${to}`}>Export CSV</a></div><form className="mt-4 grid gap-2 sm:grid-cols-5"><input className={inputClass()} type="date" name="from" defaultValue={from}/><input className={inputClass()} type="date" name="to" defaultValue={to}/><select className={inputClass()} name="branch_id"><option value="">ทุกสาขา</option>{(branches as Branch[] | null)?.map((b)=><option key={b.id} value={b.id}>{b.name}</option>)}</select><select className={inputClass()} name="status"><option value="">ทุกสถานะ</option>{Object.entries(CASH_FLOW_STATUS_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select><button className="rounded-2xl bg-[#FFD43B] font-black">กรอง</button></form><div className="mt-4 overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead><tr className="bg-black text-left text-white"><th className="p-3">วันที่</th><th>ประเภท</th><th>สถานะ</th><th>รายการ</th><th>หมวด</th><th>สาขา</th><th className="text-right">จำนวน</th></tr></thead><tbody>{entries.map((e)=><tr key={e.id} className="border-b border-black/10 font-bold"><td className="p-3">{safeThaiDate(e.transaction_date)}</td><td>{cashFlowLabel(CASH_FLOW_TYPE_LABEL, e.type)}</td><td>{cashFlowLabel(CASH_FLOW_STATUS_LABEL, e.status)}</td><td>{e.description}<div className="text-xs text-black/40">{cashFlowLabel(CASH_FLOW_SOURCE_LABEL, e.source, "ไม่ทราบแหล่งที่มา")}</div></td><td>{categoryNameByCode.get(e.category ?? "") ?? e.category ?? "-"}</td><td>{e.branch_id ? branchNameById.get(e.branch_id) ?? e.branch_id : "ส่วนกลาง"}</td><td className="text-right">{moneyFormatter.format(e.amount)}</td></tr>)}{entries.length === 0 && <tr><td className="p-6 text-center font-black text-black/50" colSpan={7}>ยังไม่มีรายการ Cash Flow ในช่วงวันที่นี้</td></tr>}</tbody></table></div></section>
+    <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm"><div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><h2 className="text-2xl font-black">รายการ Cash Flow</h2><a className="rounded-full bg-black px-4 py-2 text-center text-sm font-black text-white" href={`/api/cash-flow/export?from=${from}&to=${to}`}>Export CSV</a></div><form className="mt-4 grid gap-2 sm:grid-cols-5"><input className={inputClass()} type="date" name="from" defaultValue={from}/><input className={inputClass()} type="date" name="to" defaultValue={to}/><select className={inputClass()} name="branch_id"><option value="">ทุกสาขา</option>{(branches as Branch[] | null)?.map((b)=><option key={b.id} value={b.id}>{b.name}</option>)}</select><select className={inputClass()} name="status"><option value="">ทุกสถานะ</option>{Object.entries(CASH_FLOW_STATUS_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select><button className="rounded-2xl bg-[#FFD43B] font-black">กรอง</button></form><p className="mt-3 text-sm font-bold text-black/60">จัดการรายการด้วยปุ่มแก้ไข/ลบในตารางด้านบนหลังฟอร์มบันทึกรายการ</p></section>
   </div>;
 }
