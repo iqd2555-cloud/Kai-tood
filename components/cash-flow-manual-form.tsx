@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createSupabaseBrowserClient } from "@/lib/supabase-client";
 import type { Branch } from "@/lib/types";
 
 type Category = { id: string; name: string; type?: string; code?: string | null; is_active?: boolean };
@@ -15,7 +16,45 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export function CashFlowManualForm({ today, branches, categories, action }: { today: string; branches: Branch[]; categories: Category[]; action: (formData: FormData) => void | Promise<void> }) {
   const [type, setType] = useState<"income" | "expense">("income");
   const [category, setCategory] = useState("");
-  const filteredCategories = useMemo(() => categories.filter((item) => item.type === type && item.code), [categories, type]);
+  const [liveCategories, setLiveCategories] = useState<Category[]>(categories);
+
+  useEffect(() => {
+    setLiveCategories(categories);
+  }, [categories]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const supabase = createSupabaseBrowserClient();
+    if (!supabase) return;
+    const client = supabase;
+
+    async function loadCategories() {
+      const { data, error } = await client
+        .from("cash_flow_categories")
+        .select("id,name,type,code,is_active")
+        .eq("is_active", true)
+        .order("name");
+      if (!isMounted) return;
+      if (error) {
+        console.error("Cash Flow categories load error:", error);
+        return;
+      }
+      setLiveCategories(data ?? []);
+    }
+
+    void loadCategories();
+    const channel = client
+      .channel("cash-flow-categories-dropdown")
+      .on("postgres_changes", { event: "*", schema: "public", table: "cash_flow_categories" }, () => { void loadCategories(); })
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      void client.removeChannel(channel);
+    };
+  }, []);
+
+  const filteredCategories = useMemo(() => liveCategories.filter((item) => item.is_active !== false && item.type === type && item.code), [liveCategories, type]);
   const isOther = otherCodes.has(category);
 
   return <form action={action} className="mt-4 grid gap-3 sm:grid-cols-2">
