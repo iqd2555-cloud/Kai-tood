@@ -220,6 +220,42 @@ function logSalesCashFlowSync(event: string, details: Record<string, unknown>) {
   console.info("syncSalesReportToCashFlow", { event, ...details });
 }
 
+function salesSourceRefId(reportDate: string, branchId: string) {
+  return `${reportDate}_${branchId}`;
+}
+
+async function pruneDuplicateSalesCashFlowEntries(supabase: CashFlowClient, reportDate: string, branchId: string, canonicalSourceRefId: string) {
+  const { data: candidates, error } = await supabase
+    .from("cash_flow_entries")
+    .select("id,source_ref_id,created_at,updated_at")
+    .eq("source", "sales")
+    .eq("transaction_date", reportDate)
+    .eq("branch_id", branchId)
+    .order("updated_at", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error) return { ok: false, keptId: null, deleted: 0, message: readableSupabaseError(error.message, "ตรวจรายการยอดขายซ้ำใน Cash Flow ไม่สำเร็จ") };
+  if (!candidates || candidates.length === 0) return { ok: true, keptId: null, deleted: 0, message: "" };
+
+  const keep = candidates.find((entry) => entry.source_ref_id === canonicalSourceRefId) ?? candidates[0];
+  const duplicateIds = candidates.filter((entry) => entry.id !== keep.id).map((entry) => entry.id);
+
+  if (keep.source_ref_id !== canonicalSourceRefId) {
+    const { error: updateError } = await supabase
+      .from("cash_flow_entries")
+      .update({ source_ref_id: canonicalSourceRefId, updated_at: new Date().toISOString() })
+      .eq("id", keep.id);
+    if (updateError) return { ok: false, keptId: keep.id, deleted: 0, message: readableSupabaseError(updateError.message, "ปรับ source_ref_id ยอดขายให้เป็นมาตรฐานไม่สำเร็จ") };
+  }
+
+  if (duplicateIds.length > 0) {
+    const { error: deleteError } = await supabase.from("cash_flow_entries").delete().in("id", duplicateIds);
+    if (deleteError) return { ok: false, keptId: keep.id, deleted: 0, message: readableSupabaseError(deleteError.message, "ลบรายการยอดขายซ้ำใน Cash Flow ไม่สำเร็จ") };
+  }
+
+  return { ok: true, keptId: keep.id as string, deleted: duplicateIds.length, message: "" };
+}
+
 function readableSupabaseError(message: string, fallback: string) {
   if (/permission denied|row-level security|rls/i.test(message)) return `${fallback}: ไม่มีสิทธิ์อ่าน/เขียนข้อมูล (${message})`;
   return `${fallback}: ${message}`;
@@ -275,10 +311,14 @@ export async function syncSalesReportToCashFlow(salesReportId: string, existingC
 
 async function upsertSalesCashFlowEntry(supabase: CashFlowClient, report: SalesCashFlowReport): Promise<CashFlowSyncResult> {
   if (!isISODate(report.report_date)) return { ok: false, action: "error", entryId: null, message: `วันที่ไม่ตรงรูปแบบ ISO: ${report.report_date}` };
+  if (!report.branch_id) return { ok: false, action: "error", entryId: null, message: `ยอดขายวันที่ ${report.report_date} ไม่มี branch_id จึงสร้าง source_ref_id มาตรฐานไม่ได้` };
   const amount = Number(report.total_sales ?? 0);
-  const sourceRefId = `${report.report_date}_${report.branch_id ?? "no-branch"}`;
+  const sourceRefId = salesSourceRefId(report.report_date, report.branch_id);
   logSalesCashFlowSync("rollup_loaded", { source_ref_id: sourceRefId, branch_id: report.branch_id, sales_date: report.report_date, total_sales: amount });
   if (amount <= 0) return { ok: true, action: "skipped", entryId: null, message: "ข้ามรายการยอดขาย 0 บาท" };
+
+  const dedupe = await pruneDuplicateSalesCashFlowEntries(supabase, report.report_date, report.branch_id, sourceRefId);
+  if (!dedupe.ok) return { ok: false, action: "error", entryId: dedupe.keptId, message: dedupe.message };
 
   const { data: existingEntry, error: existingError } = await supabase
     .from("cash_flow_entries")
@@ -318,7 +358,7 @@ async function upsertSalesCashFlowEntry(supabase: CashFlowClient, report: SalesC
     return { ok: false, action: "error", entryId: null, message: readableSupabaseError(writeError.message, "upsert เข้า cash_flow_entries ไม่สำเร็จ") };
   }
 
-  logSalesCashFlowSync(existingEntry ? "updated" : "inserted", { sourceRefId, branch_id: report.branch_id, sales_date: report.report_date, total_sales: amount, cash_flow_entry_id: entry.id });
+  logSalesCashFlowSync(existingEntry ? "updated" : "inserted", { sourceRefId, branch_id: report.branch_id, sales_date: report.report_date, total_sales: amount, cash_flow_entry_id: entry.id, deleted_duplicates: dedupe.deleted });
   return { ok: true, action: existingEntry ? "updated" : "inserted", entryId: entry.id, message: existingEntry ? "ยอดขายนี้ถูก sync แล้ว จึงอัปเดตรายการเดิม" : "สร้างรายการ Cash Flow จากยอดขายแล้ว" };
 }
 
