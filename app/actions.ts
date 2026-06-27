@@ -356,8 +356,14 @@ export async function syncSalesToCashFlow(formData?: FormData) {
     .gte("report_date", from)
     .lte("report_date", to)
     .order("report_date", { ascending: false });
-  if (error) return { ok: false, message: readableSalesSyncReadError(error, "ดึงยอดขายย้อนหลังไม่สำเร็จ") };
-  if (!reports?.length) return { ok: false, message: `ไม่พบข้อมูลยอดขายในช่วงวันที่เลือก (${from} ถึง ${to})` };
+  if (error) {
+    console.error("syncSalesToCashFlow", { event: "sales_read_error", from, to, error });
+    return { ok: false, message: readableSalesSyncReadError(error, "ดึงยอดขายย้อนหลังไม่สำเร็จ") };
+  }
+
+  const found = reports?.length ?? 0;
+  console.info("syncSalesToCashFlow", { event: "sales_found", from, to, found });
+  if (found === 0) return { ok: false, message: "ไม่พบข้อมูลยอดขายในช่วงวันที่เลือก" };
 
   let synced = 0;
   let skipped = 0;
@@ -365,20 +371,28 @@ export async function syncSalesToCashFlow(formData?: FormData) {
   for (const report of reports) {
     const amount = Number(report.total_sales ?? 0);
     if (!Number.isFinite(amount)) {
-      errors.push(`${report.report_date}: ไม่พบ field ยอดขายรวม หรือยอดขายรวมไม่ใช่ตัวเลข (total_sales=${String(report.total_sales)})`);
+      const errorMessage = `${report.id} (${report.report_date}): ไม่พบ field ยอดขายรวม หรือยอดขายรวมไม่ใช่ตัวเลข (total_sales=${String(report.total_sales)})`;
+      console.error("syncSalesToCashFlow", { event: "item_error", report_id: report.id, report_date: report.report_date, reason: errorMessage });
+      errors.push(errorMessage);
       continue;
     }
     const result = await upsertSalesCashFlowEntry(syncClient, { ...report, created_by: report.submitted_by ?? profile.id });
     if (result.ok && result.action === "skipped") skipped += 1;
     else if (result.ok) synced += 1;
-    else errors.push(`${report.report_date}: ${result.message}`);
+    else {
+      const errorMessage = `${report.id} (${report.report_date}): ${result.message}`;
+      console.error("syncSalesToCashFlow", { event: "item_error", report_id: report.id, report_date: report.report_date, reason: result.message });
+      errors.push(errorMessage);
+    }
   }
 
+  console.info("syncSalesToCashFlow", { event: "sync_finished", from, to, found, synced, skipped, errors });
   revalidatePath("/cash-flow");
   revalidatePath("/dashboard");
+  revalidatePath("/owner-dashboard");
   return {
     ok: errors.length === 0,
-    message: `ซิงก์ยอดขายเข้า Cash Flow สำเร็จ ${synced} รายการ / ข้าม ${skipped} รายการ / error ${errors.length} รายการ${errors.length ? ` — ${errors.slice(0, 3).join(" | ")}` : ""}`,
+    message: `พบยอดขาย ${found} รายการ / sync สำเร็จ ${synced} รายการ / ข้าม ${skipped} รายการ / error ${errors.length} รายการ${errors.length ? ` — ${errors.slice(0, 3).join(" | ")}` : ""}`,
   };
 }
 
