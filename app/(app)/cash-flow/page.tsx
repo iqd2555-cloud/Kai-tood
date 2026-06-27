@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { saveCashFlowEntry, syncDailySalesToCashFlow } from "@/app/actions";
+import { saveCashFlowEntry, syncSalesToCashFlow } from "@/app/actions";
 import { StatCard } from "@/components/stat-card";
 import { getCurrentProfile } from "@/lib/auth";
 import { addDaysISO, CASH_FLOW_SOURCE_LABEL, CASH_FLOW_STATUS_LABEL, CASH_FLOW_TYPE_LABEL, isActualStatus, isPendingStatus, type CashFlowEntry } from "@/lib/cash-flow";
@@ -113,7 +113,7 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
 
   return <div className="space-y-5">
     <section className="rounded-[2rem] bg-[#111] p-5 text-white shadow-lg">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm font-black text-[#FFD43B]">Cash Flow Center</p><h1 className="text-3xl font-black">ศูนย์บริหารกระแสเงินสด</h1><p className="mt-2 text-sm font-bold text-white/70">ดูเงินจริง รอรับ รอจ่าย และคาดการณ์ 7/30 วัน แบบไม่ซับซ้อนเหมือนบัญชีภาษี</p></div><form action={async () => { "use server"; const result = await syncDailySalesToCashFlow(); const message = encodeURIComponent(result.message); redirect(`/cash-flow?from=${from}&to=${to}&sync_ok=${result.ok ? "1" : "0"}&sync_message=${message}`); }} className="flex flex-col gap-2 sm:items-end"><button className="focus-ring rounded-full bg-[#FFD43B] px-5 py-3 font-black text-black">ซิงก์ยอดขายอัตโนมัติ</button><p className="text-xs font-bold text-white/60">ดึงยอดขายย้อนหลัง 30 วัน แล้ว upsert ไม่ให้ซ้ำ</p></form></div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm font-black text-[#FFD43B]">Cash Flow Center</p><h1 className="text-3xl font-black">ศูนย์บริหารกระแสเงินสด</h1><p className="mt-2 text-sm font-bold text-white/70">ดูเงินจริง รอรับ รอจ่าย และคาดการณ์ 7/30 วัน แบบไม่ซับซ้อนเหมือนบัญชีภาษี</p></div><form action={async () => { "use server"; const result = await syncSalesToCashFlow(); const message = encodeURIComponent(result.message); redirect(`/cash-flow?from=${from}&to=${to}&sync_ok=${result.ok ? "1" : "0"}&sync_message=${message}`); }} className="flex flex-col gap-2 sm:items-end"><button className="focus-ring rounded-full bg-[#FFD43B] px-5 py-3 font-black text-black">ซิงก์ยอดขายอัตโนมัติ</button><p className="text-xs font-bold text-white/60">ดึงยอดขายย้อนหลัง 30 วัน แล้ว upsert ไม่ให้ซ้ำ</p></form></div>
     </section>
 
     {params?.sync_message && <div className={`rounded-2xl border p-4 font-black ${params.sync_ok === "1" ? "border-green-200 bg-green-50 text-green-700" : "border-red-200 bg-red-50 text-red-700"}`}>{decodeURIComponent(params.sync_message)}</div>}
