@@ -67,11 +67,12 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
   try {
     const [{ data: branches, error: branchesError }, { data: categories, error: categoriesError }, { data: channels, error: channelsError }] = await Promise.all([
       supabase.from("branches").select("id,name,code,low_chicken_threshold,low_sticky_rice_threshold,low_oil_threshold,is_active").order("name"),
-      supabase.from("cash_flow_categories").select("id,name,direction,sort_order,is_active").eq("is_active", true).order("sort_order"),
+      supabase.from("cash_flow_categories").select("id,name,is_active").eq("is_active", true).order("name"),
       supabase.from("cash_flow_money_channels").select("id,name,opening_balance,is_active").eq("is_active", true).order("name"),
     ]);
-    const setupError = branchesError ?? categoriesError ?? channelsError;
+    const setupError = branchesError ?? categoriesError;
     if (setupError) throw setupError;
+    if (channelsError) console.warn("Cash Flow money channels unavailable; using default empty channels", channelsError);
 
     let query = supabase.from("cash_flow_entries").select("*").gte("transaction_date", from).lte("transaction_date", to).order("transaction_date", { ascending: false });
     if (params?.branch_id) query = query.eq("branch_id", params.branch_id);
@@ -87,7 +88,7 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
 
     loadState.branches = (branches as Branch[] | null) ?? [];
     loadState.categories = categories ?? [];
-    loadState.channels = channels ?? [];
+    loadState.channels = channelsError ? [] : channels ?? [];
     loadState.entries = data ?? [];
     loadState.dashboardEntries = dashboardData ?? [];
   } catch (error) {
