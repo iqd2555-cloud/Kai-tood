@@ -75,12 +75,18 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
     let query = supabase.from("cash_flow_entries").select("*").gte("transaction_date", from).lte("transaction_date", to).order("transaction_date", { ascending: false });
     if (params?.branch_id) query = query.eq("branch_id", params.branch_id);
     if (params?.status) query = query.eq("status", params.status);
-    if (params?.category_id) query = query.eq("category", params.category_id);
+    if (params?.category_id) query = query.eq("category_id", params.category_id);
     if (params?.money_channel_id) query = query.eq("payment_method", params.money_channel_id);
     const [{ data, error: entriesError }, { data: dashboardData, error: dashboardError }] = await Promise.all([
       query.returns<CashFlowEntry[]>(),
       supabase.from("cash_flow_entries").select("*").order("transaction_date", { ascending: false }).returns<CashFlowEntry[]>(),
     ]);
+    if (entriesError) {
+      console.error("Cash flow entries load error:", entriesError);
+    }
+    if (dashboardError) {
+      console.error("Cash flow dashboard load error:", dashboardError);
+    }
     const entryError = entriesError ?? dashboardError;
     if (entryError) throw entryError;
 
