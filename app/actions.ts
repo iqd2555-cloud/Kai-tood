@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getCurrentProfile } from "@/lib/auth";
+import { addDaysISO } from "@/lib/cash-flow";
 import { ORDER_REQUEST_ITEMS } from "@/lib/report-items";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
@@ -192,7 +193,8 @@ const cashFlowEntrySchema = z.object({
     return mapped;
   }),
   category: z.string().max(200).optional().default(""),
-  description: z.string().min(1).max(500),
+  custom_category_name: z.string().max(500).optional().default(""),
+  description: z.string().max(500).optional().default(""),
   amount: z.coerce.number().positive(),
   payment_method: z.string().max(100).optional().default(""),
   branch_id: z.string().uuid().optional().or(z.literal("")),
@@ -202,7 +204,7 @@ const cashFlowEntrySchema = z.object({
   note: z.string().max(2000).optional().default(""),
 });
 
-type SalesCashFlowReport = { id: string; report_date: string; branch_id: string | null; total_sales: number | string | null; branch_name?: string | null; created_by: string | null };
+type SalesCashFlowReport = { report_date: string; branch_id: string | null; total_sales: number | string | null; branch_name?: string | null; created_by?: string | null };
 type CashFlowSyncResult = { ok: boolean; action: "inserted" | "updated" | "skipped" | "error"; entryId: string | null; message: string };
 type CashFlowClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 
@@ -227,7 +229,7 @@ function readableSalesSyncReadError(error: { message?: string; code?: string; de
   const message = error.message ?? "ไม่ทราบสาเหตุ";
   const details = [message, error.details, error.hint].filter(Boolean).join(" ");
   if (error.code === "42P01" || /relation .*daily_reports.* does not exist|Could not find the table|does not exist/i.test(details)) {
-    return `${fallback}: ไม่พบตารางยอดขาย (daily_reports) — ${message}`;
+    return `${fallback}: ไม่พบตารางยอดขาย (daily_report_rollups) — ${message}`;
   }
   if (error.code === "42703" || /total_sales|column .* does not exist|Could not find .* column|schema cache/i.test(details)) {
     return `${fallback}: ไม่พบ field ยอดขายรวม (total_sales) — ${message}`;
@@ -243,31 +245,49 @@ export async function syncSalesReportToCashFlow(salesReportId: string, existingC
   if (!serverClient) return { ok: false, action: "error", entryId: null, message: "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์" };
   const supabase = cashFlowSyncClient(serverClient);
 
-  const { data: report, error: reportError } = await supabase
+  const { data: reportKey, error: reportKeyError } = await supabase
     .from("daily_reports")
-    .select("id, report_date, branch_id, total_sales, branch_name, submitted_by")
+    .select("report_date, branch_id, submitted_by")
     .eq("id", salesReportId)
     .maybeSingle();
 
-  if (reportError) {
-    console.error("syncSalesReportToCashFlow", { salesReportId, error: reportError });
-    return { ok: false, action: "error", entryId: null, message: readableSalesSyncReadError(reportError, "อ่านยอดขายไม่สำเร็จ") };
+  if (reportKeyError) {
+    console.error("syncSalesReportToCashFlow", { salesReportId, error: reportKeyError });
+    return { ok: false, action: "error", entryId: null, message: readableSalesSyncReadError(reportKeyError, "อ่านวันที่/สาขายอดขายไม่สำเร็จ") };
   }
-  if (!report) return { ok: false, action: "error", entryId: null, message: "ไม่พบยอดขายที่ต้องการซิงก์" };
-  if (!isISODate(report.report_date)) return { ok: false, action: "error", entryId: null, message: `วันที่ไม่ตรงรูปแบบ ISO: ${report.report_date}` };
+  if (!reportKey) return { ok: false, action: "error", entryId: null, message: "ไม่พบยอดขายที่ต้องการซิงก์" };
 
+  const { data: rollup, error: rollupError } = await supabase
+    .from("daily_report_rollups")
+    .select("report_date, branch_id, total_sales, branch_name")
+    .eq("report_date", reportKey.report_date)
+    .eq("branch_id", reportKey.branch_id)
+    .gt("total_sales", 0)
+    .maybeSingle();
+
+  if (rollupError) {
+    console.error("syncSalesReportToCashFlow", { salesReportId, error: rollupError });
+    return { ok: false, action: "error", entryId: null, message: readableSalesSyncReadError(rollupError, "อ่านยอดขายจาก daily_report_rollups ไม่สำเร็จ") };
+  }
+  if (!rollup) return { ok: true, action: "skipped", entryId: null, message: "ข้ามรายการยอดขาย 0 บาท หรือไม่พบ rollup" };
+  return upsertSalesCashFlowEntry(supabase, { ...rollup, created_by: createdBy ?? reportKey.submitted_by });
+}
+
+async function upsertSalesCashFlowEntry(supabase: CashFlowClient, report: SalesCashFlowReport): Promise<CashFlowSyncResult> {
+  if (!isISODate(report.report_date)) return { ok: false, action: "error", entryId: null, message: `วันที่ไม่ตรงรูปแบบ ISO: ${report.report_date}` };
   const amount = Number(report.total_sales ?? 0);
-  logSalesCashFlowSync("report_loaded", { salesReportId, branch_id: report.branch_id, sales_date: report.report_date, total_sales: amount });
+  const sourceRefId = `${report.report_date}_${report.branch_id ?? "no-branch"}`;
+  logSalesCashFlowSync("rollup_loaded", { source_ref_id: sourceRefId, branch_id: report.branch_id, sales_date: report.report_date, total_sales: amount });
   if (amount <= 0) return { ok: true, action: "skipped", entryId: null, message: "ข้ามรายการยอดขาย 0 บาท" };
 
   const { data: existingEntry, error: existingError } = await supabase
     .from("cash_flow_entries")
     .select("id")
     .eq("source", "sales")
-    .eq("source_ref_id", salesReportId)
+    .eq("source_ref_id", sourceRefId)
     .maybeSingle();
   if (existingError) {
-    console.error("syncSalesReportToCashFlow", { salesReportId, error: existingError });
+    console.error("syncSalesReportToCashFlow", { sourceRefId, error: existingError });
     return { ok: false, action: "error", entryId: null, message: readableSupabaseError(existingError.message, "ตรวจรายการ Cash Flow เดิมไม่สำเร็จ") };
   }
 
@@ -277,15 +297,15 @@ export async function syncSalesReportToCashFlow(salesReportId: string, existingC
     type: "income",
     status: "received",
     source: "sales",
-    source_ref_id: salesReportId,
+    source_ref_id: sourceRefId,
     branch_id: report.branch_id,
     amount,
     category: "sales_revenue",
-    payment_method: "unspecified",
+    payment_method: "mixed",
     department: "หน้าร้าน",
-    description: `ยอดขายหน้าร้านประจำวันที่ ${report.report_date}${report.branch_name ? ` (${report.branch_name})` : ""}`,
-    created_by: createdBy ?? report.submitted_by,
-    note: "สร้างอัตโนมัติจากรายงานยอดขายพนักงาน",
+    description: `ยอดขายหน้าร้าน ${report.branch_name ?? "ไม่ระบุสาขา"} วันที่ ${report.report_date}`,
+    created_by: report.created_by ?? null,
+    note: "สร้างอัตโนมัติจาก daily_report_rollups",
   };
 
   const { data: entry, error: writeError } = await supabase
@@ -294,16 +314,12 @@ export async function syncSalesReportToCashFlow(salesReportId: string, existingC
     .select("id")
     .single();
   if (writeError) {
-    console.error("syncSalesReportToCashFlow", { salesReportId, branch_id: report.branch_id, sales_date: report.report_date, total_sales: amount, error: writeError });
+    console.error("syncSalesReportToCashFlow", { sourceRefId, branch_id: report.branch_id, sales_date: report.report_date, total_sales: amount, error: writeError });
     return { ok: false, action: "error", entryId: null, message: readableSupabaseError(writeError.message, "upsert เข้า cash_flow_entries ไม่สำเร็จ") };
   }
 
-  logSalesCashFlowSync(existingEntry ? "updated" : "inserted", { salesReportId, branch_id: report.branch_id, sales_date: report.report_date, total_sales: amount, cash_flow_entry_id: entry.id });
+  logSalesCashFlowSync(existingEntry ? "updated" : "inserted", { sourceRefId, branch_id: report.branch_id, sales_date: report.report_date, total_sales: amount, cash_flow_entry_id: entry.id });
   return { ok: true, action: existingEntry ? "updated" : "inserted", entryId: entry.id, message: existingEntry ? "ยอดขายนี้ถูก sync แล้ว จึงอัปเดตรายการเดิม" : "สร้างรายการ Cash Flow จากยอดขายแล้ว" };
-}
-
-async function upsertSalesCashFlowEntry(supabase: CashFlowClient, report: SalesCashFlowReport) {
-  return syncSalesReportToCashFlow(report.id, supabase, report.created_by);
 }
 
 export async function saveCashFlowEntry(_: unknown, formData: FormData) {
@@ -312,14 +328,18 @@ export async function saveCashFlowEntry(_: unknown, formData: FormData) {
   const parsed = cashFlowEntrySchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, message: "กรุณาตรวจสอบข้อมูล Cash Flow" };
   const payload = parsed.data;
+  const isIncome = payload.type === "income";
+  const description = (payload.description || payload.custom_category_name).trim();
+  const note = (payload.note || payload.custom_category_name).trim();
+  if (!description) return { ok: false, message: "กรุณากรอกรายละเอียดรายการ" };
   const supabase = await createSupabaseServerClient();
   if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์" };
   const { error } = await supabase.from("cash_flow_entries").insert({
     transaction_date: payload.transaction_date,
     due_date: payload.due_date || payload.transaction_date,
     type: payload.type,
-    status: payload.status,
-    description: payload.description,
+    status: isIncome ? "received" : "paid",
+    description,
     amount: Number(payload.amount),
     category: payload.category || null,
     payment_method: payload.payment_method || null,
@@ -327,7 +347,7 @@ export async function saveCashFlowEntry(_: unknown, formData: FormData) {
     department: payload.department || null,
     source_ref_id: payload.source_ref_id || null,
     attachment_url: payload.attachment_url || null,
-    note: payload.note || null,
+    note: note || null,
     source: "manual",
     created_by: profile.id || null,
   });
@@ -343,18 +363,20 @@ export async function syncSalesToCashFlow(formData?: FormData) {
   if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์" };
 
   const today = new Date().toISOString().slice(0, 10);
-  const defaultFrom = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const rawFrom = String(formData?.get("from") ?? defaultFrom);
-  const rawTo = String(formData?.get("to") ?? today);
-  const from = isISODate(rawFrom) ? rawFrom : defaultFrom;
-  const to = isISODate(rawTo) ? rawTo : today;
+  const selectedDateRaw = String(formData?.get("selected_date") ?? formData?.get("to") ?? today);
+  const selectedDate = isISODate(selectedDateRaw) ? selectedDateRaw : today;
+  const range = String(formData?.get("sync_range") ?? "today");
+  const days = range === "7d" ? 7 : range === "30d" ? 30 : 1;
+  const from = addDaysISO(selectedDate, -(days - 1));
+  const to = selectedDate;
 
   const syncClient = cashFlowSyncClient(supabase);
   const { data: reports, error } = await syncClient
-    .from("daily_reports")
-    .select("id, report_date, branch_id, total_sales, branch_name, submitted_by")
+    .from("daily_report_rollups")
+    .select("report_date, branch_id, total_sales, branch_name")
     .gte("report_date", from)
     .lte("report_date", to)
+    .gt("total_sales", 0)
     .order("report_date", { ascending: false });
   if (error) {
     console.error("syncSalesToCashFlow", { event: "sales_read_error", from, to, error });
@@ -371,17 +393,20 @@ export async function syncSalesToCashFlow(formData?: FormData) {
   for (const report of reports) {
     const amount = Number(report.total_sales ?? 0);
     if (!Number.isFinite(amount)) {
-      const errorMessage = `${report.id} (${report.report_date}): ไม่พบ field ยอดขายรวม หรือยอดขายรวมไม่ใช่ตัวเลข (total_sales=${String(report.total_sales)})`;
-      console.error("syncSalesToCashFlow", { event: "item_error", report_id: report.id, report_date: report.report_date, reason: errorMessage });
+      const errorMessage = `${report.report_date}_${report.branch_id ?? "no-branch"}: ไม่พบ field ยอดขายรวม หรือยอดขายรวมไม่ใช่ตัวเลข (total_sales=${String(report.total_sales)})`;
+      console.error("syncSalesToCashFlow", { event: "item_error", source_ref_id: `${report.report_date}_${report.branch_id ?? "no-branch"}`, report_date: report.report_date, reason: errorMessage });
       errors.push(errorMessage);
       continue;
     }
-    const result = await upsertSalesCashFlowEntry(syncClient, { ...report, created_by: report.submitted_by ?? profile.id });
+    const result = await upsertSalesCashFlowEntry(syncClient, { ...report, created_by: profile.id });
     if (result.ok && result.action === "skipped") skipped += 1;
-    else if (result.ok) synced += 1;
+    else if (result.ok) {
+      synced += 1;
+      if (result.action === "updated") skipped += 1;
+    }
     else {
-      const errorMessage = `${report.id} (${report.report_date}): ${result.message}`;
-      console.error("syncSalesToCashFlow", { event: "item_error", report_id: report.id, report_date: report.report_date, reason: result.message });
+      const errorMessage = `${report.report_date}_${report.branch_id ?? "no-branch"}: ${result.message}`;
+      console.error("syncSalesToCashFlow", { event: "item_error", source_ref_id: `${report.report_date}_${report.branch_id ?? "no-branch"}`, report_date: report.report_date, reason: result.message });
       errors.push(errorMessage);
     }
   }
@@ -392,7 +417,7 @@ export async function syncSalesToCashFlow(formData?: FormData) {
   revalidatePath("/owner-dashboard");
   return {
     ok: errors.length === 0,
-    message: `พบยอดขาย ${found} รายการ / sync สำเร็จ ${synced} รายการ / ข้าม ${skipped} รายการ / error ${errors.length} รายการ${errors.length ? ` — ${errors.slice(0, 3).join(" | ")}` : ""}`,
+    message: `ช่วงวันที่ ${from} ถึง ${to} / พบยอดขาย ${found} รายการ / sync สำเร็จ ${synced} รายการ / ข้ามรายการซ้ำ ${skipped} รายการ / error ${errors.length} รายการ${errors.length ? ` — ${errors.slice(0, 3).join(" | ")}` : ""}`,
   };
 }
 
