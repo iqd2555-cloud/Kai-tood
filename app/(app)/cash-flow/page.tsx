@@ -2,16 +2,15 @@ import { redirect } from "next/navigation";
 import { saveCashFlowEntry, syncDailySalesToCashFlow } from "@/app/actions";
 import { StatCard } from "@/components/stat-card";
 import { getCurrentProfile } from "@/lib/auth";
-import { addDaysISO, CASH_FLOW_SOURCE_LABEL, CASH_FLOW_STATUS_LABEL, CASH_FLOW_TYPE_LABEL, DEFAULT_CASH_FLOW_CHANNELS, isActualStatus, isPendingStatus, type CashFlowEntry } from "@/lib/cash-flow";
+import { addDaysISO, CASH_FLOW_SOURCE_LABEL, CASH_FLOW_STATUS_LABEL, CASH_FLOW_TYPE_LABEL, isActualStatus, isPendingStatus, type CashFlowEntry } from "@/lib/cash-flow";
 import { formatThaiDate, moneyFormatter, todayISO } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch } from "@/lib/types";
 
-type SearchParams = { from?: string; to?: string; branch_id?: string; status?: string; category_id?: string; money_channel_id?: string; sync_message?: string; sync_ok?: string; cash_flow_message?: string; cash_flow_ok?: string };
+type SearchParams = { from?: string; to?: string; branch_id?: string; status?: string; category?: string; payment_method?: string; sync_message?: string; sync_ok?: string; cash_flow_message?: string; cash_flow_ok?: string };
 type CashFlowLoadState = {
   branches: Branch[];
   categories: { id: string; name: string; type?: string; code?: string | null; is_active?: boolean }[];
-  channels: { id: string; name: string; opening_balance?: number | null; is_active?: boolean }[];
   entries: CashFlowEntry[];
   dashboardEntries: CashFlowEntry[];
   errorMessage: string | null;
@@ -36,7 +35,6 @@ function cashFlowLabel<T extends string>(labels: Record<T, string>, value: strin
 
 function readableLoadError(error: unknown) {
   const message = error instanceof Error ? error.message : typeof error === "object" && error && "message" in error ? String(error.message) : String(error || "ไม่ทราบสาเหตุ");
-  if (/relation .* does not exist|schema cache|Could not find the table|cash_flow_entries/i.test(message)) return `โหลด Cash Flow ไม่สำเร็จ: ไม่พบตารางหรือ schema ของ cash_flow_entries ใน Supabase production (${message})`;
   if (/permission denied|row-level security|rls|jwt/i.test(message)) return `โหลด Cash Flow ไม่สำเร็จ: สิทธิ์ Supabase/RLS ไม่อนุญาต (${message})`;
   return `โหลด Cash Flow ไม่สำเร็จ: ${message}`;
 }
@@ -63,7 +61,7 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
   const supabase = await createSupabaseServerClient();
   if (!supabase) redirect("/login?setup=supabase");
 
-  const loadState: CashFlowLoadState = { branches: [], categories: [], channels: [], entries: [], dashboardEntries: [], errorMessage: null };
+  const loadState: CashFlowLoadState = { branches: [], categories: [], entries: [], dashboardEntries: [], errorMessage: null };
   try {
     const [{ data: branches, error: branchesError }, { data: categories, error: categoriesError }] = await Promise.all([
       supabase.from("branches").select("id,name,code,low_chicken_threshold,low_sticky_rice_threshold,low_oil_threshold,is_active").order("name"),
@@ -72,14 +70,15 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
     const setupError = branchesError ?? categoriesError;
     if (setupError) throw setupError;
 
-    let query = supabase.from("cash_flow_entries").select("*").gte("transaction_date", from).lte("transaction_date", to).order("transaction_date", { ascending: false });
+    const entrySelect = "id,transaction_date,due_date,type,status,category,payment_method,branch_id,department,source,source_ref_id,amount,description,note,attachment_url,created_by,created_at,updated_at";
+    let query = supabase.from("cash_flow_entries").select(entrySelect).gte("transaction_date", from).lte("transaction_date", to).order("transaction_date", { ascending: false });
     if (params?.branch_id) query = query.eq("branch_id", params.branch_id);
     if (params?.status) query = query.eq("status", params.status);
-    if (params?.category_id) query = query.eq("category_id", params.category_id);
-    if (params?.money_channel_id) query = query.eq("payment_method", params.money_channel_id);
+    if (params?.category) query = query.eq("category", params.category);
+    if (params?.payment_method) query = query.eq("payment_method", params.payment_method);
     const [{ data, error: entriesError }, { data: dashboardData, error: dashboardError }] = await Promise.all([
       query.returns<CashFlowEntry[]>(),
-      supabase.from("cash_flow_entries").select("*").order("transaction_date", { ascending: false }).returns<CashFlowEntry[]>(),
+      supabase.from("cash_flow_entries").select(entrySelect).order("transaction_date", { ascending: false }).returns<CashFlowEntry[]>(),
     ]);
     if (entriesError) {
       console.error("Cash flow entries load error:", entriesError);
@@ -92,7 +91,6 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
 
     loadState.branches = (branches as Branch[] | null) ?? [];
     loadState.categories = categories ?? [];
-    loadState.channels = DEFAULT_CASH_FLOW_CHANNELS.map((name) => ({ id: name, name, opening_balance: 0, is_active: true }));
     loadState.entries = data ?? [];
     loadState.dashboardEntries = dashboardData ?? [];
   } catch (error) {
@@ -100,9 +98,9 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
     loadState.errorMessage = readableLoadError(error);
   }
 
-  const { branches, categories, channels, entries, dashboardEntries, errorMessage } = loadState;
+  const { branches, categories, entries, dashboardEntries, errorMessage } = loadState;
   const branchNameById = new Map(branches.map((branch) => [branch.id, branch.name]));
-  const openingBalance = channels.reduce((total, channel) => total + Number(channel.opening_balance ?? 0), 0);
+  const openingBalance = 0;
   const actualInToday = sum(dashboardEntries, "income", (entry) => entry.transaction_date === today && entry.status === "received");
   const actualOutToday = sum(dashboardEntries, "expense", (entry) => entry.transaction_date === today && entry.status === "paid");
   const actualIn = sum(dashboardEntries, "income", (entry) => isActualStatus(entry.status));
@@ -119,7 +117,7 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
     </section>
 
     {params?.sync_message && <div className={`rounded-2xl border p-4 font-black ${params.sync_ok === "1" ? "border-green-200 bg-green-50 text-green-700" : "border-red-200 bg-red-50 text-red-700"}`}>{decodeURIComponent(params.sync_message)}</div>}
-    {errorMessage && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 font-black text-red-700">{errorMessage}<div className="mt-1 text-sm font-bold text-red-600">หน้าเว็บไม่ล่ม แต่ Dashboard/รายการจะแสดงค่าเริ่มต้นจนกว่าจะรัน migration ใน Supabase production project ที่ Vercel ใช้อยู่จริง</div></div>}
+    {errorMessage && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 font-black text-red-700">{errorMessage}<div className="mt-1 text-sm font-bold text-red-600">ตรวจสอบ Supabase error ด้านบนโดยตรง ระบบไม่ใช้ข้อมูลจำลองและไม่ซ่อน error ที่เกิดขึ้นจริง</div></div>}
     {params?.cash_flow_message && <div className={`rounded-2xl border p-4 font-black ${params.cash_flow_ok === "1" ? "border-green-200 bg-green-50 text-green-700" : "border-red-200 bg-red-50 text-red-700"}`}>{decodeURIComponent(params.cash_flow_message)}</div>}
     <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard label="เงินสด/บัญชีคงเหลือปัจจุบัน" value={moneyFormatter.format(currentBalance)} tone="dark" />
@@ -140,7 +138,7 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
     <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm"><h2 className="text-2xl font-black">บันทึกรายการเอง</h2><form action={async (formData: FormData) => { "use server"; const result = await saveCashFlowEntry(null, formData); const message = encodeURIComponent(result.message); redirect(`/cash-flow?from=${formData.get("transaction_date")}&to=${formData.get("transaction_date")}&cash_flow_ok=${result.ok ? "1" : "0"}&cash_flow_message=${message}`); }} className="mt-4 grid gap-3 sm:grid-cols-2">
       <Field label="วันที่ทำรายการ"><input className={inputClass()} type="date" name="transaction_date" defaultValue={today}/></Field><Field label="วันที่ครบกำหนด"><input className={inputClass()} type="date" name="due_date" defaultValue={today}/></Field>
       <Field label="ประเภท"><select className={inputClass()} name="type"><option value="income">รับ</option><option value="expense">จ่าย</option></select></Field><Field label="สถานะ"><select className={inputClass()} name="status"><option value="received">รับแล้ว</option><option value="paid">จ่ายแล้ว</option><option value="pending_receive">รอรับ</option><option value="pending_pay">รอจ่าย</option><option value="overdue">ค้างชำระ</option><option value="cancelled">ยกเลิก</option></select></Field>
-      <Field label="หมวดหมู่"><select className={inputClass()} name="category"><option value="">ไม่ระบุ</option>{categories?.map((c)=><option key={c.id} value={c.name}>{c.name}</option>)}</select></Field><Field label="ช่องทางเงิน"><select className={inputClass()} name="payment_method"><option value="">ไม่ระบุ</option>{channels?.map((c)=><option key={c.id} value={c.name}>{c.name}</option>)}</select></Field>
+      <Field label="หมวดหมู่"><select className={inputClass()} name="category"><option value="">ไม่ระบุ</option>{categories?.map((c)=><option key={c.id} value={c.name}>{c.name}</option>)}</select></Field><Field label="ช่องทางเงิน"><input className={inputClass()} name="payment_method" placeholder="เช่น เงินสด / โอน / ธนาคาร"/></Field>
       <Field label="สาขา"><select className={inputClass()} name="branch_id"><option value="">ส่วนกลาง/ไม่ระบุ</option>{(branches as Branch[] | null)?.map((b)=><option key={b.id} value={b.id}>{b.name}</option>)}</select></Field><Field label="แผนก"><input className={inputClass()} name="department" placeholder="เช่น หน้าร้าน / ส่วนกลาง"/></Field><Field label="จำนวนเงิน"><input className={inputClass()} type="number" step="0.01" min="0" name="amount" placeholder="0"/></Field>
       <div className="sm:col-span-2"><Field label="รายละเอียดรายการ"><input className={inputClass()} name="description" placeholder="เช่น ค่าเช่า เติมเงินเข้ากิจการ ซื้อไก่สด"/></Field></div>
       <Field label="อ้างอิงเอกสาร/รหัสต้นทาง"><input className={inputClass()} name="source_ref_id"/></Field><Field label="ลิงก์สลิป/เอกสารแนบ"><input className={inputClass()} name="attachment_url"/></Field>

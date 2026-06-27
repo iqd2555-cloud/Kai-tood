@@ -27,8 +27,7 @@ export type CashFlowEntry = {
   profiles?: Pick<Profile, "full_name"> | null;
 };
 
-export type CashFlowCategory = { id: string; name: string; direction: CashFlowType | "both"; sort_order: number; is_active: boolean };
-export type CashFlowMoneyChannel = { id: string; name: string; opening_balance: number; is_active: boolean };
+export type CashFlowCategory = { id: string; name: string; type: CashFlowType; code: string | null; is_active: boolean };
 
 export const CASH_FLOW_STATUS_LABEL: Record<CashFlowStatus, string> = {
   pending_receive: "รอรับ",
@@ -42,12 +41,6 @@ export const CASH_FLOW_STATUS_LABEL: Record<CashFlowStatus, string> = {
 export const CASH_FLOW_TYPE_LABEL: Record<CashFlowType, string> = { income: "รับ", expense: "จ่าย" };
 export const CASH_FLOW_SOURCE_LABEL: Record<CashFlowSource, string> = { manual: "บันทึกเอง", sales: "ยอดขาย", stock: "สต็อก", marinade: "โรงหมัก", franchise: "แฟรนไชส์", other: "อื่น ๆ" };
 
-export const DEFAULT_CASH_FLOW_CATEGORIES = [
-  ["ยอดขายหน้าร้าน", "income"], ["รายรับแฟรนไชส์", "income"], ["ขายวัตถุดิบให้สาขา", "income"], ["คอร์ส/หนังสือ/บริการ", "income"], ["เติมเงินเข้ากิจการ", "income"], ["รับเงินคืน", "income"],
-  ["ซื้อไก่สด", "expense"], ["ซื้อวัตถุดิบ", "expense"], ["โรงหมัก", "expense"], ["ขนส่ง", "expense"], ["ค่าแรง", "expense"], ["ซื้ออุปกรณ์", "expense"], ["หน้าร้าน", "expense"], ["ส่วนกลาง", "expense"], ["ค่าเช่า", "expense"], ["ค่าไฟ", "expense"], ["ค่าน้ำ", "expense"], ["ค่าโทรศัพท์/อินเทอร์เน็ต", "expense"], ["ค่าเดินทาง", "expense"], ["ค่าโฆษณา", "expense"], ["ค่าซ่อมอุปกรณ์", "expense"], ["จ่ายหนี้", "expense"], ["ถอนเงินออกจากกิจการ", "expense"], ["ค่าใช้จ่ายจิปาถะ", "expense"], ["รายการอื่น ๆ", "both"],
-] as const;
-
-export const DEFAULT_CASH_FLOW_CHANNELS = ["เงินสด", "ธนาคาร", "โอน", "อื่น ๆ"] as const;
 
 export function addDaysISO(isoDate: string, days: number) {
   const [year, month, day] = isoDate.split("-").map(Number);
