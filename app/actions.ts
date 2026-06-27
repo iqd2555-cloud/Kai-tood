@@ -372,8 +372,20 @@ export async function saveCashFlowEntry(_: unknown, formData: FormData) {
   const description = (payload.description || payload.custom_category_name).trim();
   const note = (payload.note || payload.custom_category_name).trim();
   if (!description) return { ok: false, message: "กรุณากรอกรายละเอียดรายการ" };
+  if (!payload.category) return { ok: false, message: "กรุณาเลือกหมวดหมู่ Cash Flow" };
   const supabase = await createSupabaseServerClient();
   if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์" };
+
+  const { data: selectedCategory, error: categoryError } = await supabase
+    .from("cash_flow_categories")
+    .select("code,type,is_active")
+    .eq("code", payload.category)
+    .eq("type", payload.type)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (categoryError) return { ok: false, message: categoryError.message };
+  if (!selectedCategory?.code) return { ok: false, message: "หมวดหมู่ไม่ตรงกับประเภทรายการ รับ/จ่าย" };
+
   const { error } = await supabase.from("cash_flow_entries").insert({
     transaction_date: payload.transaction_date,
     due_date: payload.due_date || payload.transaction_date,
