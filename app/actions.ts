@@ -409,6 +409,8 @@ export async function saveCashFlowEntry(_: unknown, formData: FormData) {
     : await supabase.from("cash_flow_entries").insert({ ...entryPayload, source: "manual" });
   if (error) return { ok: false, message: error.message };
   revalidatePath("/cash-flow");
+  revalidatePath("/dashboard");
+  revalidatePath("/owner-dashboard");
   return { ok: true, message: payload.entry_id ? "แก้ไขรายการ Cash Flow เรียบร้อย" : "บันทึกรายการ Cash Flow เรียบร้อย" };
 }
 
@@ -422,6 +424,8 @@ export async function deleteCashFlowEntry(formData: FormData) {
   const { error } = await supabase.from("cash_flow_entries").delete().eq("id", entryId);
   if (error) return { ok: false, message: error.message };
   revalidatePath("/cash-flow");
+  revalidatePath("/dashboard");
+  revalidatePath("/owner-dashboard");
   return { ok: true, message: "ลบรายการ Cash Flow เรียบร้อย" };
 }
 
