@@ -49,12 +49,21 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
   if (params?.money_channel_id) query = query.eq("payment_method", params.money_channel_id);
   const [{ data, error: entriesError }, { data: dashboardData, error: dashboardError }] = await Promise.all([
     query.returns<CashFlowEntry[]>(),
-    supabase.from("cash_flow_entries").select("transaction_date,due_date,type,status,amount").returns<CashFlowEntry[]>(),
+    supabase.from("cash_flow_entries").select("*").order("transaction_date", { ascending: false }).returns<CashFlowEntry[]>(),
   ]);
+
+  if (entriesError) {
+    console.error("Cash Flow load error:", entriesError);
+    throw entriesError;
+  }
+  if (dashboardError) {
+    console.error("Cash Flow load error:", dashboardError);
+    throw dashboardError;
+  }
+
   const entries = data ?? [];
   const dashboardEntries = dashboardData ?? [];
   const branchNameById = new Map(((branches as Branch[] | null) ?? []).map((branch) => [branch.id, branch.name]));
-  const loadError = entriesError ? `ไม่สามารถโหลดข้อมูล Cash Flow ได้: ${entriesError.message}` : dashboardError ? `ไม่สามารถโหลด Dashboard Cash Flow ได้: ${dashboardError.message}` : null;
   const openingBalance = (channels ?? []).reduce((total, channel) => total + Number(channel.opening_balance ?? 0), 0);
   const actualInToday = sum(dashboardEntries, "income", (entry) => entry.transaction_date === today && entry.status === "received");
   const actualOutToday = sum(dashboardEntries, "expense", (entry) => entry.transaction_date === today && entry.status === "paid");
@@ -73,8 +82,6 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
 
     {params?.sync_message && <div className={`rounded-2xl border p-4 font-black ${params.sync_ok === "1" ? "border-green-200 bg-green-50 text-green-700" : "border-red-200 bg-red-50 text-red-700"}`}>{decodeURIComponent(params.sync_message)}</div>}
     {params?.cash_flow_message && <div className={`rounded-2xl border p-4 font-black ${params.cash_flow_ok === "1" ? "border-green-200 bg-green-50 text-green-700" : "border-red-200 bg-red-50 text-red-700"}`}>{decodeURIComponent(params.cash_flow_message)}</div>}
-    {loadError && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 font-black text-red-700">{loadError}</div>}
-
     <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard label="เงินสด/บัญชีคงเหลือปัจจุบัน" value={moneyFormatter.format(currentBalance)} tone="dark" />
       <StatCard label="รับวันนี้" value={moneyFormatter.format(actualInToday)} />
@@ -101,6 +108,6 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
       <div className="sm:col-span-2"><Field label="หมายเหตุ"><textarea className="focus-ring min-h-24 w-full rounded-2xl border-2 border-black/10 bg-white px-4 py-3 font-bold" name="note" /></Field></div><button className="focus-ring min-h-14 rounded-2xl bg-[#FFD43B] px-5 font-black text-black sm:col-span-2">บันทึกรายการ</button>
     </form></section>
 
-    <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm"><div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><h2 className="text-2xl font-black">รายการ Cash Flow</h2><a className="rounded-full bg-black px-4 py-2 text-center text-sm font-black text-white" href={`/api/cash-flow/export?from=${from}&to=${to}`}>Export CSV</a></div><form className="mt-4 grid gap-2 sm:grid-cols-5"><input className={inputClass()} type="date" name="from" defaultValue={from}/><input className={inputClass()} type="date" name="to" defaultValue={to}/><select className={inputClass()} name="branch_id"><option value="">ทุกสาขา</option>{(branches as Branch[] | null)?.map((b)=><option key={b.id} value={b.id}>{b.name}</option>)}</select><select className={inputClass()} name="status"><option value="">ทุกสถานะ</option>{Object.entries(CASH_FLOW_STATUS_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select><button className="rounded-2xl bg-[#FFD43B] font-black">กรอง</button></form><div className="mt-4 overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead><tr className="bg-black text-left text-white"><th className="p-3">วันที่</th><th>ประเภท</th><th>สถานะ</th><th>รายการ</th><th>หมวด</th><th>สาขา</th><th className="text-right">จำนวน</th></tr></thead><tbody>{entries.map((e)=><tr key={e.id} className="border-b border-black/10 font-bold"><td className="p-3">{formatThaiDate(e.transaction_date)}</td><td>{CASH_FLOW_TYPE_LABEL[e.type]}</td><td>{CASH_FLOW_STATUS_LABEL[e.status]}</td><td>{e.description}<div className="text-xs text-black/40">{CASH_FLOW_SOURCE_LABEL[e.source]}</div></td><td>{e.category ?? "-"}</td><td>{e.branch_id ? branchNameById.get(e.branch_id) ?? e.branch_id : "ส่วนกลาง"}</td><td className="text-right">{moneyFormatter.format(e.amount)}</td></tr>)}{entries.length === 0 && <tr><td className="p-6 text-center font-black text-black/50" colSpan={7}>{loadError ?? "ยังไม่มีรายการ Cash Flow ในช่วงวันที่นี้"}</td></tr>}</tbody></table></div></section>
+    <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm"><div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><h2 className="text-2xl font-black">รายการ Cash Flow</h2><a className="rounded-full bg-black px-4 py-2 text-center text-sm font-black text-white" href={`/api/cash-flow/export?from=${from}&to=${to}`}>Export CSV</a></div><form className="mt-4 grid gap-2 sm:grid-cols-5"><input className={inputClass()} type="date" name="from" defaultValue={from}/><input className={inputClass()} type="date" name="to" defaultValue={to}/><select className={inputClass()} name="branch_id"><option value="">ทุกสาขา</option>{(branches as Branch[] | null)?.map((b)=><option key={b.id} value={b.id}>{b.name}</option>)}</select><select className={inputClass()} name="status"><option value="">ทุกสถานะ</option>{Object.entries(CASH_FLOW_STATUS_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select><button className="rounded-2xl bg-[#FFD43B] font-black">กรอง</button></form><div className="mt-4 overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead><tr className="bg-black text-left text-white"><th className="p-3">วันที่</th><th>ประเภท</th><th>สถานะ</th><th>รายการ</th><th>หมวด</th><th>สาขา</th><th className="text-right">จำนวน</th></tr></thead><tbody>{entries.map((e)=><tr key={e.id} className="border-b border-black/10 font-bold"><td className="p-3">{formatThaiDate(e.transaction_date)}</td><td>{CASH_FLOW_TYPE_LABEL[e.type]}</td><td>{CASH_FLOW_STATUS_LABEL[e.status]}</td><td>{e.description}<div className="text-xs text-black/40">{CASH_FLOW_SOURCE_LABEL[e.source]}</div></td><td>{e.category ?? "-"}</td><td>{e.branch_id ? branchNameById.get(e.branch_id) ?? e.branch_id : "ส่วนกลาง"}</td><td className="text-right">{moneyFormatter.format(e.amount)}</td></tr>)}{entries.length === 0 && <tr><td className="p-6 text-center font-black text-black/50" colSpan={7}>ยังไม่มีรายการ Cash Flow ในช่วงวันที่นี้</td></tr>}</tbody></table></div></section>
   </div>;
 }
