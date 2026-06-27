@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { saveCashFlowEntry, syncDailySalesToCashFlow } from "@/app/actions";
 import { StatCard } from "@/components/stat-card";
 import { getCurrentProfile } from "@/lib/auth";
-import { addDaysISO, CASH_FLOW_SOURCE_LABEL, CASH_FLOW_STATUS_LABEL, CASH_FLOW_TYPE_LABEL, isActualStatus, isPendingStatus, type CashFlowEntry } from "@/lib/cash-flow";
+import { addDaysISO, CASH_FLOW_SOURCE_LABEL, CASH_FLOW_STATUS_LABEL, CASH_FLOW_TYPE_LABEL, DEFAULT_CASH_FLOW_CHANNELS, isActualStatus, isPendingStatus, type CashFlowEntry } from "@/lib/cash-flow";
 import { formatThaiDate, moneyFormatter, todayISO } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch } from "@/lib/types";
@@ -10,7 +10,7 @@ import type { Branch } from "@/lib/types";
 type SearchParams = { from?: string; to?: string; branch_id?: string; status?: string; category_id?: string; money_channel_id?: string; sync_message?: string; sync_ok?: string; cash_flow_message?: string; cash_flow_ok?: string };
 type CashFlowLoadState = {
   branches: Branch[];
-  categories: { id: string; name: string; direction?: string; sort_order?: number; is_active?: boolean }[];
+  categories: { id: string; name: string; type?: string; code?: string | null; is_active?: boolean }[];
   channels: { id: string; name: string; opening_balance?: number | null; is_active?: boolean }[];
   entries: CashFlowEntry[];
   dashboardEntries: CashFlowEntry[];
@@ -65,14 +65,12 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
 
   const loadState: CashFlowLoadState = { branches: [], categories: [], channels: [], entries: [], dashboardEntries: [], errorMessage: null };
   try {
-    const [{ data: branches, error: branchesError }, { data: categories, error: categoriesError }, { data: channels, error: channelsError }] = await Promise.all([
+    const [{ data: branches, error: branchesError }, { data: categories, error: categoriesError }] = await Promise.all([
       supabase.from("branches").select("id,name,code,low_chicken_threshold,low_sticky_rice_threshold,low_oil_threshold,is_active").order("name"),
-      supabase.from("cash_flow_categories").select("id,name,is_active").eq("is_active", true).order("name"),
-      supabase.from("cash_flow_money_channels").select("id,name,opening_balance,is_active").eq("is_active", true).order("name"),
+      supabase.from("cash_flow_categories").select("id,name,type,code,is_active").eq("is_active", true).order("name"),
     ]);
     const setupError = branchesError ?? categoriesError;
     if (setupError) throw setupError;
-    if (channelsError) console.warn("Cash Flow money channels unavailable; using default empty channels", channelsError);
 
     let query = supabase.from("cash_flow_entries").select("*").gte("transaction_date", from).lte("transaction_date", to).order("transaction_date", { ascending: false });
     if (params?.branch_id) query = query.eq("branch_id", params.branch_id);
@@ -88,7 +86,7 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
 
     loadState.branches = (branches as Branch[] | null) ?? [];
     loadState.categories = categories ?? [];
-    loadState.channels = channelsError ? [] : channels ?? [];
+    loadState.channels = DEFAULT_CASH_FLOW_CHANNELS.map((name) => ({ id: name, name, opening_balance: 0, is_active: true }));
     loadState.entries = data ?? [];
     loadState.dashboardEntries = dashboardData ?? [];
   } catch (error) {
@@ -111,11 +109,11 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
 
   return <div className="space-y-5">
     <section className="rounded-[2rem] bg-[#111] p-5 text-white shadow-lg">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm font-black text-[#FFD43B]">Cash Flow Center</p><h1 className="text-3xl font-black">ศูนย์บริหารกระแสเงินสด</h1><p className="mt-2 text-sm font-bold text-white/70">ดูเงินจริง รอรับ รอจ่าย และคาดการณ์ 7/15/30 วัน แบบไม่ซับซ้อนเหมือนบัญชีภาษี</p></div><form action={async (formData: FormData) => { "use server"; const result = await syncDailySalesToCashFlow(formData); const message = encodeURIComponent(result.message); redirect(`/cash-flow?from=${formData.get("from")}&to=${formData.get("to")}&sync_ok=${result.ok ? "1" : "0"}&sync_message=${message}`); }} className="flex flex-col gap-2 sm:items-end"><input type="hidden" name="from" value={from}/><input type="hidden" name="to" value={to}/><button className="focus-ring rounded-full bg-[#FFD43B] px-5 py-3 font-black text-black">ซิงก์ยอดขายอัตโนมัติ</button><p className="text-xs font-bold text-white/60">ใช้ช่วงวันที่ที่เลือก หรืออย่างน้อยย้อนหลัง 30 วัน</p></form></div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm font-black text-[#FFD43B]">Cash Flow Center</p><h1 className="text-3xl font-black">ศูนย์บริหารกระแสเงินสด</h1><p className="mt-2 text-sm font-bold text-white/70">ดูเงินจริง รอรับ รอจ่าย และคาดการณ์ 7/30 วัน แบบไม่ซับซ้อนเหมือนบัญชีภาษี</p></div><form action={async () => { "use server"; const result = await syncDailySalesToCashFlow(); const message = encodeURIComponent(result.message); redirect(`/cash-flow?from=${from}&to=${to}&sync_ok=${result.ok ? "1" : "0"}&sync_message=${message}`); }} className="flex flex-col gap-2 sm:items-end"><button className="focus-ring rounded-full bg-[#FFD43B] px-5 py-3 font-black text-black">ซิงก์ยอดขายอัตโนมัติ</button><p className="text-xs font-bold text-white/60">ดึงยอดขายย้อนหลัง 30 วัน แล้ว upsert ไม่ให้ซ้ำ</p></form></div>
     </section>
 
     {params?.sync_message && <div className={`rounded-2xl border p-4 font-black ${params.sync_ok === "1" ? "border-green-200 bg-green-50 text-green-700" : "border-red-200 bg-red-50 text-red-700"}`}>{decodeURIComponent(params.sync_message)}</div>}
-    {errorMessage && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 font-black text-red-700">{errorMessage}<div className="mt-1 text-sm font-bold text-red-600">หน้าเว็บยังใช้งานได้ แต่ใช้ข้อมูลเริ่มต้นเป็นรายการว่างและยอดเงิน 0 กรุณาตรวจ env และ migration ใน Supabase production</div></div>}
+    {errorMessage && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 font-black text-red-700">{errorMessage}<div className="mt-1 text-sm font-bold text-red-600">หน้าเว็บไม่ล่ม แต่ Dashboard/รายการจะแสดงค่าเริ่มต้นจนกว่าจะรัน migration ใน Supabase production project ที่ Vercel ใช้อยู่จริง</div></div>}
     {params?.cash_flow_message && <div className={`rounded-2xl border p-4 font-black ${params.cash_flow_ok === "1" ? "border-green-200 bg-green-50 text-green-700" : "border-red-200 bg-red-50 text-red-700"}`}>{decodeURIComponent(params.cash_flow_message)}</div>}
     <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard label="เงินสด/บัญชีคงเหลือปัจจุบัน" value={moneyFormatter.format(currentBalance)} tone="dark" />
