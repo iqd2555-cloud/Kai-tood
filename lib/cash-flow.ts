@@ -33,6 +33,57 @@ export type CashFlowEntry = {
 
 export type CashFlowCategory = { id: string; name: string; type: CashFlowType; code: string | null; is_active: boolean };
 
+export type CashFlowSummary = {
+  selectedDate: string;
+  filterStartDate: string;
+  filterEndDate: string;
+  todayIncome: number;
+  todayExpense: number;
+  todayNetCash: number;
+  todayCash: number;
+  rangeIncome: number;
+  rangeExpense: number;
+  rangeNetCash: number;
+};
+
+function isISODateOnly(value: unknown): value is string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function cashFlowAmount(entry: CashFlowEntry) {
+  return Number(entry.amount ?? 0);
+}
+
+export function calculateCashFlowSummary(entries: CashFlowEntry[], selectedDate: string, filterStartDate: string, filterEndDate: string): CashFlowSummary {
+  const normalizedSelectedDate = isISODateOnly(selectedDate) ? selectedDate : "";
+  const normalizedFilterStartDate = isISODateOnly(filterStartDate) ? filterStartDate : normalizedSelectedDate;
+  const normalizedFilterEndDate = isISODateOnly(filterEndDate) ? filterEndDate : normalizedSelectedDate;
+  const sumMatching = (predicate: (entry: CashFlowEntry) => boolean) => entries.reduce((total, entry) => total + (predicate(entry) ? cashFlowAmount(entry) : 0), 0);
+  const isOnSelectedDate = (entry: CashFlowEntry) => entry.transaction_date === normalizedSelectedDate;
+  const isInFilterRange = (entry: CashFlowEntry) => isISODateOnly(entry.transaction_date) && entry.transaction_date >= normalizedFilterStartDate && entry.transaction_date <= normalizedFilterEndDate;
+  const todayIncome = sumMatching((entry) => entry.type === "income" && entry.status === "received" && isOnSelectedDate(entry));
+  const todayExpense = sumMatching((entry) => entry.type === "expense" && entry.status === "paid" && isOnSelectedDate(entry));
+  const rangeIncome = sumMatching((entry) => entry.type === "income" && entry.status === "received" && isInFilterRange(entry));
+  const rangeExpense = sumMatching((entry) => entry.type === "expense" && entry.status === "paid" && isInFilterRange(entry));
+
+  console.log("selectedDate", normalizedSelectedDate);
+  console.log("entries count", entries.length);
+  console.log("today entries", entries.filter((entry) => entry.transaction_date === normalizedSelectedDate));
+
+  return {
+    selectedDate: normalizedSelectedDate,
+    filterStartDate: normalizedFilterStartDate,
+    filterEndDate: normalizedFilterEndDate,
+    todayIncome,
+    todayExpense,
+    todayNetCash: todayIncome - todayExpense,
+    todayCash: todayIncome - todayExpense,
+    rangeIncome,
+    rangeExpense,
+    rangeNetCash: rangeIncome - rangeExpense,
+  };
+}
+
 export const CASH_FLOW_STATUS_LABEL: Record<CashFlowStatus, string> = {
   pending_receive: "รอรับ",
   received: "รับแล้ว",
