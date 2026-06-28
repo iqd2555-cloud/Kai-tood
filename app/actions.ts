@@ -202,6 +202,9 @@ const cashFlowEntrySchema = z.object({
   department: z.string().max(200).optional().default(""),
   source_ref_id: z.string().max(200).optional().default(""),
   attachment_url: z.string().max(1000).optional().default(""),
+  document_type: z.enum(["receipt", "tax_invoice", "transfer_slip", "cash_bill", "no_document", "other"]).optional().default("no_document"),
+  accountant_note: z.string().max(2000).optional().default(""),
+  has_attachment: z.union([z.literal("true"), z.literal("on")]).optional(),
   note: z.string().max(2000).optional().default(""),
 });
 
@@ -399,6 +402,9 @@ export async function saveCashFlowEntry(_: unknown, formData: FormData) {
     department: payload.department || null,
     source_ref_id: payload.source_ref_id || null,
     attachment_url: payload.attachment_url || null,
+    document_type: payload.document_type || null,
+    accountant_note: payload.accountant_note.trim() || null,
+    has_attachment: Boolean(payload.has_attachment || payload.attachment_url.trim()),
     note: note || null,
     created_by: profile.id || null,
     updated_at: new Date().toISOString(),
