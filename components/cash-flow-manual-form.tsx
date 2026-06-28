@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { deleteCashFlowEntry } from "@/app/actions";
 import { CASH_FLOW_ENTRIES_TABLE } from "@/lib/cash-flow-constants";
 import { CASH_FLOW_DOCUMENT_TYPE_LABEL, CASH_FLOW_SOURCE_LABEL, CASH_FLOW_STATUS_LABEL, CASH_FLOW_TYPE_LABEL, type CashFlowEntry, type CashFlowStatus, type CashFlowType } from "@/lib/cash-flow";
 import { formatThaiDate, numberFormatter } from "@/lib/format";
@@ -31,6 +30,7 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
   const [liveCategories, setLiveCategories] = useState<Category[]>(categories);
   const [localEntries, setLocalEntries] = useState<CashFlowEntry[]>(entries);
   const [deletingId, setDeletingId] = useState("");
+  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => { setLiveCategories(categories); }, [categories]);
   useEffect(() => { setLocalEntries(entries); }, [entries]);
@@ -70,42 +70,62 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   };
   const handleDelete = async (entry: CashFlowEntry) => {
-    if (!entry?.id) {
-      alert("ไม่พบรหัสรายการ จึงลบไม่ได้");
-      console.error("Missing id:", entry);
+    console.log("DELETE CLICKED ITEM:", entry);
+    setDeleteError("");
+
+    if (!entry || !entry.id) {
+      const message = "ลบไม่ได้: รายการนี้ไม่มี document id";
+      setDeleteError(message);
+      alert(message);
+      console.error("Missing item.id", entry);
       return;
     }
 
     const ok = window.confirm("ยืนยันลบรายการนี้หรือไม่?");
     if (!ok) return;
 
-    const deletePath = `public.${CASH_FLOW_ENTRIES_TABLE}/${entry.id}`;
+    console.log("CONFIRM OK - START DELETE");
+
+    const supabase = createSupabaseBrowserClient();
+    if (!supabase) {
+      const message = "ลบไม่สำเร็จ: ยังไม่ได้ตั้งค่า Supabase URL หรือ Anon Key";
+      setDeleteError(message);
+      alert(message);
+      console.error("DELETE ERROR FULL:", new Error(message));
+      return;
+    }
+
+    const deleteRefPath = `public.${CASH_FLOW_ENTRIES_TABLE}/${entry.id}`;
 
     try {
-      console.log("DELETE CONFIRMED");
-      console.log("item =", entry);
       console.log("item.id =", entry.id);
-      console.log("delete path =", deletePath);
+      console.log("DELETE REF PATH:", deleteRefPath);
 
       setDeletingId(entry.id);
-      const formData = new FormData();
-      formData.set("entry_id", entry.id);
-      const result = await deleteCashFlowEntry(formData);
-      if (!result.ok) throw new Error(result.message);
+      const { data, error } = await supabase.from(CASH_FLOW_ENTRIES_TABLE).delete().eq("id", entry.id).select("id");
+
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error(`ไม่พบรายการใน ${deleteRefPath} หรือไม่มีสิทธิ์ลบ`);
 
       console.log("DELETE SUCCESS:", entry.id);
       setLocalEntries((current) => current.filter((item) => item.id !== entry.id));
-      alert("ลบรายการเรียบร้อยแล้ว");
+      alert("ลบสำเร็จ");
     } catch (error) {
-      console.error("DELETE FAILED:", error);
+      console.error("DELETE ERROR FULL:", error);
+      const code = typeof error === "object" && error && "code" in error ? String(error.code) : "unknown";
       const message = error instanceof Error ? error.message : "กรุณาตรวจสอบระบบ";
-      alert(`ลบไม่สำเร็จ: ${message}`);
+      const fullMessage = `ลบไม่สำเร็จ
+code: ${code}
+message: ${message}`;
+      setDeleteError(fullMessage);
+      alert(fullMessage);
     } finally {
       setDeletingId("");
     }
   };
 
   return <>
+    {deleteError && <div role="alert" className="mt-4 rounded-2xl border-2 border-red-600 bg-red-50 p-4 text-sm font-black whitespace-pre-line text-red-700">{deleteError}</div>}
     <form ref={formRef} action={saveAction} className="mt-4 grid gap-3 sm:grid-cols-2">
       <input type="hidden" name="entry_id" value={editingEntryId} />
       {editing?.source === "sales" && <div className="sm:col-span-2 rounded-2xl border border-[#FFD43B] bg-yellow-50 p-3 text-sm font-black text-black">รายการจากยอดขายซิงก์</div>}
