@@ -68,6 +68,7 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
   const today = todayISO();
   const from = params?.from?.match(/^\d{4}-\d{2}-\d{2}$/) ? params.from : today.slice(0, 8) + "01";
   const to = params?.to?.match(/^\d{4}-\d{2}-\d{2}$/) ? params.to : addDaysISO(today, 30);
+  const selectedDate = to;
   const supabase = await createSupabaseServerClient();
   if (!supabase) redirect("/login?setup=supabase");
 
@@ -92,7 +93,7 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
 
     const [{ data, error: entriesError }, { data: dashboardData, error: dashboardError }, { data: todaySalesRollups, error: todaySalesError }] = await Promise.all([
       query.returns<CashFlowEntry[]>(),
-      supabase.from("cash_flow_entries").select(entrySelect).order("transaction_date", { ascending: false }).returns<CashFlowEntry[]>(),
+      (params?.branch_id ? supabase.from("cash_flow_entries").select(entrySelect).eq("branch_id", params.branch_id) : supabase.from("cash_flow_entries").select(entrySelect)).order("transaction_date", { ascending: false }).returns<CashFlowEntry[]>(),
       todaySalesQuery.returns<DailyReportRollupSales[]>(),
     ]);
     if (entriesError) {
@@ -121,9 +122,10 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
   const branchNameById = new Map(branches.map((branch) => [branch.id, branch.name]));
   const categoryNameByCode = new Map(categories.filter((category) => category.code).map((category) => [category.code as string, category.name]));
   const openingBalance = 0;
-  const actualInToday = sumRollupSales(todaySalesRollups, "total_sales");
-  const cashSalesToday = sumRollupSales(todaySalesRollups, "cash_sales");
-  const actualOutToday = sum(dashboardEntries, "expense", (entry) => entry.transaction_date === today && entry.status === "paid");
+  const cashSalesToday = selectedDate === today ? sumRollupSales(todaySalesRollups, "cash_sales") : 0;
+  const actualInToday = sum(dashboardEntries, "income", (entry) => entry.transaction_date === selectedDate && entry.status === "received");
+  const actualOutToday = sum(dashboardEntries, "expense", (entry) => entry.transaction_date === selectedDate && entry.status === "paid");
+  const netCashToday = actualInToday - actualOutToday;
   const actualIn = sum(dashboardEntries, "income", (entry) => isActualStatus(entry.status));
   const actualOut = sum(dashboardEntries, "expense", (entry) => isActualStatus(entry.status));
   const currentBalance = openingBalance + actualIn - actualOut;
@@ -141,10 +143,10 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
     {errorMessage && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 font-black text-red-700">{errorMessage}<div className="mt-1 text-sm font-bold text-red-600">ตรวจสอบ Supabase error ด้านบนโดยตรง ระบบไม่ใช้ข้อมูลจำลองและไม่ซ่อน error ที่เกิดขึ้นจริง</div></div>}
     {params?.cash_flow_message && <div className={`rounded-2xl border p-4 font-black ${params.cash_flow_ok === "1" ? "border-green-200 bg-green-50 text-green-700" : "border-red-200 bg-red-50 text-red-700"}`}>{decodeURIComponent(params.cash_flow_message)}</div>}
     <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <StatCard label="เงินสดวันนี้" value={moneyFormatter.format(cashSalesToday)} tone="dark" />
-      <StatCard label="รับวันนี้" value={moneyFormatter.format(actualInToday)} />
-      <StatCard label="จ่ายวันนี้" value={moneyFormatter.format(actualOutToday)} />
-      <StatCard label="เงินคงเหลือวันนี้" value={moneyFormatter.format(openingBalance + cashSalesToday - actualOutToday)} tone="brand" />
+      <StatCard label="เงินสดวันนี้" value={numberFormatter.format(cashSalesToday)} tone="dark" />
+      <StatCard label={`รับวันที่ ${safeThaiDate(selectedDate)}`} value={numberFormatter.format(actualInToday)} />
+      <StatCard label={`จ่ายวันที่ ${safeThaiDate(selectedDate)}`} value={numberFormatter.format(actualOutToday)} />
+      <StatCard label="Net Cash" value={numberFormatter.format(netCashToday)} tone="brand" />
       <StatCard label="เงินรอรับทั้งหมด" value={moneyFormatter.format(pendingIn)} />
       <StatCard label="เงินรอจ่ายทั้งหมด" value={moneyFormatter.format(pendingOut)} />
       <StatCard label="คาดการณ์อีก 7 วัน" value={moneyFormatter.format(forecast(entries, currentBalance, addDaysISO(today, 7)))} />
