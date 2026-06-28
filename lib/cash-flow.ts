@@ -51,7 +51,12 @@ function isISODateOnly(value: unknown): value is string {
 }
 
 function cashFlowAmount(entry: CashFlowEntry) {
-  return Number(entry.amount ?? 0);
+  const amount = Number(entry.amount ?? 0);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+function cashFlowTransactionDate(entry: CashFlowEntry) {
+  return isISODateOnly(entry.transaction_date) ? entry.transaction_date : "";
 }
 
 export function calculateCashFlowSummary(entries: CashFlowEntry[], selectedDate: string, filterStartDate: string, filterEndDate: string): CashFlowSummary {
@@ -59,16 +64,15 @@ export function calculateCashFlowSummary(entries: CashFlowEntry[], selectedDate:
   const normalizedFilterStartDate = isISODateOnly(filterStartDate) ? filterStartDate : normalizedSelectedDate;
   const normalizedFilterEndDate = isISODateOnly(filterEndDate) ? filterEndDate : normalizedSelectedDate;
   const sumMatching = (predicate: (entry: CashFlowEntry) => boolean) => entries.reduce((total, entry) => total + (predicate(entry) ? cashFlowAmount(entry) : 0), 0);
-  const isOnSelectedDate = (entry: CashFlowEntry) => entry.transaction_date === normalizedSelectedDate;
-  const isInFilterRange = (entry: CashFlowEntry) => isISODateOnly(entry.transaction_date) && entry.transaction_date >= normalizedFilterStartDate && entry.transaction_date <= normalizedFilterEndDate;
+  const isOnSelectedDate = (entry: CashFlowEntry) => normalizedSelectedDate !== "" && cashFlowTransactionDate(entry) === normalizedSelectedDate;
+  const isInFilterRange = (entry: CashFlowEntry) => {
+    const transactionDate = cashFlowTransactionDate(entry);
+    return transactionDate !== "" && transactionDate >= normalizedFilterStartDate && transactionDate <= normalizedFilterEndDate;
+  };
   const todayIncome = sumMatching((entry) => entry.type === "income" && entry.status === "received" && isOnSelectedDate(entry));
   const todayExpense = sumMatching((entry) => entry.type === "expense" && entry.status === "paid" && isOnSelectedDate(entry));
   const rangeIncome = sumMatching((entry) => entry.type === "income" && entry.status === "received" && isInFilterRange(entry));
   const rangeExpense = sumMatching((entry) => entry.type === "expense" && entry.status === "paid" && isInFilterRange(entry));
-
-  console.log("selectedDate", normalizedSelectedDate);
-  console.log("entries count", entries.length);
-  console.log("today entries", entries.filter((entry) => entry.transaction_date === normalizedSelectedDate));
 
   return {
     selectedDate: normalizedSelectedDate,
