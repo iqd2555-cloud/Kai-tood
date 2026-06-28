@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { CASH_FLOW_DOCUMENT_TYPE_LABEL, CASH_FLOW_SOURCE_LABEL, CASH_FLOW_STATUS_LABEL, CASH_FLOW_TYPE_LABEL, type CashFlowDocumentType, type CashFlowSource, type CashFlowStatus, type CashFlowType } from "@/lib/cash-flow";
 import { getCurrentProfile } from "@/lib/auth";
+import { CASH_FLOW_ENTRIES_TABLE } from "@/lib/cash-flow-constants";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 function csvCell(value: unknown) {
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
   if (!supabase) return NextResponse.json({ error: "Supabase is not configured" }, { status: 500 });
 
   let query = supabase
-    .from("cash_flow_entries")
+    .from(CASH_FLOW_ENTRIES_TABLE)
     .select("transaction_date,due_date,type,status,category,payment_method,branch_id,department,source,source_ref_id,amount,description,attachment_url,document_type,accountant_note,has_attachment,created_by,created_at,updated_at,note");
   if (!isAllRange) query = query.gte("transaction_date", from).lte("transaction_date", to);
   const { data, error } = await query.order("transaction_date", { ascending: true }).returns<ExportEntry[]>();

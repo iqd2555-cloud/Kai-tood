@@ -5,9 +5,11 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getCurrentProfile } from "@/lib/auth";
 import { addDaysISO } from "@/lib/cash-flow";
+import { CASH_FLOW_ENTRIES_TABLE } from "@/lib/cash-flow-constants";
 import { ORDER_REQUEST_ITEMS } from "@/lib/report-items";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+
 
 const dailyReportSchema = z.object({
   report_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "วันที่ไม่ถูกต้อง"),
@@ -230,7 +232,7 @@ function salesSourceRefId(reportDate: string, branchId: string) {
 
 async function pruneDuplicateSalesCashFlowEntries(supabase: CashFlowClient, reportDate: string, branchId: string, canonicalSourceRefId: string) {
   const { data: candidates, error } = await supabase
-    .from("cash_flow_entries")
+    .from(CASH_FLOW_ENTRIES_TABLE)
     .select("id,source_ref_id,created_at,updated_at")
     .eq("source", "sales")
     .eq("transaction_date", reportDate)
@@ -246,14 +248,14 @@ async function pruneDuplicateSalesCashFlowEntries(supabase: CashFlowClient, repo
 
   if (keep.source_ref_id !== canonicalSourceRefId) {
     const { error: updateError } = await supabase
-      .from("cash_flow_entries")
+      .from(CASH_FLOW_ENTRIES_TABLE)
       .update({ source_ref_id: canonicalSourceRefId, updated_at: new Date().toISOString() })
       .eq("id", keep.id);
     if (updateError) return { ok: false, keptId: keep.id, deleted: 0, message: readableSupabaseError(updateError.message, "ปรับ source_ref_id ยอดขายให้เป็นมาตรฐานไม่สำเร็จ") };
   }
 
   if (duplicateIds.length > 0) {
-    const { error: deleteError } = await supabase.from("cash_flow_entries").delete().in("id", duplicateIds);
+    const { error: deleteError } = await supabase.from(CASH_FLOW_ENTRIES_TABLE).delete().in("id", duplicateIds);
     if (deleteError) return { ok: false, keptId: keep.id, deleted: 0, message: readableSupabaseError(deleteError.message, "ลบรายการยอดขายซ้ำใน Cash Flow ไม่สำเร็จ") };
   }
 
@@ -325,7 +327,7 @@ async function upsertSalesCashFlowEntry(supabase: CashFlowClient, report: SalesC
   if (!dedupe.ok) return { ok: false, action: "error", entryId: dedupe.keptId, message: dedupe.message };
 
   const { data: existingEntry, error: existingError } = await supabase
-    .from("cash_flow_entries")
+    .from(CASH_FLOW_ENTRIES_TABLE)
     .select("id")
     .eq("source", "sales")
     .eq("source_ref_id", sourceRefId)
@@ -353,7 +355,7 @@ async function upsertSalesCashFlowEntry(supabase: CashFlowClient, report: SalesC
   };
 
   const { data: entry, error: writeError } = await supabase
-    .from("cash_flow_entries")
+    .from(CASH_FLOW_ENTRIES_TABLE)
     .upsert({ ...cashFlowPayload, updated_at: new Date().toISOString() }, { onConflict: "source,source_ref_id" })
     .select("id")
     .single();
@@ -411,8 +413,8 @@ export async function saveCashFlowEntry(_: unknown, formData: FormData) {
   };
 
   const { error } = payload.entry_id
-    ? await supabase.from("cash_flow_entries").update(entryPayload).eq("id", payload.entry_id)
-    : await supabase.from("cash_flow_entries").insert({ ...entryPayload, source: "manual" });
+    ? await supabase.from(CASH_FLOW_ENTRIES_TABLE).update(entryPayload).eq("id", payload.entry_id)
+    : await supabase.from(CASH_FLOW_ENTRIES_TABLE).insert({ ...entryPayload, source: "manual" });
   if (error) return { ok: false, message: error.message };
   revalidatePath("/cash-flow");
   revalidatePath("/dashboard");
@@ -427,7 +429,7 @@ export async function deleteCashFlowEntry(formData: FormData) {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(entryId)) return { ok: false, message: "ไม่พบรายการที่ต้องการลบ" };
   const supabase = await createSupabaseServerClient();
   if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์" };
-  const { data, error } = await supabase.from("cash_flow_entries").delete().eq("id", entryId).select("id");
+  const { data, error } = await supabase.from(CASH_FLOW_ENTRIES_TABLE).delete().eq("id", entryId).select("id");
   if (error) return { ok: false, message: error.message };
   if (!data || data.length === 0) return { ok: false, message: "ไม่พบรายการในฐานข้อมูล หรือไม่มีสิทธิ์ลบรายการนี้" };
   revalidatePath("/cash-flow");

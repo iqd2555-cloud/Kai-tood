@@ -5,6 +5,7 @@ import { DateShortcuts } from "@/components/date-shortcuts";
 import { StatCard } from "@/components/stat-card";
 import { getCurrentProfile } from "@/lib/auth";
 import { addDaysISO, calculateCashFlowSummary, CASH_FLOW_STATUS_LABEL, isPendingStatus, type CashFlowEntry } from "@/lib/cash-flow";
+import { CASH_FLOW_ENTRIES_TABLE } from "@/lib/cash-flow-constants";
 import { currentMonthStartISO, formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch } from "@/lib/types";
@@ -105,7 +106,7 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
       if (setupError) throw setupError;
 
       const entrySelect = "id,transaction_date,due_date,type,status,category,payment_method,branch_id,department,source,source_ref_id,amount,description,note,attachment_url,document_type,accountant_note,has_attachment,created_by,created_at,updated_at";
-      let query = supabase.from("cash_flow_entries").select(entrySelect);
+      let query = supabase.from(CASH_FLOW_ENTRIES_TABLE).select(entrySelect);
       if (!isAllRange) query = query.gte("transaction_date", from).lte("transaction_date", to);
       if (params?.branch_id) query = query.eq("branch_id", params.branch_id);
       if (params?.status) query = query.eq("status", params.status);

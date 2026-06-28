@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { deleteCashFlowEntry } from "@/app/actions";
+import { CASH_FLOW_ENTRIES_TABLE } from "@/lib/cash-flow-constants";
 import { CASH_FLOW_DOCUMENT_TYPE_LABEL, CASH_FLOW_SOURCE_LABEL, CASH_FLOW_STATUS_LABEL, CASH_FLOW_TYPE_LABEL, type CashFlowEntry, type CashFlowStatus, type CashFlowType } from "@/lib/cash-flow";
 import { formatThaiDate, numberFormatter } from "@/lib/format";
 import { createSupabaseBrowserClient } from "@/lib/supabase-client";
@@ -69,34 +70,34 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   };
   const handleDelete = async (entry: CashFlowEntry) => {
-    console.log("DELETE ITEM:", entry);
-    console.log("DELETE ITEM ID:", entry?.id);
-
     if (!entry?.id) {
-      console.error("Missing document id:", entry);
       alert("ไม่พบรหัสรายการ จึงลบไม่ได้");
+      console.error("Missing id:", entry);
       return;
     }
 
     const ok = window.confirm("ยืนยันลบรายการนี้หรือไม่?");
     if (!ok) return;
 
-    const previousEntries = localEntries;
-    setDeletingId(entry.id);
-    setLocalEntries((current) => current.filter((item) => item.id !== entry.id));
+    const deletePath = `public.${CASH_FLOW_ENTRIES_TABLE}/${entry.id}`;
 
     try {
-      console.log("Deleting cash flow id:", entry.id);
+      console.log("DELETE CONFIRMED");
+      console.log("item =", entry);
+      console.log("item.id =", entry.id);
+      console.log("delete path =", deletePath);
+
+      setDeletingId(entry.id);
       const formData = new FormData();
       formData.set("entry_id", entry.id);
       const result = await deleteCashFlowEntry(formData);
       if (!result.ok) throw new Error(result.message);
 
-      console.log("Delete success:", entry.id);
+      console.log("DELETE SUCCESS:", entry.id);
+      setLocalEntries((current) => current.filter((item) => item.id !== entry.id));
       alert("ลบรายการเรียบร้อยแล้ว");
     } catch (error) {
-      setLocalEntries(previousEntries);
-      console.error("Delete failed:", error);
+      console.error("DELETE FAILED:", error);
       const message = error instanceof Error ? error.message : "กรุณาตรวจสอบระบบ";
       alert(`ลบไม่สำเร็จ: ${message}`);
     } finally {
