@@ -2,7 +2,7 @@ const SCRIPT_VERSION = new URL(self.location.href).searchParams.get("v") || "leg
 const CACHE_PREFIX = "kai-tood-";
 const CACHE_NAME = `${CACHE_PREFIX}${SCRIPT_VERSION}`;
 const APP_SHELL = ["/manifest.webmanifest", "/brand-logo.svg", "/icons/icon-192.svg", "/icons/icon-512.svg"];
-const NO_STALE_PATHS = ["/login", "/dashboard", "/daily"];
+const NO_STALE_PATHS = ["/login", "/dashboard", "/owner-dashboard", "/cash-flow", "/daily", "/api/cash-flow"];
 const STATIC_CACHE_PATHS = ["/_next/static/", "/icons/", "/brand-logo.svg"];
 
 function isSameOrigin(url) {
