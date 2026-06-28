@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { CASH_FLOW_DOCUMENT_TYPE_LABEL, CASH_FLOW_SOURCE_LABEL, CASH_FLOW_STATUS_LABEL, CASH_FLOW_TYPE_LABEL, type CashFlowEntry, type CashFlowStatus, type CashFlowType } from "@/lib/cash-flow";
 import { formatThaiDate, numberFormatter } from "@/lib/format";
 import { createSupabaseBrowserClient } from "@/lib/supabase-client";
@@ -27,6 +27,7 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
   const [attachmentUrl, setAttachmentUrl] = useState("");
   const [hasAttachment, setHasAttachment] = useState(false);
   const [liveCategories, setLiveCategories] = useState<Category[]>(categories);
+  const [isDeleting, startDeleteTransition] = useTransition();
 
   useEffect(() => { setLiveCategories(categories); }, [categories]);
   useEffect(() => {
@@ -48,7 +49,37 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
   const filteredCategories = useMemo(() => liveCategories.filter((item) => item.is_active !== false && item.type === type && item.code), [liveCategories, type]);
   const isOther = otherCodes.has(category);
   const resetEdit = () => { setEditing(null); setEditingEntryId(""); setType("income"); setStatus("received"); setCategory(""); setAttachmentUrl(""); setHasAttachment(false); formRef.current?.reset(); };
-  const startEdit = (entry: CashFlowEntry) => { setEditing(entry); setEditingEntryId(entry.id); setType(entry.type); setStatus(entry.status); setCategory(entry.category ?? ""); setAttachmentUrl(entry.attachment_url ?? ""); setHasAttachment(Boolean(entry.has_attachment ?? entry.attachment_url)); setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0); };
+  const handleEdit = (entry: CashFlowEntry) => {
+    if (!entry.id) {
+      console.error("Cash Flow entry is missing id; edit button is disabled", entry);
+      return;
+    }
+
+    console.log("EDIT_CLICKED", entry.id);
+    setEditing(entry);
+    setEditingEntryId(entry.id);
+    setType(entry.type);
+    setStatus(entry.status);
+    setCategory(entry.category ?? "");
+    setAttachmentUrl(entry.attachment_url ?? "");
+    setHasAttachment(Boolean(entry.has_attachment ?? entry.attachment_url));
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  };
+  const handleDelete = (entry: CashFlowEntry) => {
+    if (!entry.id) {
+      console.error("Cash Flow entry is missing id; delete button is disabled", entry);
+      return;
+    }
+
+    console.log("DELETE_CLICKED", entry.id);
+    const message = entry.source === "sales" ? "ยืนยันลบรายการนี้หรือไม่?\n\nรายการนี้มาจากการซิงก์ยอดขาย หากลบแล้วสามารถซิงก์กลับมาใหม่ได้ ต้องการลบหรือไม่?" : "ยืนยันลบรายการนี้หรือไม่?";
+    if (!window.confirm(message)) return;
+
+    const formData = new FormData();
+    formData.set("entry_id", entry.id);
+    formData.set("transaction_date", entry.transaction_date);
+    startDeleteTransition(() => { void deleteAction(formData); });
+  };
 
   return <>
     <form ref={formRef} action={saveAction} className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -74,6 +105,6 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
       <div className="grid gap-2 sm:col-span-2 sm:grid-cols-2"><button className="focus-ring min-h-14 rounded-2xl bg-[#FFD43B] px-5 font-black text-black">{editing ? "บันทึกการแก้ไข" : "บันทึกรายการ"}</button>{editing && <button type="button" onClick={resetEdit} className="focus-ring min-h-14 rounded-2xl bg-black/10 px-5 font-black text-black">ยกเลิกการแก้ไข</button>}</div>
     </form>
 
-    <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[880px] text-sm"><thead><tr className="bg-black text-left text-white"><th className="p-3">วันที่</th><th>ประเภท</th><th>สถานะ</th><th>รายการ</th><th>หมวด</th><th>สาขา</th><th className="text-right">จำนวน</th><th className="text-center">จัดการ</th></tr></thead><tbody>{entries.map((e)=><tr key={e.id} className="border-b border-black/10 font-bold"><td className="p-3">{formatThaiDate(e.transaction_date)}</td><td>{label(CASH_FLOW_TYPE_LABEL, e.type)}</td><td>{label(CASH_FLOW_STATUS_LABEL, e.status)}</td><td>{e.description}<div className="text-xs text-black/40">{e.source === "sales" ? "รายการจากยอดขายซิงก์" : label(CASH_FLOW_SOURCE_LABEL, e.source, "ไม่ทราบแหล่งที่มา")}</div></td><td>{categoryNameByCode[e.category ?? ""] ?? e.category ?? "-"}</td><td>{e.branch_id ? branchNameById[e.branch_id] ?? e.branch_id : "ส่วนกลาง"}</td><td className={`text-right ${e.type === "expense" ? "text-red-600" : "text-green-700"}`}>{amountText(e)}</td><td><div className="flex justify-center gap-2"><button type="button" onClick={() => startEdit(e)} className="rounded-full bg-[#FFD43B] px-3 py-2 font-black text-black">แก้ไข</button><form action={deleteAction} onSubmit={(event) => { const message = e.source === "sales" ? "ยืนยันลบรายการนี้หรือไม่?\n\nรายการนี้มาจากการซิงก์ยอดขาย หากลบแล้วสามารถซิงก์กลับมาใหม่ได้ ต้องการลบหรือไม่?" : "ยืนยันลบรายการนี้หรือไม่?"; if (!window.confirm(message)) event.preventDefault(); }}><input type="hidden" name="entry_id" value={e.id}/><input type="hidden" name="transaction_date" value={e.transaction_date}/><button className="rounded-full bg-red-600 px-3 py-2 font-black text-white">ลบ</button></form></div></td></tr>)}{entries.length === 0 && <tr><td className="p-6 text-center font-black text-black/50" colSpan={8}>ไม่พบรายการในช่วงวันที่เลือก ลองเลือก 7 วันหรือเดือนนี้</td></tr>}</tbody></table></div>
+    <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[880px] text-sm"><thead><tr className="bg-black text-left text-white"><th className="p-3">วันที่</th><th>ประเภท</th><th>สถานะ</th><th>รายการ</th><th>หมวด</th><th>สาขา</th><th className="text-right">จำนวน</th><th className="text-center">จัดการ</th></tr></thead><tbody>{entries.map((e) => { const hasEntryId = Boolean(e.id); if (!hasEntryId) console.error("Cash Flow entry is missing id; action buttons were not rendered", e); return <tr key={e.id || `${e.transaction_date}-${e.description}`} className="border-b border-black/10 font-bold"><td className="p-3">{formatThaiDate(e.transaction_date)}</td><td>{label(CASH_FLOW_TYPE_LABEL, e.type)}</td><td>{label(CASH_FLOW_STATUS_LABEL, e.status)}</td><td>{e.description}<div className="text-xs text-black/40">{e.source === "sales" ? "รายการจากยอดขายซิงก์" : label(CASH_FLOW_SOURCE_LABEL, e.source, "ไม่ทราบแหล่งที่มา")}</div></td><td>{categoryNameByCode[e.category ?? ""] ?? e.category ?? "-"}</td><td>{e.branch_id ? branchNameById[e.branch_id] ?? e.branch_id : "ส่วนกลาง"}</td><td className={`text-right ${e.type === "expense" ? "text-red-600" : "text-green-700"}`}>{amountText(e)}</td><td className="relative z-10"><div className="relative z-20 flex justify-center gap-2 pointer-events-auto">{hasEntryId ? <><button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleEdit(e); }} className="relative z-20 pointer-events-auto rounded-full bg-[#FFD43B] px-3 py-2 font-black text-black">แก้ไข</button><button type="button" disabled={isDeleting} onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleDelete(e); }} className="relative z-20 pointer-events-auto rounded-full bg-red-600 px-3 py-2 font-black text-white disabled:opacity-50">ลบ</button></> : <span className="text-xs font-black text-red-600">ไม่มี ID</span>}</div></td></tr>; })}{entries.length === 0 && <tr><td className="p-6 text-center font-black text-black/50" colSpan={8}>ไม่พบรายการในช่วงวันที่เลือก ลองเลือก 7 วันหรือเดือนนี้</td></tr>}</tbody></table></div>
   </>;
 }
