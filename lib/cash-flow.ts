@@ -2,7 +2,8 @@ import type { Branch, Profile } from "@/lib/types";
 
 export type CashFlowType = "income" | "expense";
 export type CashFlowStatus = "pending_receive" | "received" | "pending_pay" | "paid" | "cancelled" | "overdue";
-export type CashFlowSource = "manual" | "sales" | "stock" | "marinade" | "franchise" | "other";
+export type CashFlowSource = "manual" | "sales" | "purchase" | "franchise" | "course" | "stock" | "marinade" | "other";
+export type CashFlowDocumentType = "receipt" | "tax_invoice" | "transfer_slip" | "cash_bill" | "no_document" | "other";
 
 export type CashFlowEntry = {
   id: string;
@@ -19,6 +20,9 @@ export type CashFlowEntry = {
   source: CashFlowSource;
   source_ref_id: string | null;
   attachment_url: string | null;
+  document_type: CashFlowDocumentType | null;
+  accountant_note: string | null;
+  has_attachment: boolean | null;
   note: string | null;
   created_by: string | null;
   created_at: string;
@@ -39,7 +43,8 @@ export const CASH_FLOW_STATUS_LABEL: Record<CashFlowStatus, string> = {
 };
 
 export const CASH_FLOW_TYPE_LABEL: Record<CashFlowType, string> = { income: "รับ", expense: "จ่าย" };
-export const CASH_FLOW_SOURCE_LABEL: Record<CashFlowSource, string> = { manual: "บันทึกเอง", sales: "ยอดขาย", stock: "สต็อก", marinade: "โรงหมัก", franchise: "แฟรนไชส์", other: "อื่น ๆ" };
+export const CASH_FLOW_SOURCE_LABEL: Record<CashFlowSource, string> = { manual: "manual", sales: "sales", purchase: "purchase", franchise: "franchise", course: "course", stock: "stock", marinade: "marinade", other: "other" };
+export const CASH_FLOW_DOCUMENT_TYPE_LABEL: Record<CashFlowDocumentType, string> = { receipt: "ใบเสร็จ", tax_invoice: "ใบกำกับภาษี", transfer_slip: "สลิปโอน", cash_bill: "บิลเงินสด", no_document: "ไม่มีเอกสาร", other: "อื่น ๆ" };
 
 
 export function addDaysISO(isoDate: string, days: number) {

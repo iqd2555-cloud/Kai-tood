@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CASH_FLOW_SOURCE_LABEL, CASH_FLOW_STATUS_LABEL, CASH_FLOW_TYPE_LABEL, type CashFlowEntry, type CashFlowStatus, type CashFlowType } from "@/lib/cash-flow";
+import { CASH_FLOW_DOCUMENT_TYPE_LABEL, CASH_FLOW_SOURCE_LABEL, CASH_FLOW_STATUS_LABEL, CASH_FLOW_TYPE_LABEL, type CashFlowEntry, type CashFlowStatus, type CashFlowType } from "@/lib/cash-flow";
 import { numberFormatter } from "@/lib/format";
 import { createSupabaseBrowserClient } from "@/lib/supabase-client";
 import type { Branch } from "@/lib/types";
@@ -24,6 +24,8 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
   const [type, setType] = useState<CashFlowType>("income");
   const [status, setStatus] = useState<CashFlowStatus>("received");
   const [category, setCategory] = useState("");
+  const [attachmentUrl, setAttachmentUrl] = useState("");
+  const [hasAttachment, setHasAttachment] = useState(false);
   const [liveCategories, setLiveCategories] = useState<Category[]>(categories);
 
   useEffect(() => { setLiveCategories(categories); }, [categories]);
@@ -45,8 +47,8 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
 
   const filteredCategories = useMemo(() => liveCategories.filter((item) => item.is_active !== false && item.type === type && item.code), [liveCategories, type]);
   const isOther = otherCodes.has(category);
-  const resetEdit = () => { setEditing(null); setEditingEntryId(""); setType("income"); setStatus("received"); setCategory(""); formRef.current?.reset(); };
-  const startEdit = (entry: CashFlowEntry) => { setEditing(entry); setEditingEntryId(entry.id); setType(entry.type); setStatus(entry.status); setCategory(entry.category ?? ""); setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0); };
+  const resetEdit = () => { setEditing(null); setEditingEntryId(""); setType("income"); setStatus("received"); setCategory(""); setAttachmentUrl(""); setHasAttachment(false); formRef.current?.reset(); };
+  const startEdit = (entry: CashFlowEntry) => { setEditing(entry); setEditingEntryId(entry.id); setType(entry.type); setStatus(entry.status); setCategory(entry.category ?? ""); setAttachmentUrl(entry.attachment_url ?? ""); setHasAttachment(Boolean(entry.has_attachment ?? entry.attachment_url)); setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0); };
 
   return <>
     <form ref={formRef} action={saveAction} className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -64,7 +66,10 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
       <Field label="จำนวนเงิน"><input className={inputClass} type="number" step="0.01" min="0" name="amount" key={`amount-${editing?.id ?? "new"}`} defaultValue={editing?.amount ?? ""} placeholder="0" required/></Field>
       <div className="sm:col-span-2"><Field label="รายละเอียดรายการ"><input className={inputClass} name="description" key={`desc-${editing?.id ?? "new"}`} defaultValue={editing?.description ?? ""} placeholder="เช่น ค่าไก่สด / ค่าข้าวเหนียว / ค่าขายไก่หมัก" required={!isOther}/></Field></div>
       <Field label="อ้างอิงเอกสาร/รหัสต้นทาง"><input className={inputClass} name="source_ref_id" key={`ref-${editing?.id ?? "new"}`} defaultValue={editing?.source_ref_id ?? ""}/></Field>
-      <Field label="ลิงก์สลิป/เอกสารแนบ"><input className={inputClass} name="attachment_url" key={`attach-${editing?.id ?? "new"}`} defaultValue={editing?.attachment_url ?? ""}/></Field>
+      <Field label="ลิงก์สลิป/เอกสารแนบ"><input className={inputClass} name="attachment_url" key={`attach-${editing?.id ?? "new"}`} value={attachmentUrl} onChange={(event) => { setAttachmentUrl(event.target.value); if (event.target.value.trim()) setHasAttachment(true); }}/></Field>
+      <Field label="ประเภทเอกสาร"><select className={inputClass} name="document_type" key={`doc-${editing?.id ?? "new"}`} defaultValue={editing?.document_type ?? "transfer_slip"}>{Object.entries(CASH_FLOW_DOCUMENT_TYPE_LABEL).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select></Field>
+      <label className="flex min-h-12 items-center gap-3 rounded-2xl border-2 border-black/10 bg-white px-4 text-base font-black shadow-sm"><input type="checkbox" name="has_attachment" value="true" checked={hasAttachment} onChange={(event) => setHasAttachment(event.target.checked)} className="h-5 w-5 accent-[#FFD43B]"/>มีเอกสารแนบหรือไม่</label>
+      <div className="sm:col-span-2"><Field label="หมายเหตุถึงสำนักงานบัญชี"><textarea className="focus-ring min-h-24 w-full rounded-2xl border-2 border-black/10 bg-white px-4 py-3 font-bold" name="accountant_note" key={`accountant-${editing?.id ?? "new"}`} defaultValue={editing?.accountant_note ?? ""} /></Field></div>
       <div className="sm:col-span-2"><Field label="หมายเหตุ"><textarea className="focus-ring min-h-24 w-full rounded-2xl border-2 border-black/10 bg-white px-4 py-3 font-bold" name="note" key={`note-${editing?.id ?? "new"}`} defaultValue={editing?.note ?? ""} /></Field></div>
       <div className="grid gap-2 sm:col-span-2 sm:grid-cols-2"><button className="focus-ring min-h-14 rounded-2xl bg-[#FFD43B] px-5 font-black text-black">{editing ? "บันทึกการแก้ไข" : "บันทึกรายการ"}</button>{editing && <button type="button" onClick={resetEdit} className="focus-ring min-h-14 rounded-2xl bg-black/10 px-5 font-black text-black">ยกเลิกการแก้ไข</button>}</div>
     </form>
