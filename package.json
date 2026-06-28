@@ -12,7 +12,8 @@
     "verify:env": "node scripts/verify-env.mjs",
     "verify:auth": "node scripts/verify-auth-deployment.mjs",
     "fix:auth-redirect": "node scripts/fix-auth-redirect.mjs",
-    "test:dashboard-summary": "node --experimental-strip-types scripts/dashboard-summary.test.mjs"
+    "test:dashboard-summary": "node --experimental-strip-types scripts/dashboard-summary.test.mjs",
+    "test:cash-flow-summary": "node --experimental-strip-types scripts/cash-flow-summary.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
