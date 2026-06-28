@@ -4,25 +4,16 @@ import { CashFlowManualForm } from "@/components/cash-flow-manual-form";
 import { DateShortcuts } from "@/components/date-shortcuts";
 import { StatCard } from "@/components/stat-card";
 import { getCurrentProfile } from "@/lib/auth";
-import { addDaysISO, CASH_FLOW_STATUS_LABEL, isActualStatus, isPendingStatus, type CashFlowEntry } from "@/lib/cash-flow";
+import { addDaysISO, CASH_FLOW_STATUS_LABEL, isPendingStatus, type CashFlowEntry } from "@/lib/cash-flow";
 import { currentMonthStartISO, formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch } from "@/lib/types";
 
 type SearchParams = { from?: string; to?: string; range?: string; branch_id?: string; status?: string; category?: string; payment_method?: string; sync_message?: string; sync_ok?: string; cash_flow_message?: string; cash_flow_ok?: string };
-type DailyReportRollupSales = {
-  report_date: string;
-  branch_code: string | null;
-  cash_sales: number | string | null;
-  total_sales: number | string | null;
-};
-
 type CashFlowLoadState = {
   branches: Branch[];
   categories: { id: string; name: string; type?: string; code?: string | null; is_active?: boolean }[];
   entries: CashFlowEntry[];
-  dashboardEntries: CashFlowEntry[];
-  todaySalesRollups: DailyReportRollupSales[];
   errorMessage: string | null;
 };
 type PageProps = { searchParams?: Promise<SearchParams> };
@@ -31,8 +22,15 @@ function sum(entries: CashFlowEntry[], type: "income" | "expense", predicate: (e
   return entries.filter((entry) => entry.type === type && predicate(entry)).reduce((total, entry) => total + Number(entry.amount ?? 0), 0);
 }
 
-function sumRollupSales(rollups: DailyReportRollupSales[], key: "cash_sales" | "total_sales") {
-  return rollups.reduce((total, rollup) => total + Number(rollup[key] ?? 0), 0);
+function isSameDateRange(from: string, to: string) {
+  return isISODate(from) && isISODate(to) && from === to;
+}
+
+function dashboardRangeLabel(kind: "income" | "expense", from: string, to: string, today: string) {
+  const prefix = kind === "income" ? "รับ" : "จ่าย";
+  if (isSameDateRange(from, to) && to === today) return `${prefix}วันนี้`;
+  if (isSameDateRange(from, to)) return `${prefix}วันที่ ${safeThaiDate(to)}`;
+  return `${prefix}ตามช่วงที่เลือก`;
 }
 
 function isISODate(value: unknown): value is string {
@@ -92,71 +90,51 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
   const isAllRange = params?.range === "all";
   const from = isAllRange ? "" : params?.from?.match(/^\d{4}-\d{2}-\d{2}$/) ? params.from : currentMonthStartISO();
   const to = isAllRange ? "" : params?.to?.match(/^\d{4}-\d{2}-\d{2}$/) ? params.to : today;
-  const selectedDate = to || today;
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) redirect("/login?setup=supabase");
+  const supabaseClient = await createSupabaseServerClient();
+  if (!supabaseClient) redirect("/login?setup=supabase");
+  const supabase = supabaseClient;
 
-  const loadState: CashFlowLoadState = { branches: [], categories: [], entries: [], dashboardEntries: [], todaySalesRollups: [], errorMessage: null };
-  try {
-    const [{ data: branches, error: branchesError }, { data: categories, error: categoriesError }] = await Promise.all([
-      supabase.from("branches").select("id,name,code,low_chicken_threshold,low_sticky_rice_threshold,low_oil_threshold,is_active").order("name"),
-      supabase.from("cash_flow_categories").select("id,name,type,code,is_active").eq("is_active", true).order("name"),
-    ]);
-    const setupError = branchesError ?? categoriesError;
-    if (setupError) throw setupError;
+  async function loadCashFlowData(): Promise<CashFlowLoadState> {
+    const loadState: CashFlowLoadState = { branches: [], categories: [], entries: [], errorMessage: null };
+    try {
+      const [{ data: branches, error: branchesError }, { data: categories, error: categoriesError }] = await Promise.all([
+        supabase.from("branches").select("id,name,code,low_chicken_threshold,low_sticky_rice_threshold,low_oil_threshold,is_active").order("name"),
+        supabase.from("cash_flow_categories").select("id,name,type,code,is_active").eq("is_active", true).order("name"),
+      ]);
+      const setupError = branchesError ?? categoriesError;
+      if (setupError) throw setupError;
 
-    const selectedBranch = params?.branch_id ? ((branches as Branch[] | null) ?? []).find((branch) => branch.id === params.branch_id) : null;
-    const entrySelect = "id,transaction_date,due_date,type,status,category,payment_method,branch_id,department,source,source_ref_id,amount,description,note,attachment_url,document_type,accountant_note,has_attachment,created_by,created_at,updated_at";
-    let query = supabase.from("cash_flow_entries").select(entrySelect);
-    if (!isAllRange) query = query.gte("transaction_date", from).lte("transaction_date", to);
-    query = query.order("transaction_date", { ascending: false });
-    if (params?.branch_id) query = query.eq("branch_id", params.branch_id);
-    if (params?.status) query = query.eq("status", params.status);
-    if (params?.category) query = query.eq("category", params.category);
-    if (params?.payment_method) query = query.eq("payment_method", params.payment_method);
-    let todaySalesQuery = supabase.from("daily_report_rollups").select("report_date,branch_code,cash_sales,total_sales").eq("report_date", today);
-    if (selectedBranch?.code) todaySalesQuery = todaySalesQuery.eq("branch_code", selectedBranch.code);
+      const entrySelect = "id,transaction_date,due_date,type,status,category,payment_method,branch_id,department,source,source_ref_id,amount,description,note,attachment_url,document_type,accountant_note,has_attachment,created_by,created_at,updated_at";
+      let query = supabase.from("cash_flow_entries").select(entrySelect);
+      if (!isAllRange) query = query.gte("transaction_date", from).lte("transaction_date", to);
+      if (params?.branch_id) query = query.eq("branch_id", params.branch_id);
+      if (params?.status) query = query.eq("status", params.status);
+      if (params?.category) query = query.eq("category", params.category);
+      if (params?.payment_method) query = query.eq("payment_method", params.payment_method);
+      const { data, error: entriesError } = await query.order("transaction_date", { ascending: false }).returns<CashFlowEntry[]>();
+      if (entriesError) throw entriesError;
 
-    const [{ data, error: entriesError }, { data: dashboardData, error: dashboardError }, { data: todaySalesRollups, error: todaySalesError }] = await Promise.all([
-      query.returns<CashFlowEntry[]>(),
-      (params?.branch_id ? supabase.from("cash_flow_entries").select(entrySelect).eq("branch_id", params.branch_id) : supabase.from("cash_flow_entries").select(entrySelect)).order("transaction_date", { ascending: false }).returns<CashFlowEntry[]>(),
-      todaySalesQuery.returns<DailyReportRollupSales[]>(),
-    ]);
-    if (entriesError) {
-      console.error("Cash flow entries load error:", entriesError);
+      loadState.branches = (branches as Branch[] | null) ?? [];
+      loadState.categories = categories ?? [];
+      loadState.entries = data ?? [];
+    } catch (error) {
+      console.error("Cash Flow load error:", error);
+      loadState.errorMessage = readableLoadError(error);
     }
-    if (dashboardError) {
-      console.error("Cash flow dashboard load error:", dashboardError);
-    }
-    if (todaySalesError) {
-      console.error("Daily report rollup sales load error:", todaySalesError);
-    }
-    const entryError = entriesError ?? dashboardError ?? todaySalesError;
-    if (entryError) throw entryError;
-
-    loadState.branches = (branches as Branch[] | null) ?? [];
-    loadState.categories = categories ?? [];
-    loadState.entries = data ?? [];
-    loadState.dashboardEntries = dashboardData ?? [];
-    loadState.todaySalesRollups = todaySalesRollups ?? [];
-  } catch (error) {
-    console.error("Cash Flow load error:", error);
-    loadState.errorMessage = readableLoadError(error);
+    return loadState;
   }
 
-  const { branches, categories, entries, dashboardEntries, todaySalesRollups, errorMessage } = loadState;
+  const { branches, categories, entries, errorMessage } = await loadCashFlowData();
   const branchNameById = new Map(branches.map((branch) => [branch.id, branch.name]));
   const categoryNameByCode = new Map(categories.filter((category) => category.code).map((category) => [category.code as string, category.name]));
   const openingBalance = 0;
-  const cashSalesToday = selectedDate === today ? sumRollupSales(todaySalesRollups, "cash_sales") : 0;
-  const actualInToday = sum(dashboardEntries, "income", (entry) => entry.transaction_date === selectedDate && entry.status === "received");
-  const actualOutToday = sum(dashboardEntries, "expense", (entry) => entry.transaction_date === selectedDate && entry.status === "paid");
-  const netCashToday = actualInToday - actualOutToday;
-  const actualIn = sum(dashboardEntries, "income", (entry) => isActualStatus(entry.status));
-  const actualOut = sum(dashboardEntries, "expense", (entry) => isActualStatus(entry.status));
-  const currentBalance = openingBalance + actualIn - actualOut;
-  const pendingIn = sum(dashboardEntries, "income", (entry) => entry.status === "pending_receive");
-  const pendingOut = sum(dashboardEntries, "expense", (entry) => entry.status === "pending_pay");
+  const filteredEntries = entries;
+  const actualIn = sum(filteredEntries, "income", (entry) => entry.status === "received");
+  const actualOut = sum(filteredEntries, "expense", (entry) => entry.status === "paid");
+  const netCash = actualIn - actualOut;
+  const currentBalance = openingBalance + netCash;
+  const pendingIn = sum(filteredEntries, "income", (entry) => entry.status === "pending_receive");
+  const pendingOut = sum(filteredEntries, "expense", (entry) => entry.status === "pending_pay");
   const urgentPayables = entries.filter((entry) => entry.type === "expense" && isPendingStatus(entry.status)).slice(0, 5);
   const followReceivables = entries.filter((entry) => entry.type === "income" && isPendingStatus(entry.status)).slice(0, 5);
 
@@ -169,10 +147,9 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
     {errorMessage && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 font-black text-red-700">{errorMessage}<div className="mt-1 text-sm font-bold text-red-600">ตรวจสอบ Supabase error ด้านบนโดยตรง ระบบไม่ใช้ข้อมูลจำลองและไม่ซ่อน error ที่เกิดขึ้นจริง</div></div>}
     {params?.cash_flow_message && <div className={`rounded-2xl border p-4 font-black ${params.cash_flow_ok === "1" ? "border-green-200 bg-green-50 text-green-700" : "border-red-200 bg-red-50 text-red-700"}`}>{decodeURIComponent(params.cash_flow_message)}</div>}
     <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <StatCard label="เงินสดวันนี้" value={numberFormatter.format(cashSalesToday)} tone="dark" />
-      <StatCard label={`รับวันที่ ${safeThaiDate(selectedDate)}`} value={numberFormatter.format(actualInToday)} />
-      <StatCard label={`จ่ายวันที่ ${safeThaiDate(selectedDate)}`} value={numberFormatter.format(actualOutToday)} />
-      <StatCard label="Net Cash" value={numberFormatter.format(netCashToday)} tone="brand" />
+      <StatCard label={dashboardRangeLabel("income", from, to, today)} value={numberFormatter.format(actualIn)} tone="dark" />
+      <StatCard label={dashboardRangeLabel("expense", from, to, today)} value={numberFormatter.format(actualOut)} />
+      <StatCard label="Net Cash" value={numberFormatter.format(netCash)} tone="brand" />
       <StatCard label="เงินรอรับทั้งหมด" value={moneyFormatter.format(pendingIn)} />
       <StatCard label="เงินรอจ่ายทั้งหมด" value={moneyFormatter.format(pendingOut)} />
       <StatCard label="คาดการณ์อีก 7 วัน" value={moneyFormatter.format(forecast(entries, currentBalance, addDaysISO(today, 7)))} />
