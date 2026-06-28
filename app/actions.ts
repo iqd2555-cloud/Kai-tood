@@ -427,8 +427,9 @@ export async function deleteCashFlowEntry(formData: FormData) {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(entryId)) return { ok: false, message: "ไม่พบรายการที่ต้องการลบ" };
   const supabase = await createSupabaseServerClient();
   if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์" };
-  const { error } = await supabase.from("cash_flow_entries").delete().eq("id", entryId);
+  const { data, error } = await supabase.from("cash_flow_entries").delete().eq("id", entryId).select("id");
   if (error) return { ok: false, message: error.message };
+  if (!data || data.length === 0) return { ok: false, message: "ไม่พบรายการในฐานข้อมูล หรือไม่มีสิทธิ์ลบรายการนี้" };
   revalidatePath("/cash-flow");
   revalidatePath("/dashboard");
   revalidatePath("/owner-dashboard");
