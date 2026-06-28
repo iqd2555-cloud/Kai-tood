@@ -3,8 +3,9 @@ import { currentMonthStartISO, daysAgoISO, todayISO } from "@/lib/format";
 
 type DateShortcut = {
   label: string;
-  from: string;
-  to: string;
+  from?: string;
+  to?: string;
+  range?: "all";
 };
 
 type DateShortcutsProps = {
@@ -13,7 +14,10 @@ type DateShortcutsProps = {
 };
 
 function buildHref(basePath: string, shortcut: DateShortcut, branchId?: string | null) {
-  const params = new URLSearchParams({ from: shortcut.from, to: shortcut.to });
+  const params = new URLSearchParams();
+  if (shortcut.from) params.set("from", shortcut.from);
+  if (shortcut.to) params.set("to", shortcut.to);
+  if (shortcut.range) params.set("range", shortcut.range);
   if (branchId) params.set("branch_id", branchId);
   return `${basePath}?${params.toString()}`;
 }
@@ -25,6 +29,7 @@ export function getDateShortcuts(): DateShortcut[] {
     { label: "เมื่อวาน", from: daysAgoISO(1), to: daysAgoISO(1) },
     { label: "7 วัน", from: daysAgoISO(6), to: today },
     { label: "เดือนนี้", from: currentMonthStartISO(), to: today },
+    { label: "ทั้งหมด", range: "all" },
   ];
 }
 

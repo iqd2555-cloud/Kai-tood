@@ -38,19 +38,18 @@ export async function GET(request: Request) {
   const profile = await getCurrentProfile();
   if (profile.role !== "owner") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { searchParams } = new URL(request.url);
+  const isAllRange = searchParams.get("range") === "all";
   const from = searchParams.get("from") ?? new Date().toISOString().slice(0, 10);
   const to = searchParams.get("to") ?? from;
   const isAccountingExport = searchParams.get("mode") === "accounting";
   const supabase = await createSupabaseServerClient();
   if (!supabase) return NextResponse.json({ error: "Supabase is not configured" }, { status: 500 });
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("cash_flow_entries")
-    .select("transaction_date,due_date,type,status,category,payment_method,branch_id,department,source,source_ref_id,amount,description,attachment_url,document_type,accountant_note,has_attachment,created_by,created_at,updated_at,note")
-    .gte("transaction_date", from)
-    .lte("transaction_date", to)
-    .order("transaction_date", { ascending: true })
-    .returns<ExportEntry[]>();
+    .select("transaction_date,due_date,type,status,category,payment_method,branch_id,department,source,source_ref_id,amount,description,attachment_url,document_type,accountant_note,has_attachment,created_by,created_at,updated_at,note");
+  if (!isAllRange) query = query.gte("transaction_date", from).lte("transaction_date", to);
+  const { data, error } = await query.order("transaction_date", { ascending: true }).returns<ExportEntry[]>();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const branchIds = Array.from(new Set((data ?? []).map((entry) => entry.branch_id).filter(Boolean))) as string[];
@@ -79,7 +78,7 @@ export async function GET(request: Request) {
   return new NextResponse(`\uFEFF${csv}`, {
     headers: {
       "content-type": "text/csv; charset=utf-8",
-      "content-disposition": `attachment; filename="cash-flow${isAccountingExport ? "-accounting" : ""}-${from}-${to}.csv"`,
+      "content-disposition": `attachment; filename="cash-flow${isAccountingExport ? "-accounting" : ""}-${isAllRange ? "all" : `${from}-${to}`}.csv"`,
     },
   });
 }
