@@ -9,29 +9,17 @@ import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch } from "@/lib/types";
 
 type SearchParams = { from?: string; to?: string; branch_id?: string; status?: string; category?: string; payment_method?: string; sync_message?: string; sync_ok?: string; cash_flow_message?: string; cash_flow_ok?: string };
-type DailyReportRollupSales = {
-  report_date: string;
-  branch_code: string | null;
-  cash_sales: number | string | null;
-  total_sales: number | string | null;
-};
-
 type CashFlowLoadState = {
   branches: Branch[];
   categories: { id: string; name: string; type?: string; code?: string | null; is_active?: boolean }[];
   entries: CashFlowEntry[];
   dashboardEntries: CashFlowEntry[];
-  todaySalesRollups: DailyReportRollupSales[];
   errorMessage: string | null;
 };
 type PageProps = { searchParams?: Promise<SearchParams> };
 
 function sum(entries: CashFlowEntry[], type: "income" | "expense", predicate: (entry: CashFlowEntry) => boolean) {
   return entries.filter((entry) => entry.type === type && predicate(entry)).reduce((total, entry) => total + Number(entry.amount ?? 0), 0);
-}
-
-function sumRollupSales(rollups: DailyReportRollupSales[], key: "cash_sales" | "total_sales") {
-  return rollups.reduce((total, rollup) => total + Number(rollup[key] ?? 0), 0);
 }
 
 function isISODate(value: unknown): value is string {
@@ -71,7 +59,7 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
   const supabase = await createSupabaseServerClient();
   if (!supabase) redirect("/login?setup=supabase");
 
-  const loadState: CashFlowLoadState = { branches: [], categories: [], entries: [], dashboardEntries: [], todaySalesRollups: [], errorMessage: null };
+  const loadState: CashFlowLoadState = { branches: [], categories: [], entries: [], dashboardEntries: [], errorMessage: null };
   try {
     const [{ data: branches, error: branchesError }, { data: categories, error: categoriesError }] = await Promise.all([
       supabase.from("branches").select("id,name,code,low_chicken_threshold,low_sticky_rice_threshold,low_oil_threshold,is_active").order("name"),
@@ -80,20 +68,15 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
     const setupError = branchesError ?? categoriesError;
     if (setupError) throw setupError;
 
-    const selectedBranch = params?.branch_id ? ((branches as Branch[] | null) ?? []).find((branch) => branch.id === params.branch_id) : null;
     const entrySelect = "id,transaction_date,due_date,type,status,category,payment_method,branch_id,department,source,source_ref_id,amount,description,note,attachment_url,created_by,created_at,updated_at";
     let query = supabase.from("cash_flow_entries").select(entrySelect).gte("transaction_date", from).lte("transaction_date", to).order("transaction_date", { ascending: false });
     if (params?.branch_id) query = query.eq("branch_id", params.branch_id);
     if (params?.status) query = query.eq("status", params.status);
     if (params?.category) query = query.eq("category", params.category);
     if (params?.payment_method) query = query.eq("payment_method", params.payment_method);
-    let todaySalesQuery = supabase.from("daily_report_rollups").select("report_date,branch_code,cash_sales,total_sales").eq("report_date", today);
-    if (selectedBranch?.code) todaySalesQuery = todaySalesQuery.eq("branch_code", selectedBranch.code);
-
-    const [{ data, error: entriesError }, { data: dashboardData, error: dashboardError }, { data: todaySalesRollups, error: todaySalesError }] = await Promise.all([
+    const [{ data, error: entriesError }, { data: dashboardData, error: dashboardError }] = await Promise.all([
       query.returns<CashFlowEntry[]>(),
       supabase.from("cash_flow_entries").select(entrySelect).order("transaction_date", { ascending: false }).returns<CashFlowEntry[]>(),
-      todaySalesQuery.returns<DailyReportRollupSales[]>(),
     ]);
     if (entriesError) {
       console.error("Cash flow entries load error:", entriesError);
@@ -101,29 +84,27 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
     if (dashboardError) {
       console.error("Cash flow dashboard load error:", dashboardError);
     }
-    if (todaySalesError) {
-      console.error("Daily report rollup sales load error:", todaySalesError);
-    }
-    const entryError = entriesError ?? dashboardError ?? todaySalesError;
+    const entryError = entriesError ?? dashboardError;
     if (entryError) throw entryError;
 
     loadState.branches = (branches as Branch[] | null) ?? [];
     loadState.categories = categories ?? [];
     loadState.entries = data ?? [];
     loadState.dashboardEntries = dashboardData ?? [];
-    loadState.todaySalesRollups = todaySalesRollups ?? [];
   } catch (error) {
     console.error("Cash Flow load error:", error);
     loadState.errorMessage = readableLoadError(error);
   }
 
-  const { branches, categories, entries, dashboardEntries, todaySalesRollups, errorMessage } = loadState;
+  const { branches, categories, entries, dashboardEntries, errorMessage } = loadState;
   const branchNameById = new Map(branches.map((branch) => [branch.id, branch.name]));
   const categoryNameByCode = new Map(categories.filter((category) => category.code).map((category) => [category.code as string, category.name]));
   const openingBalance = 0;
-  const actualInToday = sumRollupSales(todaySalesRollups, "total_sales");
-  const cashSalesToday = sumRollupSales(todaySalesRollups, "cash_sales");
-  const actualOutToday = sum(dashboardEntries, "expense", (entry) => entry.transaction_date === today && entry.status === "paid");
+  const dashboardDate = from === to ? from : today;
+  const todayEntries = entries.filter((entry) => entry.transaction_date === dashboardDate);
+  const actualInToday = sum(todayEntries, "income", (entry) => entry.status === "received");
+  const actualOutToday = sum(todayEntries, "expense", (entry) => entry.status === "paid");
+  const cashSalesToday = sum(todayEntries, "income", (entry) => entry.status === "received" && entry.source === "sales" && (entry.payment_method === "cash" || entry.payment_method === "เงินสด"));
   const actualIn = sum(dashboardEntries, "income", (entry) => isActualStatus(entry.status));
   const actualOut = sum(dashboardEntries, "expense", (entry) => isActualStatus(entry.status));
   const currentBalance = openingBalance + actualIn - actualOut;
@@ -144,7 +125,7 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
       <StatCard label="เงินสดวันนี้" value={moneyFormatter.format(cashSalesToday)} tone="dark" />
       <StatCard label="รับวันนี้" value={moneyFormatter.format(actualInToday)} />
       <StatCard label="จ่ายวันนี้" value={moneyFormatter.format(actualOutToday)} />
-      <StatCard label="เงินคงเหลือวันนี้" value={moneyFormatter.format(openingBalance + cashSalesToday - actualOutToday)} tone="brand" />
+      <StatCard label="เงินคงเหลือวันนี้" value={moneyFormatter.format(openingBalance + actualInToday - actualOutToday)} tone="brand" />
       <StatCard label="เงินรอรับทั้งหมด" value={moneyFormatter.format(pendingIn)} />
       <StatCard label="เงินรอจ่ายทั้งหมด" value={moneyFormatter.format(pendingOut)} />
       <StatCard label="คาดการณ์อีก 7 วัน" value={moneyFormatter.format(forecast(entries, currentBalance, addDaysISO(today, 7)))} />
