@@ -69,56 +69,58 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
     setHasAttachment(Boolean(entry.has_attachment ?? entry.attachment_url));
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   };
-  const handleDelete = async (entry: CashFlowEntry) => {
-    console.log("DELETE CLICKED ITEM:", entry);
+  const handleDelete = async (item: CashFlowEntry) => {
+    alert("เริ่มลบ");
+    alert("item = " + JSON.stringify(item));
     setDeleteError("");
 
-    if (!entry || !entry.id) {
-      const message = "ลบไม่ได้: รายการนี้ไม่มี document id";
+    if (!item?.id) {
+      const message = "ลบไม่ได้ เพราะไม่มี item.id";
       setDeleteError(message);
       alert(message);
-      console.error("Missing item.id", entry);
+      console.error("Missing item.id", item);
       return;
     }
 
     const ok = window.confirm("ยืนยันลบรายการนี้หรือไม่?");
-    if (!ok) return;
-
-    console.log("CONFIRM OK - START DELETE");
-
-    const supabase = createSupabaseBrowserClient();
-    if (!supabase) {
-      const message = "ลบไม่สำเร็จ: ยังไม่ได้ตั้งค่า Supabase URL หรือ Anon Key";
-      setDeleteError(message);
-      alert(message);
-      console.error("DELETE ERROR FULL:", new Error(message));
+    if (!ok) {
+      alert("ยกเลิกการลบ");
       return;
     }
 
-    const deleteRefPath = `public.${CASH_FLOW_ENTRIES_TABLE}/${entry.id}`;
+    const supabase = createSupabaseBrowserClient();
+    if (!supabase) {
+      const message = "ลบไม่สำเร็จ\ncode: supabase-client-missing\nmessage: ยังไม่ได้ตั้งค่า Supabase URL หรือ Anon Key";
+      setDeleteError(message);
+      alert(message);
+      console.error("DELETE ERROR:", new Error(message));
+      return;
+    }
+
+    // ต้องตรงกับ path ตอนอ่านข้อมูลจริงใน app/(app)/cash-flow/page.tsx:
+    // supabase.from(CASH_FLOW_ENTRIES_TABLE).select(entrySelect)
+    const deletePath = `public.${CASH_FLOW_ENTRIES_TABLE}/${item.id}`;
 
     try {
-      console.log("item.id =", entry.id);
-      console.log("DELETE REF PATH:", deleteRefPath);
+      alert("หลัง confirm แล้ว กำลังลบ id = " + item.id);
+      alert("delete path = " + deletePath);
 
-      setDeletingId(entry.id);
-      const { data, error } = await supabase.from(CASH_FLOW_ENTRIES_TABLE).delete().eq("id", entry.id).select("id");
+      setDeletingId(item.id);
+      const { data, error } = await supabase.from(CASH_FLOW_ENTRIES_TABLE).delete().eq("id", item.id).select("id");
 
       if (error) throw error;
-      if (!data || data.length === 0) throw new Error(`ไม่พบรายการใน ${deleteRefPath} หรือไม่มีสิทธิ์ลบ`);
+      if (!data || data.length === 0) throw new Error(`ไม่พบรายการใน ${deletePath} หรือไม่มีสิทธิ์ลบ`);
 
-      console.log("DELETE SUCCESS:", entry.id);
-      setLocalEntries((current) => current.filter((item) => item.id !== entry.id));
-      alert("ลบสำเร็จ");
+      alert("deleteDoc สำเร็จ id = " + item.id);
+      setLocalEntries((prev) => prev.filter((row) => row.id !== item.id));
+      alert("ลบจากหน้าจอแล้ว");
     } catch (error) {
-      console.error("DELETE ERROR FULL:", error);
       const code = typeof error === "object" && error && "code" in error ? String(error.code) : "unknown";
       const message = error instanceof Error ? error.message : "กรุณาตรวจสอบระบบ";
-      const fullMessage = `ลบไม่สำเร็จ
-code: ${code}
-message: ${message}`;
+      const fullMessage = `ลบไม่สำเร็จ\ncode: ${code}\nmessage: ${message}`;
       setDeleteError(fullMessage);
       alert(fullMessage);
+      console.error("DELETE ERROR:", error);
     } finally {
       setDeletingId("");
     }
