@@ -136,6 +136,6 @@ Trigger/migration เก่ามีแนวคิด sync จาก `daily_rep
 ## 9) จุดเสี่ยง/ข้อค้นพบจากโค้ดจริง
 
 1. Type `CashFlowSourceTable` ยังประกาศ `sales_records` และ `daily_reports` แต่หน้า `/cash-flow` ปัจจุบัน map ทุก row ที่โหลดเป็น `source_table = 'cash_flow_entries'`.
-2. Client component ตอนนี้คำนวณ `canDelete = hasDbId && e.source_table === 'cash_flow_entries'` ซึ่งยังทำให้ row `source='sales'` เห็นปุ่มลบได้ แม้ server จะ reject. ตาม requirement ควรเปลี่ยนเป็นเช็ค `e.source === 'manual'` ด้วยหลังจาก system map นี้เสร็จ.
+2. Client component คำนวณ `canDelete = hasDbId && e.source_table === 'cash_flow_entries' && e.source === 'manual'` แล้ว จึงซ่อนปุ่มลบของ row ที่ sync จากยอดขาย (`source='sales'`) ก่อนถึง server action.
 3. `saveCashFlowEntry()` อนุญาต update row ใดก็ได้ตาม `entry_id` โดยไม่ได้กัน source generated บน server; UI แค่แจ้งว่าเป็นรายการจากยอดขายซิงก์. ถ้าต้องการความถูกต้องสูง ควร block edit ของ `source != 'manual'` หรือให้แก้ได้เฉพาะ metadata ที่ปลอดภัย.
 4. การลบ generated source ควรทำที่ต้นทางและ sync ใหม่ ไม่ควรลบ `cash_flow_entries` โดยตรงจาก UI ปกติ.
