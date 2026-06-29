@@ -8,6 +8,7 @@ export type CashFlowSourceTable = "cash_flow_entries" | "sales_records" | "daily
 
 export type CashFlowEntry = {
   id: string;
+  db_id: string;
   dbPath?: string;
   source_table: CashFlowSourceTable;
   transaction_date: string;
