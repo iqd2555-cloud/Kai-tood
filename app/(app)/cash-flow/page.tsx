@@ -130,8 +130,32 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
       if (params?.status) query = query.eq("status", params.status);
       if (params?.category) query = query.eq("category", params.category);
       if (params?.payment_method) query = query.eq("payment_method", params.payment_method);
+      const whereClauses = [
+        ...(!isAllRange ? [`transaction_date >= '${from}'`, `transaction_date <= '${to}'`] : []),
+        ...(params?.branch_id ? [`branch_id = '${params.branch_id}'`] : []),
+        ...(params?.status ? [`status = '${params.status}'`] : []),
+        ...(params?.category ? [`category = '${params.category}'`] : []),
+        ...(params?.payment_method ? [`payment_method = '${params.payment_method}'`] : []),
+      ];
+      const cashFlowSql = [
+        `select ${entrySelect} from public.${CASH_FLOW_ENTRIES_TABLE}`,
+        whereClauses.length > 0 ? `where ${whereClauses.join(" and ")}` : "",
+        "order by transaction_date desc",
+      ].filter(Boolean).join(" ");
+      console.log({
+        from,
+        to,
+        range: params?.range,
+        hasDateFilter,
+      });
+      console.log({ sql: cashFlowSql });
       const { data, error: entriesError } = await query.order("transaction_date", { ascending: false }).returns<CashFlowEntry[]>();
       if (entriesError) throw entriesError;
+      console.log({
+        rows: data.length,
+        firstDate: data?.[0]?.transaction_date,
+        lastDate: data?.[data.length - 1]?.transaction_date,
+      });
 
       loadState.branches = (branches as Branch[] | null) ?? [];
       loadState.categories = categories ?? [];
