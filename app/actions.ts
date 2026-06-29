@@ -468,20 +468,37 @@ export async function deleteCashFlowEntry(formData: FormData) {
   const profile = await getCurrentProfile();
 
   const entryId = String(formData.get("entry_id") ?? "").trim();
+  const source = String(formData.get("source") ?? "").trim();
   const sourceTable = String(formData.get("source_table") ?? "").trim();
   const dbPath = String(formData.get("db_path") ?? `public.${sourceTable}/${entryId}`).trim();
   const expectedDbPath = `public.${CASH_FLOW_ENTRIES_TABLE}/${entryId}`;
   const queries: CashFlowDeleteDiagnosticQuery[] = [];
+  const friendlyMessageByCode: Record<string, string> = {
+    forbidden: "เฉพาะเจ้าของร้านเท่านั้นที่ลบรายการ Cash Flow ได้",
+    "missing-id": "ไม่พบรหัสรายการ กรุณารีเฟรชหน้าแล้วลองใหม่",
+    "missing-source-table": "ไม่พบแหล่งข้อมูลของรายการ กรุณารีเฟรชหน้าแล้วลองใหม่",
+    "unsupported-source-table": "รายการนี้ไม่ได้มาจากตาราง Cash Flow โดยตรง จึงลบจากหน้านี้ไม่ได้",
+    "invalid-db-path": "ข้อมูลรายการไม่ตรงกับฐานข้อมูล กรุณารีเฟรชหน้าแล้วลองใหม่",
+    "invalid-source": "รายการนี้มาจากระบบอื่น ไม่สามารถลบจากหน้านี้ได้",
+    "generated-source": "รายการนี้มาจากระบบอื่น ไม่สามารถลบจากหน้านี้ได้",
+    "already-deleted": "ไม่พบรายการนี้ อาจถูกลบไปแล้ว ระบบรีเฟรชรายการให้เรียบร้อย",
+    "rls-read-blocked": "ไม่มีสิทธิ์เข้าถึงรายการนี้ กรุณาตรวจสอบสิทธิ์ผู้ใช้",
+    "rls-delete-blocked": "ไม่มีสิทธิ์ลบรายการนี้ กรุณาตรวจสอบสิทธิ์ผู้ใช้",
+    "source-changed": "รายการนี้มาจากระบบอื่น ไม่สามารถลบจากหน้านี้ได้",
+    "supabase-client-missing": "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์",
+    deleted: "ลบรายการเรียบร้อยแล้ว",
+  };
   const finish = (ok: boolean, code: string, reason: string, deletedCount: number) => {
     const diagnostic = buildCashFlowDeleteDiagnostic({ entryId, sourceTable, dbPath, queries, deletedCount, reason });
     console.info("cash_flow_delete_diagnostic", diagnostic);
-    return { ok, code, message: diagnostic, diagnostic, deleted_count: deletedCount };
+    return { ok, code, message: friendlyMessageByCode[code] ?? "ลบรายการไม่สำเร็จ กรุณาลองใหม่", diagnostic, deleted_count: deletedCount };
   };
 
   if (profile.role !== "owner") return finish(false, "forbidden", "RLS/สิทธิ์แอปไม่อนุญาต: ผู้ใช้ไม่ใช่ owner", 0);
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(entryId)) return finish(false, "missing-id", "id ไม่ตรง: entryId ที่ client ส่งมาไม่ใช่ UUID ที่ใช้ query ได้", 0);
   if (!sourceTable) return finish(false, "missing-source-table", "query ผิด: client ไม่ส่ง source_table", 0);
   if (sourceTable !== CASH_FLOW_ENTRIES_TABLE) return finish(false, "unsupported-source-table", `query ผิด: source_table=${sourceTable} ไม่ใช่ ${CASH_FLOW_ENTRIES_TABLE}`, 0);
+  if (source && source !== "manual") return finish(false, "invalid-source", `source ไม่ใช่ manual: source=${source}`, 0);
   if (dbPath !== expectedDbPath) return finish(false, "invalid-db-path", `id ไม่ตรง: db_path=${dbPath || "-"} ไม่ตรงกับ ${expectedDbPath}`, 0);
 
   const supabase = await createSupabaseServerClient();
@@ -532,7 +549,12 @@ export async function deleteCashFlowEntry(formData: FormData) {
     const admin = createSupabaseAdminClient();
     const adminById = admin ? await admin.from(CASH_FLOW_ENTRIES_TABLE).select("id,source,created_by").eq("id", entryId).maybeSingle() : { data: null, error: null };
     queries.push({ label: `service role after delete_count=0: select id, source, created_by from ${CASH_FLOW_ENTRIES_TABLE} where id = ${entryId}`, data: adminById.data, error: adminById.error });
-    if (!adminById.data) return finish(false, "not-found-after-delete", "record ไม่มีอยู่จริง: ก่อน delete อ่านได้ แต่หลัง delete_count=0 service role ไม่พบ record แล้ว อาจถูกลบพร้อมกัน", 0);
+    if (!adminById.data) {
+      revalidatePath("/cash-flow");
+      revalidatePath("/dashboard");
+      revalidatePath("/owner-dashboard");
+      return finish(true, "already-deleted", "record ไม่มีอยู่จริง: ก่อน delete อ่านได้ แต่หลัง delete_count=0 service role ไม่พบ record แล้ว อาจถูกลบพร้อมกัน", 0);
+    }
     if (adminById.data.source !== "manual") return finish(false, "source-changed", `source ไม่ใช่ manual: source เปลี่ยนเป็น ${adminById.data.source} ก่อน delete`, 0);
     return finish(false, "rls-delete-blocked", "RLS ไม่อนุญาต: record ยังมีอยู่ด้วย service role แต่ delete ด้วย session ได้ deleted_count=0", 0);
   }

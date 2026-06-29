@@ -71,35 +71,34 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
     setHasAttachment(Boolean(entry.has_attachment ?? entry.attachment_url));
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   };
-  const clientDeleteDiagnostic = (row: CashFlowEntry) => `===== CLIENT =====
-row.id: ${row.id || "-"}
-row.db_id: ${row.db_id || "-"}
-row.source: ${row.source || "-"}
-row.source_table: ${row.source_table || "-"}`;
+  const removeDeletedEntryFromScreen = (row: CashFlowEntry) => {
+    setLocalEntries((prev) => prev.filter((item) => !(item.db_id === row.db_id && item.source_table === row.source_table)));
+    router.refresh();
+  };
 
   const handleDelete = async (row: CashFlowEntry) => {
     setDeleteError("");
 
-    if (!row) {
-      const message = "ไม่พบข้อมูลรายการ";
-      setDeleteError(message);
-      alert(message);
-      return;
-    }
-
-    if (!row.db_id) {
-      const message = "ลบไม่ได้: รายการนี้ไม่มี db_id จริงจากฐานข้อมูล";
+    if (!row?.db_id) {
+      const message = "ไม่พบรหัสรายการจากฐานข้อมูล กรุณารีเฟรชหน้าแล้วลองใหม่";
       setDeleteError(message);
       alert(message);
       console.error("Missing db_id:", row);
       return;
     }
 
-    if (!row.source_table) {
-      const message = "ลบไม่ได้: ไม่พบแหล่งข้อมูลของรายการ";
+    if (row.source_table !== "cash_flow_entries") {
+      const message = "รายการนี้ไม่ได้มาจากตาราง Cash Flow โดยตรง จึงลบจากหน้านี้ไม่ได้";
       setDeleteError(message);
       alert(message);
-      console.error("Missing source_table:", row);
+      console.error("Unsupported Cash Flow source_table:", row);
+      return;
+    }
+
+    if (row.source !== "manual") {
+      const message = "รายการนี้มาจากระบบอื่น ไม่สามารถลบจากหน้านี้ได้";
+      setDeleteError(message);
+      alert(message);
       return;
     }
 
@@ -107,49 +106,34 @@ row.source_table: ${row.source_table || "-"}`;
     if (!ok) return;
 
     try {
-      const clientDiagnostic = clientDeleteDiagnostic(row);
-      console.log(clientDiagnostic);
-      console.log("DELETE ROW:", row);
-      console.log("DELETE TABLE:", row.source_table);
-      console.log("DELETE ID:", row.db_id);
-      setDeleteError(clientDiagnostic);
       setDeletingId(row.db_id);
 
       const formData = new FormData();
       formData.set("entry_id", row.db_id);
+      formData.set("source", row.source);
       formData.set("source_table", row.source_table);
       if (row.dbPath) formData.set("db_path", row.dbPath);
       const result = await deleteAction(formData);
 
-      const serverDiagnostic = result.diagnostic || result.message;
-      const fullDiagnostic = `${clientDiagnostic}
-
-${serverDiagnostic}`;
-      setDeleteError(fullDiagnostic);
-      console.log("DELETE DIAGNOSTIC RESULT:", result);
+      console.log("DELETE RESULT:", result);
 
       if (!result.ok) {
-        const error = new Error(fullDiagnostic);
-        (error as Error & { code?: string }).code = result.code ?? "delete-failed";
-        throw error;
+        const message = result.message || "ลบรายการไม่สำเร็จ กรุณาลองใหม่";
+        setDeleteError(message);
+        alert(message);
+        console.error("DELETE FAILED:", result.diagnostic ?? result);
+        return;
       }
 
-      console.log("DELETE SUCCESS:", row.db_id, "deleted_count:", result.deleted_count ?? 0);
-      setLocalEntries((prev) => prev.filter((item) => !(item.db_id === row.db_id && item.source_table === row.source_table)));
-      router.refresh();
-      if (result.code === "already-deleted") {
-        alert("รายการนี้ไม่มีอยู่ในฐานข้อมูลแล้ว ระบบลบออกจากหน้าจอให้เรียบร้อย");
-      } else {
-        alert(`ลบรายการเรียบร้อยแล้ว
-deleted_count: ${result.deleted_count ?? 0}`);
-      }
+      removeDeletedEntryFromScreen(row);
+      const successMessage = result.code === "already-deleted"
+        ? "ไม่พบรายการนี้ในฐานข้อมูล อาจถูกลบไปแล้ว ระบบรีเฟรชรายการให้เรียบร้อย"
+        : "ลบรายการเรียบร้อยแล้ว";
+      alert(successMessage);
     } catch (error) {
-      const code = typeof error === "object" && error && "code" in error ? String(error.code) : "unknown";
-      const message = error instanceof Error ? error.message : "กรุณาตรวจสอบระบบ";
-      const fullMessage = `code: ${code}
-${message}`;
-      setDeleteError(fullMessage);
-      alert(fullMessage);
+      const message = "ลบรายการไม่สำเร็จ กรุณาลองใหม่หรือรีเฟรชหน้า";
+      setDeleteError(message);
+      alert(message);
       console.error("DELETE FAILED:", error);
     } finally {
       setDeletingId("");
@@ -205,7 +189,7 @@ ${message}`;
                 <div className="relative z-20 flex justify-center gap-2 pointer-events-auto">
                   {hasDbId ? <>
                     <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleEdit(e); }} className="relative z-20 pointer-events-auto rounded-full bg-[#FFD43B] px-3 py-2 font-black text-black">แก้ไข</button>
-                    {canDelete ? <button type="button" disabled={deletingId === e.db_id} onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleDelete(e); }} className="relative z-20 pointer-events-auto rounded-full bg-red-600 px-3 py-2 font-black text-white disabled:opacity-50">ลบ/วินิจฉัย</button> : <span className="max-w-36 text-center text-xs font-black text-black/50">{e.source !== "manual" ? "รายการที่สร้างจากข้อมูลต้นทาง ต้องลบจากเมนูต้นทาง" : "รายการนี้ไม่ได้มาจาก cash_flow_entries"}</span>}
+                    {canDelete ? <button type="button" disabled={deletingId === e.db_id} onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleDelete(e); }} className="relative z-20 pointer-events-auto rounded-full bg-red-600 px-3 py-2 font-black text-white disabled:opacity-50">ลบ</button> : <span className="max-w-36 text-center text-xs font-black text-black/50">{e.source !== "manual" ? "รายการที่สร้างจากข้อมูลต้นทาง ต้องลบจากเมนูต้นทาง" : "รายการนี้ไม่ได้มาจาก cash_flow_entries"}</span>}
                   </> : <span className="text-xs font-black text-red-600">ไม่มี db_id</span>}
                 </div>
               </td>
