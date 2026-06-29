@@ -4,10 +4,12 @@ export type CashFlowType = "income" | "expense";
 export type CashFlowStatus = "pending_receive" | "received" | "pending_pay" | "paid" | "cancelled" | "overdue";
 export type CashFlowSource = "manual" | "sales" | "purchase" | "franchise" | "course" | "stock" | "marinade" | "other";
 export type CashFlowDocumentType = "receipt" | "tax_invoice" | "transfer_slip" | "cash_bill" | "no_document" | "other";
+export type CashFlowSourceTable = "cash_flow_entries" | "sales_records" | "daily_reports";
 
 export type CashFlowEntry = {
   id: string;
   dbPath?: string;
+  source_table: CashFlowSourceTable;
   transaction_date: string;
   due_date: string | null;
   type: CashFlowType;
