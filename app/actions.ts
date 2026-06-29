@@ -459,6 +459,10 @@ export async function deleteCashFlowEntry(formData: FormData) {
       : { ok: false, code: "not-found", message: `ไม่พบ id=${entryId} ใน ${dbPath} กรุณาตรวจว่า UI ใช้ primary key จริงจาก ${CASH_FLOW_ENTRIES_TABLE}` };
   }
 
+  if (existing.source !== "manual") {
+    return { ok: false, code: "generated-source", message: "รายการนี้สร้างจากข้อมูลต้นทาง ต้องลบจากเมนูต้นทาง" };
+  }
+
   const { data, error } = await supabase.from(CASH_FLOW_ENTRIES_TABLE).delete().eq("id", entryId).select("id");
   if (error) return { ok: false, code: error.code ?? "delete-failed", message: error.message };
   if (!data || data.length === 0) {

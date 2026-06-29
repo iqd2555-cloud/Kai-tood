@@ -78,11 +78,11 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
       return;
     }
 
-    if (!row.id) {
-      const message = "ลบไม่ได้: ไม่พบ id ของรายการ";
+    if (!row.db_id) {
+      const message = "ลบไม่ได้: รายการนี้ไม่มี db_id จริงจากฐานข้อมูล";
       setDeleteError(message);
       alert(message);
-      console.error("Missing id:", row);
+      console.error("Missing db_id:", row);
       return;
     }
 
@@ -100,11 +100,11 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
     try {
       console.log("DELETE ROW:", row);
       console.log("DELETE TABLE:", row.source_table);
-      console.log("DELETE ID:", row.id);
-      setDeletingId(row.id);
+      console.log("DELETE ID:", row.db_id);
+      setDeletingId(row.db_id);
 
       const formData = new FormData();
-      formData.set("entry_id", row.id);
+      formData.set("entry_id", row.db_id);
       formData.set("source_table", row.source_table);
       if (row.dbPath) formData.set("db_path", row.dbPath);
       const result = await deleteAction(formData);
@@ -115,8 +115,8 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
         throw error;
       }
 
-      console.log("DELETE SUCCESS:", row.id);
-      setLocalEntries((prev) => prev.filter((item) => !(item.id === row.id && item.source_table === row.source_table)));
+      console.log("DELETE SUCCESS:", row.db_id);
+      setLocalEntries((prev) => prev.filter((item) => !(item.db_id === row.db_id && item.source_table === row.source_table)));
       alert("ลบรายการเรียบร้อยแล้ว");
     } catch (error) {
       const code = typeof error === "object" && error && "code" in error ? String(error.code) : "unknown";
@@ -157,6 +157,39 @@ message: ${message}`;
       <div className="grid gap-2 sm:col-span-2 sm:grid-cols-2"><button className="focus-ring min-h-14 rounded-2xl bg-[#FFD43B] px-5 font-black text-black">{editing ? "บันทึกการแก้ไข" : "บันทึกรายการ"}</button>{editing && <button type="button" onClick={resetEdit} className="focus-ring min-h-14 rounded-2xl bg-black/10 px-5 font-black text-black">ยกเลิกการแก้ไข</button>}</div>
     </form>
 
-    <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[880px] text-sm"><thead><tr className="bg-black text-left text-white"><th className="p-3">วันที่</th><th>ประเภท</th><th>สถานะ</th><th>รายการ</th><th>หมวด</th><th>สาขา</th><th className="text-right">จำนวน</th><th className="text-center">จัดการ</th></tr></thead><tbody>{localEntries.map((e) => { const hasEntryId = Boolean(e.id); if (!hasEntryId) console.error("Cash Flow entry is missing id; action buttons were not rendered", e); return <tr key={e.id || `${e.transaction_date}-${e.description}`} className="border-b border-black/10 font-bold"><td className="p-3">{formatThaiDate(e.transaction_date)}</td><td>{label(CASH_FLOW_TYPE_LABEL, e.type)}</td><td>{label(CASH_FLOW_STATUS_LABEL, e.status)}</td><td>{e.description}<div className="text-xs text-black/40">{e.source_table ? `${e.source_table} / ` : ""}{e.source === "sales" ? "รายการจากยอดขายซิงก์" : label(CASH_FLOW_SOURCE_LABEL, e.source, "ไม่ทราบแหล่งที่มา")}</div></td><td>{categoryNameByCode[e.category ?? ""] ?? e.category ?? "-"}</td><td>{e.branch_id ? branchNameById[e.branch_id] ?? e.branch_id : "ส่วนกลาง"}</td><td className={`text-right ${e.type === "expense" ? "text-red-600" : "text-green-700"}`}>{amountText(e)}</td><td className="relative z-10"><div className="relative z-20 flex justify-center gap-2 pointer-events-auto">{hasEntryId ? <><button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleEdit(e); }} className="relative z-20 pointer-events-auto rounded-full bg-[#FFD43B] px-3 py-2 font-black text-black">แก้ไข</button><button type="button" disabled={deletingId === e.id} onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleDelete(e); }} className="relative z-20 pointer-events-auto rounded-full bg-red-600 px-3 py-2 font-black text-white disabled:opacity-50">ลบ</button></> : <span className="text-xs font-black text-red-600">ไม่มี ID</span>}</div></td></tr>; })}{localEntries.length === 0 && <tr><td className="p-6 text-center font-black text-black/50" colSpan={8}>ไม่พบรายการในช่วงวันที่เลือก ลองเลือก 7 วันหรือเดือนนี้</td></tr>}</tbody></table></div>
+    <div className="mt-4 overflow-x-auto">
+      <table className="w-full min-w-[880px] text-sm">
+        <thead>
+          <tr className="bg-black text-left text-white">
+            <th className="p-3">วันที่</th><th>ประเภท</th><th>สถานะ</th><th>รายการ</th><th>หมวด</th><th>สาขา</th><th className="text-right">จำนวน</th><th className="text-center">จัดการ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {localEntries.map((e) => {
+            const hasDbId = Boolean(e.db_id);
+            const canDelete = hasDbId && e.source_table === "cash_flow_entries" && e.source === "manual";
+            if (!hasDbId) console.error("Cash Flow entry is missing db_id; action buttons were not rendered", e);
+            return <tr key={e.db_id || e.id || `${e.transaction_date}-${e.description}`} className="border-b border-black/10 font-bold">
+              <td className="p-3">{formatThaiDate(e.transaction_date)}</td>
+              <td>{label(CASH_FLOW_TYPE_LABEL, e.type)}</td>
+              <td>{label(CASH_FLOW_STATUS_LABEL, e.status)}</td>
+              <td>{e.description}<div className="text-xs text-black/40">{e.source_table ? `${e.source_table} / ` : ""}{e.source === "sales" ? "รายการจากยอดขายซิงก์" : label(CASH_FLOW_SOURCE_LABEL, e.source, "ไม่ทราบแหล่งที่มา")}</div></td>
+              <td>{categoryNameByCode[e.category ?? ""] ?? e.category ?? "-"}</td>
+              <td>{e.branch_id ? branchNameById[e.branch_id] ?? e.branch_id : "ส่วนกลาง"}</td>
+              <td className={`text-right ${e.type === "expense" ? "text-red-600" : "text-green-700"}`}>{amountText(e)}</td>
+              <td className="relative z-10">
+                <div className="relative z-20 flex justify-center gap-2 pointer-events-auto">
+                  {hasDbId ? <>
+                    <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleEdit(e); }} className="relative z-20 pointer-events-auto rounded-full bg-[#FFD43B] px-3 py-2 font-black text-black">แก้ไข</button>
+                    {canDelete ? <button type="button" disabled={deletingId === e.db_id} onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleDelete(e); }} className="relative z-20 pointer-events-auto rounded-full bg-red-600 px-3 py-2 font-black text-white disabled:opacity-50">ลบ</button> : <span className="max-w-36 text-center text-xs font-black text-black/50">รายการนี้สร้างจากข้อมูลต้นทาง ต้องลบจากเมนูต้นทาง</span>}
+                  </> : <span className="text-xs font-black text-red-600">ไม่มี db_id</span>}
+                </div>
+              </td>
+            </tr>;
+          })}
+          {localEntries.length === 0 && <tr><td className="p-6 text-center font-black text-black/50" colSpan={8}>ไม่พบรายการในช่วงวันที่เลือก ลองเลือก 7 วันหรือเดือนนี้</td></tr>}
+        </tbody>
+      </table>
+    </div>
   </>;
 }
