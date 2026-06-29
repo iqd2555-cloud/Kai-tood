@@ -426,29 +426,50 @@ export async function deleteCashFlowEntry(formData: FormData) {
   const profile = await getCurrentProfile();
   if (profile.role !== "owner") return { ok: false, code: "forbidden", message: "เฉพาะเจ้าของร้านเท่านั้น" };
 
-  const entryId = String(formData.get("entry_id") ?? "");
-  const dbPath = String(formData.get("db_path") ?? "");
+  const entryId = String(formData.get("entry_id") ?? "").trim();
+  const sourceTable = String(formData.get("source_table") ?? "").trim();
+  const dbPath = String(formData.get("db_path") ?? `public.${sourceTable}/${entryId}`).trim();
   const expectedDbPath = `public.${CASH_FLOW_ENTRIES_TABLE}/${entryId}`;
 
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(entryId)) return { ok: false, code: "missing-id", message: "ไม่พบรายการที่ต้องการลบ" };
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(entryId)) return { ok: false, code: "missing-id", message: "ลบไม่ได้: ไม่พบ id ของรายการ" };
+  if (!sourceTable) return { ok: false, code: "missing-source-table", message: "ลบไม่ได้: ไม่พบแหล่งข้อมูลของรายการ" };
+  if (sourceTable !== CASH_FLOW_ENTRIES_TABLE) return { ok: false, code: "unsupported-source-table", message: `ลบไม่ได้: รายการนี้มาจาก ${sourceTable} ไม่ใช่ ${CASH_FLOW_ENTRIES_TABLE}` };
   if (dbPath !== expectedDbPath) return { ok: false, code: "invalid-db-path", message: `path ฐานข้อมูลไม่ตรงกับรายการจริง: ${dbPath || "-"}` };
 
   const supabase = await createSupabaseServerClient();
   if (!supabase) return { ok: false, code: "supabase-client-missing", message: "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์" };
 
-  console.info("Deleting cash flow entry", { dbPath, entryId, table: CASH_FLOW_ENTRIES_TABLE });
+  console.info("DELETE ROW:", { id: entryId, source_table: sourceTable, db_path: dbPath });
+  console.info("DELETE TABLE:", sourceTable);
+  console.info("DELETE ID:", entryId);
+
   const { data: existing, error: readError } = await supabase
     .from(CASH_FLOW_ENTRIES_TABLE)
-    .select("id,source")
+    .select("id,source,created_by,branch_id")
     .eq("id", entryId)
     .maybeSingle();
   if (readError) return { ok: false, code: readError.code ?? "read-failed", message: readError.message };
-  if (!existing) return { ok: false, code: "not-found", message: `ไม่พบรายการใน ${dbPath}` };
-  if (existing.source === "sales") return { ok: false, code: "generated-source", message: "รายการนี้ต้องลบจากข้อมูลต้นทาง (ยอดขายหน้าร้าน)" };
+  if (!existing) {
+    const admin = createSupabaseAdminClient();
+    const { data: adminExisting } = admin
+      ? await admin.from(CASH_FLOW_ENTRIES_TABLE).select("id").eq("id", entryId).maybeSingle()
+      : { data: null };
+    return adminExisting
+      ? { ok: false, code: "rls-read-blocked", message: `พบรายการใน ${dbPath} ด้วย service role แต่ session ปัจจุบันอ่านไม่ได้ ตรวจ Supabase RLS policy` }
+      : { ok: false, code: "not-found", message: `ไม่พบ id=${entryId} ใน ${dbPath} กรุณาตรวจว่า UI ใช้ primary key จริงจาก ${CASH_FLOW_ENTRIES_TABLE}` };
+  }
 
   const { data, error } = await supabase.from(CASH_FLOW_ENTRIES_TABLE).delete().eq("id", entryId).select("id");
   if (error) return { ok: false, code: error.code ?? "delete-failed", message: error.message };
-  if (!data || data.length === 0) return { ok: false, code: "not-deleted", message: `ไม่พบรายการใน ${dbPath} หรือไม่มีสิทธิ์ลบรายการนี้` };
+  if (!data || data.length === 0) {
+    const admin = createSupabaseAdminClient();
+    const { data: adminExisting } = admin
+      ? await admin.from(CASH_FLOW_ENTRIES_TABLE).select("id").eq("id", entryId).maybeSingle()
+      : { data: null };
+    return adminExisting
+      ? { ok: false, code: "rls-delete-blocked", message: `พบรายการใน ${dbPath} แต่ลบแล้ว data ว่าง: Supabase RLS policy ไม่อนุญาตให้ delete หรือเงื่อนไข owner/user/branch ไม่ตรง` }
+      : { ok: false, code: "not-deleted", message: `ไม่พบรายการใน ${dbPath} id=${entryId} หรือรายการถูกลบไปแล้ว` };
+  }
   revalidatePath("/cash-flow");
   revalidatePath("/dashboard");
   revalidatePath("/owner-dashboard");

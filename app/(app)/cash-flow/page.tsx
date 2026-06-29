@@ -119,7 +119,9 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
       loadState.categories = categories ?? [];
       loadState.entries = (data ?? []).map((entry) => ({
         ...entry,
+        id: entry.id,
         source: entry.source ?? "manual",
+        source_table: CASH_FLOW_ENTRIES_TABLE,
         dbPath: `public.${CASH_FLOW_ENTRIES_TABLE}/${entry.id}`,
       }));
     } catch (error) {
