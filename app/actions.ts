@@ -517,7 +517,8 @@ export async function deleteCashFlowEntry(formData: FormData) {
     const adminById = admin ? await admin.from(CASH_FLOW_ENTRIES_TABLE).select("id,source,created_by").eq("id", entryId).maybeSingle() : { data: null, error: null };
     queries.push({ label: `service role check: select id, source, created_by from ${CASH_FLOW_ENTRIES_TABLE} where id = ${entryId}`, data: adminById.data, error: adminById.error });
     if (adminById.data) return finish(false, "rls-read-blocked", "RLS ไม่อนุญาต: service role พบ record แต่ session ปัจจุบัน query by id ไม่เห็น", 0);
-    return finish(false, "not-found", "record ไม่มีอยู่จริง: ไม่พบ record จาก id ที่รับเข้ามา", 0);
+    revalidatePath("/cash-flow");
+    return finish(true, "already-deleted", "รายการนี้ไม่มีอยู่ในฐานข้อมูลแล้ว จึงลบออกจากหน้าจอได้", 0);
   }
 
   if (byId.data.source !== "manual") return finish(false, "generated-source", `source ไม่ใช่ manual: source=${byId.data.source}`, 0);
