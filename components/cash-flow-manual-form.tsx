@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CASH_FLOW_DOCUMENT_TYPE_LABEL, CASH_FLOW_SOURCE_LABEL, CASH_FLOW_STATUS_LABEL, CASH_FLOW_TYPE_LABEL, type CashFlowEntry, type CashFlowStatus, type CashFlowType } from "@/lib/cash-flow";
 import { formatThaiDate, numberFormatter } from "@/lib/format";
 import { createSupabaseBrowserClient } from "@/lib/supabase-client";
@@ -19,6 +20,7 @@ function amountText(entry: CashFlowEntry) { const formatted = numberFormatter.fo
 function label<T extends string>(labels: Record<T, string>, value: string | null | undefined, fallback = "-") { return value && value in labels ? labels[value as T] : fallback; }
 
 export function CashFlowManualForm({ today, branches, categories, entries, branchNameById, categoryNameByCode, saveAction, deleteAction }: Props) {
+  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [editing, setEditing] = useState<CashFlowEntry | null>(null);
   const [editingEntryId, setEditingEntryId] = useState("");
@@ -134,8 +136,13 @@ ${serverDiagnostic}`;
 
       console.log("DELETE SUCCESS:", row.db_id, "deleted_count:", result.deleted_count ?? 0);
       setLocalEntries((prev) => prev.filter((item) => !(item.db_id === row.db_id && item.source_table === row.source_table)));
-      alert(`ลบรายการเรียบร้อยแล้ว
+      router.refresh();
+      if (result.code === "already-deleted") {
+        alert("รายการนี้ไม่มีอยู่ในฐานข้อมูลแล้ว ระบบลบออกจากหน้าจอให้เรียบร้อย");
+      } else {
+        alert(`ลบรายการเรียบร้อยแล้ว
 deleted_count: ${result.deleted_count ?? 0}`);
+      }
     } catch (error) {
       const code = typeof error === "object" && error && "code" in error ? String(error.code) : "unknown";
       const message = error instanceof Error ? error.message : "กรุณาตรวจสอบระบบ";
@@ -184,7 +191,7 @@ ${message}`;
         <tbody>
           {localEntries.map((e) => {
             const hasDbId = Boolean(e.db_id);
-            const canDelete = hasDbId && e.source_table === "cash_flow_entries";
+            const canDelete = hasDbId && e.source_table === "cash_flow_entries" && e.source === "manual";
             if (!hasDbId) console.error("Cash Flow entry is missing db_id; action buttons were not rendered", e);
             return <tr key={e.db_id || e.id || `${e.transaction_date}-${e.description}`} className="border-b border-black/10 font-bold">
               <td className="p-3">{formatThaiDate(e.transaction_date)}</td>
@@ -198,7 +205,7 @@ ${message}`;
                 <div className="relative z-20 flex justify-center gap-2 pointer-events-auto">
                   {hasDbId ? <>
                     <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleEdit(e); }} className="relative z-20 pointer-events-auto rounded-full bg-[#FFD43B] px-3 py-2 font-black text-black">แก้ไข</button>
-                    {canDelete ? <button type="button" disabled={deletingId === e.db_id} onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleDelete(e); }} className="relative z-20 pointer-events-auto rounded-full bg-red-600 px-3 py-2 font-black text-white disabled:opacity-50">ลบ/วินิจฉัย</button> : <span className="max-w-36 text-center text-xs font-black text-black/50">รายการนี้ไม่ได้มาจาก cash_flow_entries</span>}
+                    {canDelete ? <button type="button" disabled={deletingId === e.db_id} onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleDelete(e); }} className="relative z-20 pointer-events-auto rounded-full bg-red-600 px-3 py-2 font-black text-white disabled:opacity-50">ลบ/วินิจฉัย</button> : <span className="max-w-36 text-center text-xs font-black text-black/50">{e.source !== "manual" ? "รายการที่สร้างจากข้อมูลต้นทาง ต้องลบจากเมนูต้นทาง" : "รายการนี้ไม่ได้มาจาก cash_flow_entries"}</span>}
                   </> : <span className="text-xs font-black text-red-600">ไม่มี db_id</span>}
                 </div>
               </td>
