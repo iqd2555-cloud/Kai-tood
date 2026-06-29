@@ -8,6 +8,26 @@ import { createSupabaseBrowserClient } from "@/lib/supabase-client";
 import type { Branch } from "@/lib/types";
 
 type Category = { id: string; name: string; type?: string; code?: string | null; is_active?: boolean };
+
+const incomeCategoryOrder = new Map([
+  ["sales_revenue", 10],
+  ["marinated_chicken_sales", 20],
+  ["fresh_chicken_sales", 30],
+  ["recipe_book_sales", 40],
+  ["online_course_sales", 50],
+  ["live_course_sales", 60],
+  ["franchise_income", 70],
+  ["other_income", 80],
+]);
+
+function categorySortValue(category: Category) {
+  if (category.type === "income") return incomeCategoryOrder.get(category.code ?? "") ?? 900;
+  return 900;
+}
+
+function sortCategoriesByBusinessOrder(categories: Category[]) {
+  return [...categories].sort((a, b) => categorySortValue(a) - categorySortValue(b) || a.name.localeCompare(b.name, "th"));
+}
 type DeleteResult = { ok: boolean; message: string; code?: string; deleted_count?: number; diagnostic?: string };
 type Props = { today: string; branches: Branch[]; categories: Category[]; entries: CashFlowEntry[]; branchNameById: Record<string, string>; categoryNameByCode: Record<string, string>; saveAction: (formData: FormData) => void | Promise<void>; deleteAction: (formData: FormData) => Promise<DeleteResult> };
 
@@ -52,7 +72,7 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
     return () => { isMounted = false; void client.removeChannel(channel); };
   }, []);
 
-  const filteredCategories = useMemo(() => liveCategories.filter((item) => item.is_active !== false && item.type === type && item.code), [liveCategories, type]);
+  const filteredCategories = useMemo(() => sortCategoriesByBusinessOrder(liveCategories.filter((item) => item.is_active !== false && item.type === type && item.code)), [liveCategories, type]);
   const isOther = otherCodes.has(category);
   const resetEdit = () => { setEditing(null); setEditingEntryId(""); setType("income"); setStatus("received"); setCategory(""); setAttachmentUrl(""); setHasAttachment(false); formRef.current?.reset(); };
   const handleEdit = (entry: CashFlowEntry) => {
