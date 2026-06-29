@@ -7,7 +7,8 @@ import { createSupabaseBrowserClient } from "@/lib/supabase-client";
 import type { Branch } from "@/lib/types";
 
 type Category = { id: string; name: string; type?: string; code?: string | null; is_active?: boolean };
-type Props = { today: string; branches: Branch[]; categories: Category[]; entries: CashFlowEntry[]; branchNameById: Record<string, string>; categoryNameByCode: Record<string, string>; saveAction: (formData: FormData) => void | Promise<void>; deleteAction: (formData: FormData) => Promise<{ ok: boolean; message: string; code?: string }> };
+type DeleteResult = { ok: boolean; message: string; code?: string; deleted_count?: number; diagnostic?: string };
+type Props = { today: string; branches: Branch[]; categories: Category[]; entries: CashFlowEntry[]; branchNameById: Record<string, string>; categoryNameByCode: Record<string, string>; saveAction: (formData: FormData) => void | Promise<void>; deleteAction: (formData: FormData) => Promise<DeleteResult> };
 
 const inputClass = "focus-ring min-h-12 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-base font-bold shadow-sm";
 const otherCodes = new Set(["other_expense", "other_income"]);
@@ -68,6 +69,12 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
     setHasAttachment(Boolean(entry.has_attachment ?? entry.attachment_url));
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   };
+  const clientDeleteDiagnostic = (row: CashFlowEntry) => `===== CLIENT =====
+row.id: ${row.id || "-"}
+row.db_id: ${row.db_id || "-"}
+row.source: ${row.source || "-"}
+row.source_table: ${row.source_table || "-"}`;
+
   const handleDelete = async (row: CashFlowEntry) => {
     setDeleteError("");
 
@@ -98,9 +105,12 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
     if (!ok) return;
 
     try {
+      const clientDiagnostic = clientDeleteDiagnostic(row);
+      console.log(clientDiagnostic);
       console.log("DELETE ROW:", row);
       console.log("DELETE TABLE:", row.source_table);
       console.log("DELETE ID:", row.db_id);
+      setDeleteError(clientDiagnostic);
       setDeletingId(row.db_id);
 
       const formData = new FormData();
@@ -109,21 +119,28 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
       if (row.dbPath) formData.set("db_path", row.dbPath);
       const result = await deleteAction(formData);
 
+      const serverDiagnostic = result.diagnostic || result.message;
+      const fullDiagnostic = `${clientDiagnostic}
+
+${serverDiagnostic}`;
+      setDeleteError(fullDiagnostic);
+      console.log("DELETE DIAGNOSTIC RESULT:", result);
+
       if (!result.ok) {
-        const error = new Error(result.message);
+        const error = new Error(fullDiagnostic);
         (error as Error & { code?: string }).code = result.code ?? "delete-failed";
         throw error;
       }
 
-      console.log("DELETE SUCCESS:", row.db_id);
+      console.log("DELETE SUCCESS:", row.db_id, "deleted_count:", result.deleted_count ?? 0);
       setLocalEntries((prev) => prev.filter((item) => !(item.db_id === row.db_id && item.source_table === row.source_table)));
-      alert("ลบรายการเรียบร้อยแล้ว");
+      alert(`ลบรายการเรียบร้อยแล้ว
+deleted_count: ${result.deleted_count ?? 0}`);
     } catch (error) {
       const code = typeof error === "object" && error && "code" in error ? String(error.code) : "unknown";
       const message = error instanceof Error ? error.message : "กรุณาตรวจสอบระบบ";
-      const fullMessage = `ลบไม่สำเร็จ
-code: ${code}
-message: ${message}`;
+      const fullMessage = `code: ${code}
+${message}`;
       setDeleteError(fullMessage);
       alert(fullMessage);
       console.error("DELETE FAILED:", error);
@@ -167,7 +184,7 @@ message: ${message}`;
         <tbody>
           {localEntries.map((e) => {
             const hasDbId = Boolean(e.db_id);
-            const canDelete = hasDbId && e.source_table === "cash_flow_entries" && e.source === "manual";
+            const canDelete = hasDbId && e.source_table === "cash_flow_entries";
             if (!hasDbId) console.error("Cash Flow entry is missing db_id; action buttons were not rendered", e);
             return <tr key={e.db_id || e.id || `${e.transaction_date}-${e.description}`} className="border-b border-black/10 font-bold">
               <td className="p-3">{formatThaiDate(e.transaction_date)}</td>
@@ -181,7 +198,7 @@ message: ${message}`;
                 <div className="relative z-20 flex justify-center gap-2 pointer-events-auto">
                   {hasDbId ? <>
                     <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleEdit(e); }} className="relative z-20 pointer-events-auto rounded-full bg-[#FFD43B] px-3 py-2 font-black text-black">แก้ไข</button>
-                    {canDelete ? <button type="button" disabled={deletingId === e.db_id} onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleDelete(e); }} className="relative z-20 pointer-events-auto rounded-full bg-red-600 px-3 py-2 font-black text-white disabled:opacity-50">ลบ</button> : <span className="max-w-36 text-center text-xs font-black text-black/50">รายการนี้สร้างจากข้อมูลต้นทาง ต้องลบจากเมนูต้นทาง</span>}
+                    {canDelete ? <button type="button" disabled={deletingId === e.db_id} onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleDelete(e); }} className="relative z-20 pointer-events-auto rounded-full bg-red-600 px-3 py-2 font-black text-white disabled:opacity-50">ลบ/วินิจฉัย</button> : <span className="max-w-36 text-center text-xs font-black text-black/50">รายการนี้ไม่ได้มาจาก cash_flow_entries</span>}
                   </> : <span className="text-xs font-black text-red-600">ไม่มี db_id</span>}
                 </div>
               </td>
