@@ -7,6 +7,7 @@ export type CashFlowDocumentType = "receipt" | "tax_invoice" | "transfer_slip" |
 
 export type CashFlowEntry = {
   id: string;
+  dbPath?: string;
   transaction_date: string;
   due_date: string | null;
   type: CashFlowType;

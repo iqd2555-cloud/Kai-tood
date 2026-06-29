@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { saveCashFlowEntry, syncSalesToCashFlow } from "@/app/actions";
+import { deleteCashFlowEntry, saveCashFlowEntry, syncSalesToCashFlow } from "@/app/actions";
 import { CashFlowManualForm } from "@/components/cash-flow-manual-form";
 import { DateShortcuts } from "@/components/date-shortcuts";
 import { StatCard } from "@/components/stat-card";
@@ -117,7 +117,11 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
 
       loadState.branches = (branches as Branch[] | null) ?? [];
       loadState.categories = categories ?? [];
-      loadState.entries = data ?? [];
+      loadState.entries = (data ?? []).map((entry) => ({
+        ...entry,
+        source: entry.source ?? "manual",
+        dbPath: `public.${CASH_FLOW_ENTRIES_TABLE}/${entry.id}`,
+      }));
     } catch (error) {
       console.error("Cash Flow load error:", error);
       loadState.errorMessage = readableLoadError(error);
@@ -166,7 +170,7 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
       <div className="rounded-[1.75rem] border border-black/10 bg-white p-5"><h2 className="text-xl font-black">รายการรับที่ควรติดตาม</h2>{followReceivables.map((e)=><p key={e.id} className="mt-3 flex justify-between gap-3 rounded-2xl bg-yellow-50 p-3 text-sm font-bold"><span>{e.description}<br/><span className="text-black/50">ครบกำหนด {safeThaiDate(e.due_date ?? e.transaction_date)}</span></span><span className="text-green-700">{plainAmount(e)}</span></p>)}</div>
     </section>
 
-    <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm"><h2 className="text-2xl font-black">บันทึกรายการเอง</h2><CashFlowManualForm today={today} branches={branches as Branch[]} categories={categories} entries={entries} branchNameById={Object.fromEntries(branchNameById)} categoryNameByCode={Object.fromEntries(categoryNameByCode)} saveAction={async (formData: FormData) => { "use server"; const result = await saveCashFlowEntry(null, formData); const message = encodeURIComponent(result.message); const selectedDate = formData.get("transaction_date"); redirect(cashFlowRedirectPath(monthStartISO(selectedDate, today), selectedDate, result.ok, message)); }} /></section>
+    <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm"><h2 className="text-2xl font-black">บันทึกรายการเอง</h2><CashFlowManualForm today={today} branches={branches as Branch[]} categories={categories} entries={entries} branchNameById={Object.fromEntries(branchNameById)} categoryNameByCode={Object.fromEntries(categoryNameByCode)} saveAction={async (formData: FormData) => { "use server"; const result = await saveCashFlowEntry(null, formData); const message = encodeURIComponent(result.message); const selectedDate = formData.get("transaction_date"); redirect(cashFlowRedirectPath(monthStartISO(selectedDate, today), selectedDate, result.ok, message)); }} deleteAction={deleteCashFlowEntry} /></section>
 
     <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm"><div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><h2 className="text-2xl font-black">รายการ Cash Flow</h2><div className="flex flex-wrap gap-2"><a className="rounded-full bg-black px-4 py-2 text-center text-sm font-black text-white" href={exportHref(from, to, isAllRange)}>Export CSV ทั่วไป</a><a className="rounded-full bg-[#FFD43B] px-4 py-2 text-center text-sm font-black text-black" href={exportHref(from, to, isAllRange, "accounting")}>Export CSV สำหรับสำนักงานบัญชี</a></div></div><div className="mt-4"><p className="mb-2 text-sm font-black text-black/60">ช่วงวันที่ด่วน</p><DateShortcuts basePath="/cash-flow" branchId={params?.branch_id} /></div><form className="mt-4 grid gap-2 sm:grid-cols-5"><input className={inputClass()} type="date" name="from" defaultValue={from}/><input className={inputClass()} type="date" name="to" defaultValue={to}/><select className={inputClass()} name="branch_id" defaultValue={params?.branch_id ?? ""}><option value="">ทุกสาขา</option>{(branches as Branch[] | null)?.map((b)=><option key={b.id} value={b.id}>{b.name}</option>)}</select><select className={inputClass()} name="status" defaultValue={params?.status ?? ""}><option value="">ทุกสถานะ</option>{Object.entries(CASH_FLOW_STATUS_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select><button className="rounded-2xl bg-[#FFD43B] font-black">กรอง</button></form><p className="mt-3 text-sm font-bold text-black/60">จัดการรายการด้วยปุ่มแก้ไข/ลบในตารางด้านบนหลังฟอร์มบันทึกรายการ</p></section>
   </div>;

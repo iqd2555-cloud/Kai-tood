@@ -424,14 +424,31 @@ export async function saveCashFlowEntry(_: unknown, formData: FormData) {
 
 export async function deleteCashFlowEntry(formData: FormData) {
   const profile = await getCurrentProfile();
-  if (profile.role !== "owner") return { ok: false, message: "เฉพาะเจ้าของร้านเท่านั้น" };
+  if (profile.role !== "owner") return { ok: false, code: "forbidden", message: "เฉพาะเจ้าของร้านเท่านั้น" };
+
   const entryId = String(formData.get("entry_id") ?? "");
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(entryId)) return { ok: false, message: "ไม่พบรายการที่ต้องการลบ" };
+  const dbPath = String(formData.get("db_path") ?? "");
+  const expectedDbPath = `public.${CASH_FLOW_ENTRIES_TABLE}/${entryId}`;
+
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(entryId)) return { ok: false, code: "missing-id", message: "ไม่พบรายการที่ต้องการลบ" };
+  if (dbPath !== expectedDbPath) return { ok: false, code: "invalid-db-path", message: `path ฐานข้อมูลไม่ตรงกับรายการจริง: ${dbPath || "-"}` };
+
   const supabase = await createSupabaseServerClient();
-  if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์" };
+  if (!supabase) return { ok: false, code: "supabase-client-missing", message: "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์" };
+
+  console.info("Deleting cash flow entry", { dbPath, entryId, table: CASH_FLOW_ENTRIES_TABLE });
+  const { data: existing, error: readError } = await supabase
+    .from(CASH_FLOW_ENTRIES_TABLE)
+    .select("id,source")
+    .eq("id", entryId)
+    .maybeSingle();
+  if (readError) return { ok: false, code: readError.code ?? "read-failed", message: readError.message };
+  if (!existing) return { ok: false, code: "not-found", message: `ไม่พบรายการใน ${dbPath}` };
+  if (existing.source === "sales") return { ok: false, code: "generated-source", message: "รายการนี้ต้องลบจากข้อมูลต้นทาง (ยอดขายหน้าร้าน)" };
+
   const { data, error } = await supabase.from(CASH_FLOW_ENTRIES_TABLE).delete().eq("id", entryId).select("id");
-  if (error) return { ok: false, message: error.message };
-  if (!data || data.length === 0) return { ok: false, message: "ไม่พบรายการในฐานข้อมูล หรือไม่มีสิทธิ์ลบรายการนี้" };
+  if (error) return { ok: false, code: error.code ?? "delete-failed", message: error.message };
+  if (!data || data.length === 0) return { ok: false, code: "not-deleted", message: `ไม่พบรายการใน ${dbPath} หรือไม่มีสิทธิ์ลบรายการนี้` };
   revalidatePath("/cash-flow");
   revalidatePath("/dashboard");
   revalidatePath("/owner-dashboard");
