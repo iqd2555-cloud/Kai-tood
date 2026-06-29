@@ -6,7 +6,7 @@ import { StatCard } from "@/components/stat-card";
 import { getCurrentProfile } from "@/lib/auth";
 import { addDaysISO, calculateCashFlowSummary, CASH_FLOW_STATUS_LABEL, isPendingStatus, type CashFlowEntry } from "@/lib/cash-flow";
 import { CASH_FLOW_ENTRIES_TABLE } from "@/lib/cash-flow-constants";
-import { currentMonthStartISO, formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib/format";
+import { formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch } from "@/lib/types";
 
@@ -89,8 +89,17 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const today = todayISO();
   const isAllRange = params?.range === "all";
-  const from = isAllRange ? "" : params?.from?.match(/^\d{4}-\d{2}-\d{2}$/) ? params.from : currentMonthStartISO();
-  const to = isAllRange ? "" : params?.to?.match(/^\d{4}-\d{2}-\d{2}$/) ? params.to : today;
+  const hasDateFilter = Boolean(params?.from) || Boolean(params?.to) || isAllRange;
+  const from = isAllRange
+    ? ""
+    : hasDateFilter && isISODate(params?.from)
+      ? params.from
+      : today;
+  const to = isAllRange
+    ? ""
+    : hasDateFilter && isISODate(params?.to)
+      ? params.to
+      : today;
   const supabaseClient = await createSupabaseServerClient();
   if (!supabaseClient) redirect("/login?setup=supabase");
   const supabase = supabaseClient;
@@ -148,7 +157,25 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
 
   return <div className="space-y-5">
     <section className="rounded-[2rem] bg-[#111] p-5 text-white shadow-lg">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm font-black text-[#FFD43B]">Cash Flow Center</p><h1 className="text-3xl font-black">ศูนย์บริหารกระแสเงินสด</h1><p className="mt-2 text-sm font-bold text-white/70">ดูเงินจริง รอรับ รอจ่าย และคาดการณ์ 7/30 วัน แบบไม่ซับซ้อนเหมือนบัญชีภาษี</p></div><form action={async (formData: FormData) => { "use server"; const result = await syncSalesToCashFlow(formData); const message = encodeURIComponent(result.message); const selectedDate = formData.get("selected_date") ?? to; redirect(`/cash-flow?from=${monthStartISO(selectedDate, today)}&to=${selectedDate}&sync_ok=${result.ok ? "1" : "0"}&sync_message=${message}`); }} className="flex flex-col gap-2 sm:items-end"><input type="date" className={inputClass()} name="selected_date" defaultValue={isISODate(params?.to) ? params?.to : today}/><select className={inputClass()} name="sync_range" defaultValue="today"><option value="today">ซิงก์ข้อมูลวันนี้</option><option value="7d">ซิงก์ข้อมูลย้อนหลัง 7 วัน</option><option value="30d">ซิงก์ข้อมูลย้อนหลัง 30 วัน</option></select><button className="focus-ring rounded-full bg-[#FFD43B] px-5 py-3 font-black text-black">ซิงก์ยอดขายอัตโนมัติ</button><p className="text-xs font-bold text-white/60">เลือกช่วงก่อนซิงก์ ระบบไม่ดึงทั้งเดือนอัตโนมัติ</p></form></div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm font-black text-[#FFD43B]">Cash Flow Center</p>
+          <h1 className="text-3xl font-black">ศูนย์บริหารกระแสเงินสด</h1>
+          <p className="mt-2 text-sm font-bold text-white/70">ดูเงินจริง รอรับ รอจ่าย และคาดการณ์ 7/30 วัน แบบไม่ซับซ้อนเหมือนบัญชีภาษี</p>
+        </div>
+        <form action={async (formData: FormData) => {
+          "use server";
+          const result = await syncSalesToCashFlow(formData);
+          const message = encodeURIComponent(result.message);
+          const selectedDate = formData.get("selected_date") ?? to;
+          redirect(`/cash-flow?from=${monthStartISO(selectedDate, today)}&to=${selectedDate}&sync_ok=${result.ok ? "1" : "0"}&sync_message=${message}`);
+        }} className="flex flex-col gap-2 sm:items-end">
+          <input type="date" className={inputClass()} name="selected_date" defaultValue={isISODate(params?.to) ? params?.to : today}/>
+          <select className={inputClass()} name="sync_range" defaultValue="today"><option value="today">ซิงก์ข้อมูลวันนี้</option><option value="7d">ซิงก์ข้อมูลย้อนหลัง 7 วัน</option><option value="30d">ซิงก์ข้อมูลย้อนหลัง 30 วัน</option></select>
+          <button className="focus-ring rounded-full bg-[#FFD43B] px-5 py-3 font-black text-black">ซิงก์ยอดขายอัตโนมัติ</button>
+          <p className="text-xs font-bold text-white/60">เลือกช่วงก่อนซิงก์ ระบบไม่ดึงทั้งเดือนอัตโนมัติ</p>
+        </form>
+      </div>
     </section>
 
     {params?.sync_message && <div className={`rounded-2xl border p-4 font-black ${params.sync_ok === "1" ? "border-green-200 bg-green-50 text-green-700" : "border-red-200 bg-red-50 text-red-700"}`}>{decodeURIComponent(params.sync_message)}</div>}
