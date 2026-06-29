@@ -422,62 +422,124 @@ export async function saveCashFlowEntry(_: unknown, formData: FormData) {
   return { ok: true, message: payload.entry_id ? "แก้ไขรายการ Cash Flow เรียบร้อย" : "บันทึกรายการ Cash Flow เรียบร้อย" };
 }
 
+type CashFlowDeleteDiagnosticQuery = {
+  label: string;
+  data: unknown;
+  error: unknown;
+};
+
+function formatDiagnosticValue(value: unknown) {
+  if (value === null || value === undefined) return "null";
+  if (typeof value === "string") return value;
+  return JSON.stringify(value, null, 2);
+}
+
+function buildCashFlowDeleteDiagnostic(input: {
+  entryId: string;
+  sourceTable: string;
+  dbPath: string;
+  queries: CashFlowDeleteDiagnosticQuery[];
+  deletedCount: number;
+  reason: string;
+}) {
+  const queryLines = input.queries.map((query) => [
+    `${query.label}:`,
+    `data: ${formatDiagnosticValue(query.data)}`,
+    `error: ${formatDiagnosticValue(query.error)}`,
+  ].join("\n")).join("\n\n");
+
+  return [
+    "===== SERVER =====",
+    `entryId ที่รับเข้ามา: ${input.entryId || "-"}`,
+    `source_table ที่รับเข้ามา: ${input.sourceTable || "-"}`,
+    `db_path ที่รับเข้ามา: ${input.dbPath || "-"}`,
+    "ผล query",
+    queryLines || "-",
+    "",
+    "===== DELETE =====",
+    `deleted_count: ${input.deletedCount}`,
+    "",
+    "===== RESULT =====",
+    `สาเหตุจริง: ${input.reason}`,
+  ].join("\n");
+}
+
 export async function deleteCashFlowEntry(formData: FormData) {
   const profile = await getCurrentProfile();
-  if (profile.role !== "owner") return { ok: false, code: "forbidden", message: "เฉพาะเจ้าของร้านเท่านั้น" };
 
   const entryId = String(formData.get("entry_id") ?? "").trim();
   const sourceTable = String(formData.get("source_table") ?? "").trim();
   const dbPath = String(formData.get("db_path") ?? `public.${sourceTable}/${entryId}`).trim();
   const expectedDbPath = `public.${CASH_FLOW_ENTRIES_TABLE}/${entryId}`;
+  const queries: CashFlowDeleteDiagnosticQuery[] = [];
+  const finish = (ok: boolean, code: string, reason: string, deletedCount: number) => {
+    const diagnostic = buildCashFlowDeleteDiagnostic({ entryId, sourceTable, dbPath, queries, deletedCount, reason });
+    console.info("cash_flow_delete_diagnostic", diagnostic);
+    return { ok, code, message: diagnostic, diagnostic, deleted_count: deletedCount };
+  };
 
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(entryId)) return { ok: false, code: "missing-id", message: "ลบไม่ได้: ไม่พบ id ของรายการ" };
-  if (!sourceTable) return { ok: false, code: "missing-source-table", message: "ลบไม่ได้: ไม่พบแหล่งข้อมูลของรายการ" };
-  if (sourceTable !== CASH_FLOW_ENTRIES_TABLE) return { ok: false, code: "unsupported-source-table", message: `ลบไม่ได้: รายการนี้มาจาก ${sourceTable} ไม่ใช่ ${CASH_FLOW_ENTRIES_TABLE}` };
-  if (dbPath !== expectedDbPath) return { ok: false, code: "invalid-db-path", message: `path ฐานข้อมูลไม่ตรงกับรายการจริง: ${dbPath || "-"}` };
+  if (profile.role !== "owner") return finish(false, "forbidden", "RLS/สิทธิ์แอปไม่อนุญาต: ผู้ใช้ไม่ใช่ owner", 0);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(entryId)) return finish(false, "missing-id", "id ไม่ตรง: entryId ที่ client ส่งมาไม่ใช่ UUID ที่ใช้ query ได้", 0);
+  if (!sourceTable) return finish(false, "missing-source-table", "query ผิด: client ไม่ส่ง source_table", 0);
+  if (sourceTable !== CASH_FLOW_ENTRIES_TABLE) return finish(false, "unsupported-source-table", `query ผิด: source_table=${sourceTable} ไม่ใช่ ${CASH_FLOW_ENTRIES_TABLE}`, 0);
+  if (dbPath !== expectedDbPath) return finish(false, "invalid-db-path", `id ไม่ตรง: db_path=${dbPath || "-"} ไม่ตรงกับ ${expectedDbPath}`, 0);
 
   const supabase = await createSupabaseServerClient();
-  if (!supabase) return { ok: false, code: "supabase-client-missing", message: "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์" };
+  if (!supabase) return finish(false, "supabase-client-missing", "query ผิด: ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์", 0);
 
-  console.info("DELETE ROW:", { id: entryId, source_table: sourceTable, db_path: dbPath });
-  console.info("DELETE TABLE:", sourceTable);
-  console.info("DELETE ID:", entryId);
+  console.info("===== SERVER =====", { entryId, sourceTable, dbPath });
 
-  const { data: existing, error: readError } = await supabase
+  const byId = await supabase
     .from(CASH_FLOW_ENTRIES_TABLE)
-    .select("id,source,created_by,branch_id")
+    .select("id,source,created_by")
     .eq("id", entryId)
     .maybeSingle();
-  if (readError) return { ok: false, code: readError.code ?? "read-failed", message: readError.message };
-  if (!existing) {
+  queries.push({ label: `select id, source, created_by from ${CASH_FLOW_ENTRIES_TABLE} where id = ${entryId}`, data: byId.data, error: byId.error });
+  if (byId.error) return finish(false, byId.error.code ?? "read-failed", `query ผิด: query by id error=${byId.error.message}`, 0);
+
+  if (!byId.data) {
+    const uuidProbe = await supabase.from(CASH_FLOW_ENTRIES_TABLE).select("uuid").limit(1);
+    const hasUuidColumn = !uuidProbe.error;
+    queries.push({ label: "ตรวจว่ามี column uuid หรือไม่: select uuid from cash_flow_entries limit 1", data: uuidProbe.data, error: uuidProbe.error });
+
+    if (hasUuidColumn) {
+      const byUuid = await supabase
+        .from(CASH_FLOW_ENTRIES_TABLE)
+        .select("id,source,created_by")
+        .eq("uuid", entryId)
+        .maybeSingle();
+      queries.push({ label: `select id, source, created_by from ${CASH_FLOW_ENTRIES_TABLE} where uuid = ${entryId}`, data: byUuid.data, error: byUuid.error });
+      if (byUuid.error) return finish(false, byUuid.error.code ?? "uuid-read-failed", `query ผิด: query by uuid error=${byUuid.error.message}`, 0);
+      if (byUuid.data) return finish(false, "id-mismatch", "id ไม่ตรง: พบ record เมื่อเทียบ entryId กับ column uuid แต่ไม่พบเมื่อเทียบกับ primary key id", 0);
+    }
+
     const admin = createSupabaseAdminClient();
-    const { data: adminExisting } = admin
-      ? await admin.from(CASH_FLOW_ENTRIES_TABLE).select("id").eq("id", entryId).maybeSingle()
-      : { data: null };
-    return adminExisting
-      ? { ok: false, code: "rls-read-blocked", message: `พบรายการใน ${dbPath} ด้วย service role แต่ session ปัจจุบันอ่านไม่ได้ ตรวจ Supabase RLS policy` }
-      : { ok: false, code: "not-found", message: `ไม่พบ id=${entryId} ใน ${dbPath} กรุณาตรวจว่า UI ใช้ primary key จริงจาก ${CASH_FLOW_ENTRIES_TABLE}` };
+    const adminById = admin ? await admin.from(CASH_FLOW_ENTRIES_TABLE).select("id,source,created_by").eq("id", entryId).maybeSingle() : { data: null, error: null };
+    queries.push({ label: `service role check: select id, source, created_by from ${CASH_FLOW_ENTRIES_TABLE} where id = ${entryId}`, data: adminById.data, error: adminById.error });
+    if (adminById.data) return finish(false, "rls-read-blocked", "RLS ไม่อนุญาต: service role พบ record แต่ session ปัจจุบัน query by id ไม่เห็น", 0);
+    return finish(false, "not-found", "record ไม่มีอยู่จริง: ไม่พบ record จาก id ที่รับเข้ามา", 0);
   }
 
-  if (existing.source !== "manual") {
-    return { ok: false, code: "generated-source", message: "รายการนี้สร้างจากข้อมูลต้นทาง ต้องลบจากเมนูต้นทาง" };
+  if (byId.data.source !== "manual") return finish(false, "generated-source", `source ไม่ใช่ manual: source=${byId.data.source}`, 0);
+
+  const deleted = await supabase.from(CASH_FLOW_ENTRIES_TABLE).delete().eq("id", entryId).eq("source", "manual").select("id");
+  queries.push({ label: `delete from ${CASH_FLOW_ENTRIES_TABLE} where id = ${entryId} and source = manual returning id`, data: deleted.data, error: deleted.error });
+  if (deleted.error) return finish(false, deleted.error.code ?? "delete-failed", `query ผิดหรือ RLS ไม่อนุญาต: delete error=${deleted.error.message}`, 0);
+
+  const deletedCount = deleted.data?.length ?? 0;
+  if (deletedCount === 0) {
+    const admin = createSupabaseAdminClient();
+    const adminById = admin ? await admin.from(CASH_FLOW_ENTRIES_TABLE).select("id,source,created_by").eq("id", entryId).maybeSingle() : { data: null, error: null };
+    queries.push({ label: `service role after delete_count=0: select id, source, created_by from ${CASH_FLOW_ENTRIES_TABLE} where id = ${entryId}`, data: adminById.data, error: adminById.error });
+    if (!adminById.data) return finish(false, "not-found-after-delete", "record ไม่มีอยู่จริง: ก่อน delete อ่านได้ แต่หลัง delete_count=0 service role ไม่พบ record แล้ว อาจถูกลบพร้อมกัน", 0);
+    if (adminById.data.source !== "manual") return finish(false, "source-changed", `source ไม่ใช่ manual: source เปลี่ยนเป็น ${adminById.data.source} ก่อน delete`, 0);
+    return finish(false, "rls-delete-blocked", "RLS ไม่อนุญาต: record ยังมีอยู่ด้วย service role แต่ delete ด้วย session ได้ deleted_count=0", 0);
   }
 
-  const { data, error } = await supabase.from(CASH_FLOW_ENTRIES_TABLE).delete().eq("id", entryId).select("id");
-  if (error) return { ok: false, code: error.code ?? "delete-failed", message: error.message };
-  if (!data || data.length === 0) {
-    const admin = createSupabaseAdminClient();
-    const { data: adminExisting } = admin
-      ? await admin.from(CASH_FLOW_ENTRIES_TABLE).select("id").eq("id", entryId).maybeSingle()
-      : { data: null };
-    return adminExisting
-      ? { ok: false, code: "rls-delete-blocked", message: `พบรายการใน ${dbPath} แต่ลบแล้ว data ว่าง: Supabase RLS policy ไม่อนุญาตให้ delete หรือเงื่อนไข owner/user/branch ไม่ตรง` }
-      : { ok: false, code: "not-deleted", message: `ไม่พบรายการใน ${dbPath} id=${entryId} หรือรายการถูกลบไปแล้ว` };
-  }
   revalidatePath("/cash-flow");
   revalidatePath("/dashboard");
   revalidatePath("/owner-dashboard");
-  return { ok: true, message: "ลบรายการ Cash Flow เรียบร้อย" };
+  return finish(true, "deleted", "ลบสำเร็จพร้อมหลักฐาน deleted_count > 0", deletedCount);
 }
 
 export async function syncSalesToCashFlow(formData?: FormData) {
