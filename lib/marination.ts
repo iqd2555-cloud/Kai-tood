@@ -42,7 +42,7 @@ export type MarinationPartSummary = Omit<MarinationPartStockSummary, "latestNote
   systemBalance: number;
   latestCounted: number | null;
   variance: number | null;
-  latestNote: string;
+  latestNote: string | null;
   latestMovementAt: string | null;
   latestRecorder: string;
 };
@@ -65,15 +65,17 @@ export const movementTypeLabels: Record<MarinationMovementType, string> = {
 };
 
 export function buildMarinationSummaries(parts: ChickenPart[], movements: MarinationStockMovement[], selectedDate: string) {
-  // Stock ledger rule: opening balance must come from every system-affecting
-  // movement before the selected date. The selected date then adds receipts,
-  // subtracts usage, and applies adjustment deltas. Physical counts are only
-  // displayed for variance and never mutate the system balance here.
+  // Daily closed-ledger rule: opening balance for the selected date is the
+  // system closing balance from the latest stock day before the selected date.
+  // That closing balance is rebuilt from system-affecting movements only:
+  // received = +kg, used = -kg, adjustment = signed delta, counted = display
+  // only. This prevents positive-only history (or physical counts) from being
+  // treated as today's opening balance.
   const summaries = parts.map<MarinationPartSummary>((part) => {
     const partMovements = movements.filter((movement) => movement.chicken_part_id === part.id);
     const previousMovements = partMovements.filter((movement) => movement.movement_date < selectedDate);
     const selectedDateMovements = partMovements.filter((movement) => movement.movement_date === selectedDate);
-    const opening = calculateMarinationSystemBalance(previousMovements);
+    const opening = calculateMarinationOpeningBalance(previousMovements);
     const received = sumByType(selectedDateMovements, "received");
     const used = sumByType(selectedDateMovements, "used");
     const adjustment = sumByType(selectedDateMovements, "adjustment");
@@ -96,7 +98,7 @@ export function buildMarinationSummaries(parts: ChickenPart[], movements: Marina
       systemRemainingKg: systemBalance,
       latestPhysicalCountKg: latestCounted,
       varianceKg: latestCounted === null ? null : latestCounted - systemBalance,
-      latestNote: latestNoteValue ?? "-",
+      latestNote: latestNoteValue,
       latestMovementAt: latestMovement?.created_at ?? null,
       latestRecorder: latestMovement?.created_by ?? "-",
       received,
@@ -122,13 +124,31 @@ export function buildMarinationSummaries(parts: ChickenPart[], movements: Marina
   return { summaries, totals };
 }
 
+export function calculateMarinationOpeningBalance(movements: Pick<MarinationStockMovement, "movement_date" | "movement_type" | "quantity_kg">[]) {
+  const movementsByDate = new Map<string, Pick<MarinationStockMovement, "movement_type" | "quantity_kg">[]>();
+
+  for (const movement of movements) {
+    const dateMovements = movementsByDate.get(movement.movement_date) ?? [];
+    dateMovements.push(movement);
+    movementsByDate.set(movement.movement_date, dateMovements);
+  }
+
+  return Array.from(movementsByDate.keys()).sort().reduce((closingBalance, date) => {
+    return closingBalance + calculateMarinationSystemBalance(movementsByDate.get(date) ?? []);
+  }, 0);
+}
+
 export function calculateMarinationSystemBalance(movements: Pick<MarinationStockMovement, "movement_type" | "quantity_kg">[]) {
   return movements.reduce((balance, movement) => {
-    const quantity = Number(movement.quantity_kg);
-    if (movement.movement_type === "received" || movement.movement_type === "adjustment") return balance + quantity;
-    if (movement.movement_type === "used") return balance - quantity;
-    return balance;
+    return balance + getMarinationMovementDelta(movement);
   }, 0);
+}
+
+function getMarinationMovementDelta(movement: Pick<MarinationStockMovement, "movement_type" | "quantity_kg">) {
+  const quantity = Number(movement.quantity_kg);
+  if (movement.movement_type === "received" || movement.movement_type === "adjustment") return quantity;
+  if (movement.movement_type === "used") return -quantity;
+  return 0;
 }
 
 function sumByType(movements: MarinationStockMovement[], type: MarinationMovementType) {
