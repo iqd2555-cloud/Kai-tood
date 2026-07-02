@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { buildMarinationSummaries, calculateMarinationOpeningBalance, calculateMarinationSystemBalance } from "../lib/marination.ts";
+import { buildMarinationSummaries, calculateMarinationClosingBalanceOnDate, calculateMarinationOpeningBalance, calculateMarinationSystemBalance } from "../lib/marination.ts";
 
 const parts = [
   { id: "bl-scrap", name: "เศษ BL", sort_order: 1, is_active: true },
@@ -47,6 +47,7 @@ assert.equal(offal.latestNote, "ใช้หมักวันนี้", "lates
 assert.equal(totals.opening, 265);
 assert.equal(totals.systemBalance, 60);
 assert.equal(calculateMarinationOpeningBalance(movements.filter((item) => item.movement_date < "2026-07-02")), 265);
+assert.equal(calculateMarinationClosingBalanceOnDate(movements, "2026-07-01"), totals.opening, "2026-07-02 opening must equal 2026-07-01 system closing after received, used, and adjustments");
 assert.equal(calculateMarinationSystemBalance(movements), 60);
 
 console.log("marination-summary tests passed");
