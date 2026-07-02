@@ -143,20 +143,7 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
       created_by: userId,
     };
 
-    if (isAdjustment) {
-      const { data: currentMovements, error: balanceError } = await supabase
-        .from("marination_stock_movements")
-        .select("movement_type, quantity_kg")
-        .lte("movement_date", formState.movement_date)
-        .eq("chicken_part_id", formState.chicken_part_id)
-        .returns<Pick<MarinationStockMovement, "movement_type" | "quantity_kg">[]>();
-      if (balanceError) { setMessage(`คำนวณยอดคงเหลือปัจจุบันไม่สำเร็จ: ${balanceError.message}`); return; }
-
-      const currentSystemBalance = calculateMarinationSystemBalance(currentMovements ?? []);
-      const adjustmentDelta = inputQuantityKg - currentSystemBalance;
-      insertPayload.quantity_kg = adjustmentDelta;
-      insertPayload.note = buildAdjustmentNote(formState.note, inputQuantityKg, currentSystemBalance);
-    }
+    if (isAdjustment) insertPayload.note = buildAdjustmentNote(formState.note, inputQuantityKg, selectedPartSystemBalance);
 
     const { error } = await supabase.from("marination_stock_movements").insert(insertPayload);
     if (error) { setMessage(`บันทึกไม่สำเร็จ: ${error.message}`); return; }
@@ -286,6 +273,14 @@ function AuditPart({ audit }: { audit: MarinationPartCalculationAudit }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div><p className="text-sm font-black text-black/50">{formatThaiDate(audit.selectedDate)}</p><h3 className="text-2xl font-black">{audit.partName}</h3><p className="mt-1 font-bold text-black/60">คงเหลือ = ยกมา + รับเข้า - ใช้หมัก + ปรับยอด</p><p className="font-black text-[#E60012]">{audit.formulaText}</p></div>
         <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">{[["ยกมา", audit.openingKg], ["รับเข้า", audit.receivedKg], ["ใช้หมัก", audit.usedKg], ["ปรับยอด", audit.adjustmentKg], ["คงเหลือ", audit.systemRemainingKg]].map(([label, value]) => <div key={label} className="rounded-2xl bg-black/5 p-3"><div className="font-black text-black/50">{label}</div><div className="text-lg font-black">{kg(value as number)}</div></div>)}</div>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
+        {[["รับเข้าก่อนวัน", audit.totalReceiveBeforeDate], ["ใช้หมักก่อนวัน", audit.totalUseBeforeDate], ["ผลปรับยอดก่อนวัน", audit.adjustmentEffectsBeforeDate], ["ตรวจนับที่ ignore", audit.stockCheckIgnoredBeforeDate], ["openingKg", audit.openingKg]].map(([label, value]) => (
+          <div key={label} className="rounded-2xl bg-yellow-50 p-3">
+            <div className="font-black text-yellow-900/60">{label}</div>
+            <div className="text-lg font-black text-yellow-950">{kg(value as number)}</div>
+          </div>
+        ))}
       </div>
       {audit.warnings.length > 0 && <div className="mt-4 rounded-2xl bg-yellow-100 p-3 font-black text-yellow-900"><p>คำเตือน</p><ul className="mt-1 list-disc pl-5">{audit.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}
       <AuditRows title="รายการที่นำมาคิดเป็นยอดยกมา" rows={audit.openingRows} />
