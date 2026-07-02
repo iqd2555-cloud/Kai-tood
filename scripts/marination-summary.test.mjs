@@ -22,6 +22,8 @@ const movements = [
   movement("m6", "2026-07-01", "offal", "received", 100, "รับเข้าเมื่อวาน"),
   movement("m7", "2026-07-01", "offal", "used", 15),
   movement("m8", "2026-07-01", "whole-offal", "adjustment", 15, "ปิดยอดเครื่องในไม่ผ่า"),
+  movement("m8-adjust-superseded-40", "2026-07-01", "bl-scrap", "adjustment", 40, "ปรับยอดรอบแรก ต้องถูกแทนที่", "2026-07-01T06:00:00.000Z"),
+  movement("m8-adjust-superseded-75", "2026-07-01", "bl-scrap", "set_balance", 75, "ปรับยอดรอบสอง ต้องถูกแทนที่", "2026-07-01T06:30:00.000Z"),
   movement("m8-adjust", "2026-07-01", "bl-scrap", "set_balance", 50, "ตั้งยอดใหม่ให้เหลือ 50 กก.", "2026-07-01T07:00:00.000Z"),
   movement("m8-use", "2026-07-01", "bl-scrap", "used", 50, "ใช้หมัก 50 กก. หลังตั้งยอดใหม่", "2026-07-01T08:00:00.000Z"),
   movement("m8-receive-70", "2026-07-01", "bl-scrap", "received", 70, "รับเข้า 70 กก.", "2026-07-01T09:00:00.000Z"),
@@ -53,6 +55,7 @@ assert.equal(blScrap.adjustmentKg, 0);
 assert.equal(blScrapAudit.totalReceiveBeforeDate, 200);
 assert.equal(blScrapAudit.totalUseBeforeDate, 90);
 assert.equal(blScrapAudit.adjustmentEffectsBeforeDate, -30);
+assert.equal(blScrapAudit.ignoredRows.filter((row) => row.bucket === "ignored" && row.reason.includes("แทนที่")).length, 2);
 assert.equal(blScrapAudit.stockCheckIgnoredBeforeDate, 120);
 
 const blScrapOutOfEntryOrderMovements = [
@@ -70,6 +73,23 @@ assert.equal(outOfEntryOrderAudit.usedKg, 80);
 assert.equal(outOfEntryOrderAudit.adjustmentKg, 0);
 assert.equal(outOfEntryOrderAudit.systemRemainingKg, 100);
 assert.equal(outOfEntryOrderAudit.formulaText, "80 + 100 - 80 + 0 = 100");
+
+const multipleSameDayAdjustments = [
+  movement("multi-adjust-1", "2026-07-01", "bl-scrap", "adjustment", 50, "ปรับยอดเก่าถูกแทนที่", "2026-07-01T07:00:00.000Z"),
+  movement("multi-adjust-2", "2026-07-01", "bl-scrap", "adjustment", 90, "ปรับยอดเก่าถูกแทนที่", "2026-07-01T08:00:00.000Z"),
+  movement("multi-adjust-final", "2026-07-01", "bl-scrap", "adjustment", 50, "ปรับยอดล่าสุดของวัน", "2026-07-01T09:00:00.000Z"),
+  movement("multi-use", "2026-07-01", "bl-scrap", "used", 50, "ใช้หมัก 50", "2026-07-01T10:00:00.000Z"),
+  movement("multi-receive-70", "2026-07-01", "bl-scrap", "received", 70, "รับเข้า 70", "2026-07-01T11:00:00.000Z"),
+  movement("multi-receive-10", "2026-07-01", "bl-scrap", "received", 10, "รับเข้า 10", "2026-07-01T12:00:00.000Z"),
+  movement("multi-next-receive", "2026-07-02", "bl-scrap", "received", 100, "รับเข้า 100"),
+  movement("multi-next-use", "2026-07-02", "bl-scrap", "used", 80, "ใช้หมัก 80"),
+];
+const multipleSameDayAudit = buildMarinationCalculationAudit({ selectedDate: "2026-07-02", part: parts[0], movements: multipleSameDayAdjustments });
+assert.equal(multipleSameDayAudit.openingKg, 80, "only the final same-day adjustment should set the 2026-07-01 base balance");
+assert.equal(multipleSameDayAudit.receivedKg, 100);
+assert.equal(multipleSameDayAudit.usedKg, 80);
+assert.equal(multipleSameDayAudit.systemRemainingKg, 100);
+assert.equal(multipleSameDayAudit.ignoredRows.filter((row) => row.reason.includes("แทนที่")).length, 2);
 
 assertPart("bb-scrap", 30, 30, 0);
 assertPart("skin", 40, 40, 0);
