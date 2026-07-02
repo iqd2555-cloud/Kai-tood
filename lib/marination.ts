@@ -20,6 +20,9 @@ export type MarinationStockMovement = {
   updated_at?: string | null;
 };
 
+type LedgerMovement = Pick<MarinationStockMovement, "movement_date" | "movement_type" | "quantity_kg"> &
+  Partial<Pick<MarinationStockMovement, "id" | "created_at">>;
+
 export type MarinationPartStockSummary = {
   partId: string;
   partName: string;
@@ -66,11 +69,11 @@ export const movementTypeLabels: Record<MarinationMovementType, string> = {
 
 export function buildMarinationSummaries(parts: ChickenPart[], movements: MarinationStockMovement[], selectedDate: string) {
   // Daily closed-ledger rule: opening balance for the selected date is the
-  // system closing balance from the latest stock day before the selected date.
-  // That closing balance is rebuilt from system-affecting movements only:
-  // received = +kg, used = -kg, adjustment = signed delta, counted = display
-  // only. This prevents positive-only history (or physical counts) from being
-  // treated as today's opening balance.
+  // system closing balance from the previous business day. Rebuild it by
+  // replaying every movement in business-date order: received = +kg, used =
+  // -kg, adjustment = set system balance to the target kg, counted = display
+  // only. This keeps target-balance adjustments from being counted as an
+  // additional positive movement.
   const summaries = parts.map<MarinationPartSummary>((part) => {
     const partMovements = movements.filter((movement) => movement.chicken_part_id === part.id);
     const previousMovements = partMovements.filter((movement) => movement.movement_date < selectedDate);
@@ -78,8 +81,8 @@ export function buildMarinationSummaries(parts: ChickenPart[], movements: Marina
     const opening = calculateMarinationOpeningBalance(previousMovements);
     const received = sumByType(selectedDateMovements, "received");
     const used = sumByType(selectedDateMovements, "used");
-    const adjustment = sumByType(selectedDateMovements, "adjustment");
-    const systemBalance = opening + received + adjustment - used;
+    const systemBalance = replayMarinationLedger(selectedDateMovements, opening).balance;
+    const adjustment = systemBalance - opening - received + used;
     const latestCount = selectedDateMovements.find((movement) => movement.movement_type === "counted");
     const latestWithNote = selectedDateMovements.find((movement) => movement.note?.trim());
     const latestMovement = selectedDateMovements[0];
@@ -124,41 +127,38 @@ export function buildMarinationSummaries(parts: ChickenPart[], movements: Marina
   return { summaries, totals };
 }
 
-export function calculateMarinationOpeningBalance(movements: Pick<MarinationStockMovement, "movement_date" | "movement_type" | "quantity_kg">[]) {
-  const movementsByDate = groupMarinationMovementsByDate(movements);
-
-  return Array.from(movementsByDate.keys()).sort().reduce((closingBalance, date) => {
-    return closingBalance + calculateMarinationSystemBalance(movementsByDate.get(date) ?? []);
-  }, 0);
+export function calculateMarinationOpeningBalance(movements: LedgerMovement[]) {
+  return replayMarinationLedger(movements).balance;
 }
 
-export function calculateMarinationClosingBalanceOnDate(movements: Pick<MarinationStockMovement, "movement_date" | "movement_type" | "quantity_kg">[], closingDate: string) {
+export function calculateMarinationClosingBalanceOnDate(movements: LedgerMovement[], closingDate: string) {
   return calculateMarinationOpeningBalance(movements.filter((movement) => movement.movement_date <= closingDate));
 }
 
-function groupMarinationMovementsByDate(movements: Pick<MarinationStockMovement, "movement_date" | "movement_type" | "quantity_kg">[]) {
-  const movementsByDate = new Map<string, Pick<MarinationStockMovement, "movement_type" | "quantity_kg">[]>();
-
-  for (const movement of movements) {
-    const dateMovements = movementsByDate.get(movement.movement_date) ?? [];
-    dateMovements.push(movement);
-    movementsByDate.set(movement.movement_date, dateMovements);
-  }
-
-  return movementsByDate;
+export function calculateMarinationSystemBalance(movements: LedgerMovement[]) {
+  return replayMarinationLedger(movements).balance;
 }
 
-export function calculateMarinationSystemBalance(movements: Pick<MarinationStockMovement, "movement_type" | "quantity_kg">[]) {
-  return movements.reduce((balance, movement) => {
-    return balance + getMarinationMovementDelta(movement);
-  }, 0);
+export function replayMarinationLedger(movements: LedgerMovement[], initialBalance = 0) {
+  return sortMarinationLedgerMovements(movements).reduce((state, movement) => {
+    const previousBalance = state.balance;
+    const quantity = Number(movement.quantity_kg) || 0;
+
+    if (movement.movement_type === "received") state.balance += quantity;
+    if (movement.movement_type === "used") state.balance -= quantity;
+    if (movement.movement_type === "adjustment") state.balance = quantity;
+
+    if (movement.movement_type === "adjustment") state.adjustmentEffectKg += state.balance - previousBalance;
+    return state;
+  }, { balance: initialBalance, adjustmentEffectKg: 0 });
 }
 
-function getMarinationMovementDelta(movement: Pick<MarinationStockMovement, "movement_type" | "quantity_kg">) {
-  const quantity = Number(movement.quantity_kg);
-  if (movement.movement_type === "received" || movement.movement_type === "adjustment") return quantity;
-  if (movement.movement_type === "used") return -quantity;
-  return 0;
+export function sortMarinationLedgerMovements<T extends LedgerMovement>(movements: T[]) {
+  return movements.slice().sort((a, b) =>
+    a.movement_date.localeCompare(b.movement_date) ||
+    (a.created_at ?? "").localeCompare(b.created_at ?? "") ||
+    (a.id ?? "").localeCompare(b.id ?? "")
+  );
 }
 
 function sumByType(movements: MarinationStockMovement[], type: MarinationMovementType) {

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { buildMarinationSummaries, calculateMarinationClosingBalanceOnDate, calculateMarinationOpeningBalance, calculateMarinationSystemBalance } from "../lib/marination.ts";
+import { buildMarinationCalculationAudit } from "../lib/marination/stock-audit.ts";
 
 const parts = [
   { id: "bl-scrap", name: "เศษ BL", sort_order: 1, is_active: true },
@@ -21,6 +22,13 @@ const movements = [
   movement("m6", "2026-07-01", "offal", "received", 100, "รับเข้าเมื่อวาน"),
   movement("m7", "2026-07-01", "offal", "used", 15),
   movement("m8", "2026-07-01", "whole-offal", "adjustment", 15, "ปิดยอดเครื่องในไม่ผ่า"),
+  movement("m8-count", "2026-07-01", "bl-scrap", "counted", 120, "ตรวจนับจริงไม่กระทบยอดระบบ"),
+  movement("m8-adjust", "2026-07-01", "bl-scrap", "adjustment", 80, "ตั้งยอดปิดวันเป็น 80 กก.", "2026-07-01T07:00:00.000Z"),
+  movement("m8-use", "2026-07-01", "bl-scrap", "used", 40, "รายการนี้ต้องถูกหักก่อนตั้งยอด", "2026-07-01T09:00:00.000Z"),
+  movement("m8-late-adjust", "2026-07-01", "bl-scrap", "adjustment", 80, "ยืนยันยอดปิดวันที่ 01/07/2026 เป็น 80 กก.", "2026-07-01T10:00:00.000Z"),
+  movement("m8-extra-count", "2026-07-01", "bl-scrap", "counted", 40, "ตรวจนับจริงไม่ใช่รับเข้า"),
+  movement("m8-created-next-day", "2026-07-01", "bl-scrap", "used", 0, "ใช้ movement_date แม้ created_at ข้ามวัน", "2026-07-02T01:00:00.000Z"),
+  movement("m8-future", "2026-07-02", "bl-scrap", "received", 100, "รับเข้าวันที่เลือก ห้ามนับในยอดยกมา"),
   movement("m9", "2026-07-02", "bl-scrap", "used", 80, "ใช้หมักให้หมดพอดี"),
   movement("m10", "2026-07-02", "bb-scrap", "used", 30),
   movement("m11", "2026-07-02", "skin", "used", 40),
@@ -31,7 +39,18 @@ const movements = [
 ];
 
 const { summaries, totals } = buildMarinationSummaries(parts, movements, "2026-07-02");
-assertPart("bl-scrap", 80, 80, 0);
+assertPart("bl-scrap", 80, 80, 100);
+const blScrap = summaries.find((summary) => summary.partId === "bl-scrap");
+assert.equal(blScrap.receivedKg, 100);
+const blScrapAudit = buildMarinationCalculationAudit({ selectedDate: "2026-07-02", part: parts[0], movements });
+assert.equal(blScrapAudit.openingKg, 80);
+assert.equal(blScrapAudit.receivedKg, 100);
+assert.equal(blScrapAudit.usedKg, 80);
+assert.equal(blScrapAudit.systemRemainingKg, 100);
+assert.equal(blScrapAudit.totalReceiveBeforeDate, 120);
+assert.equal(blScrapAudit.totalUseBeforeDate, 80);
+assert.equal(blScrapAudit.adjustmentEffectsBeforeDate, 40);
+assert.equal(blScrapAudit.stockCheckIgnoredBeforeDate, 160);
 assertPart("bb-scrap", 30, 30, 0);
 assertPart("skin", 40, 40, 0);
 assertPart("small-drumstick", 10, 10, 0);
@@ -45,10 +64,10 @@ assert.equal(offal.latestPhysicalCountKg, 43, "count is displayed separately");
 assert.equal(offal.varianceKg, -2, "count must not overwrite system balance");
 assert.equal(offal.latestNote, "ใช้หมักวันนี้", "latest note should come from selected-date movements only");
 assert.equal(totals.opening, 265);
-assert.equal(totals.systemBalance, 60);
-assert.equal(calculateMarinationOpeningBalance(movements.filter((item) => item.movement_date < "2026-07-02")), 265);
-assert.equal(calculateMarinationClosingBalanceOnDate(movements, "2026-07-01"), totals.opening, "2026-07-02 opening must equal 2026-07-01 system closing after received, used, and adjustments");
-assert.equal(calculateMarinationSystemBalance(movements), 60);
+assert.equal(totals.systemBalance, 160);
+assert.equal(sumOpeningByPart(movements.filter((item) => item.movement_date < "2026-07-02")), 265);
+assert.equal(sumClosingByPart(movements, "2026-07-01"), totals.opening, "2026-07-02 opening must equal 2026-07-01 system closing after received, used, and adjustments");
+assert.equal(sumSystemBalanceByPart(movements), totals.systemBalance);
 
 console.log("marination-summary tests passed");
 
@@ -59,7 +78,19 @@ function assertPart(partId, openingKg, usedKg, systemRemainingKg) {
   assert.equal(summary.systemRemainingKg, systemRemainingKg, `${partId} must calculate opening + received - used + adjustment`);
 }
 
-function movement(id, movement_date, chicken_part_id, movement_type, quantity_kg, note = null) {
+function sumSystemBalanceByPart(allMovements) {
+  return parts.reduce((sum, part) => sum + calculateMarinationSystemBalance(allMovements.filter((item) => item.chicken_part_id === part.id)), 0);
+}
+
+function sumOpeningByPart(allMovements) {
+  return parts.reduce((sum, part) => sum + calculateMarinationOpeningBalance(allMovements.filter((item) => item.chicken_part_id === part.id)), 0);
+}
+
+function sumClosingByPart(allMovements, closingDate) {
+  return parts.reduce((sum, part) => sum + calculateMarinationClosingBalanceOnDate(allMovements.filter((item) => item.chicken_part_id === part.id), closingDate), 0);
+}
+
+function movement(id, movement_date, chicken_part_id, movement_type, quantity_kg, note = null, created_at = `${movement_date}T08:00:00.000Z`) {
   return {
     id,
     movement_date,
@@ -68,6 +99,6 @@ function movement(id, movement_date, chicken_part_id, movement_type, quantity_kg
     quantity_kg,
     note,
     created_by: "user-1",
-    created_at: `${movement_date}T08:00:00.000Z`,
+    created_at,
   };
 }
