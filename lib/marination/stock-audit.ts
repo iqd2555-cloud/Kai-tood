@@ -47,17 +47,17 @@ export function buildMarinationCalculationAudit({ selectedDate, part, movements 
   const warnings = [...replay.warnings];
   if (duplicateIds.length > 0) warnings.push(`พบ duplicate id: ${duplicateIds.map(shortId).join(", ")}`);
 
-  const openingRows = replay.rowsBeforeDate.map((row) => toAuditRow(row, part.name, "opening"));
-  const todayRows = replay.rowsOnDate.map((row) => toAuditRow(row, part.name, getTodayBucket(row.movementType)));
+  const openingRows = replay.rowsBeforeSelectedDate.map((row) => toAuditRow(row, part.name, "opening"));
+  const todayRows = replay.rowsOnSelectedDate.map((row) => toAuditRow(row, part.name, getTodayBucket(row.normalizedKind)));
   const ignoredRows = replay.ignoredRows.map((row) => toAuditRow(row, part.name, "ignored"));
   const todayReceiveRows = todayRows.filter((row) => row.bucket === "today_receive");
   const todayUseRows = todayRows.filter((row) => row.bucket === "today_use");
   const todayAdjustmentRows = todayRows.filter((row) => row.bucket === "today_adjustment");
 
-  const totalReceiveBeforeDate = sumQuantity(openingRows.filter((row) => row.movementType === "received"));
-  const totalUseBeforeDate = sumQuantity(openingRows.filter((row) => row.movementType === "used"));
-  const adjustmentEffectsBeforeDate = sumSigned(openingRows.filter((row) => row.movementType === "adjustment"));
-  const stockCheckIgnoredBeforeDate = sumQuantity(ignoredRows.filter((row) => row.date < selectedDate && row.movementType === "counted"));
+  const totalReceiveBeforeDate = sumReplayQuantity(replay.rowsBeforeSelectedDate.filter((row) => row.normalizedKind === "receive"));
+  const totalUseBeforeDate = sumReplayQuantity(replay.rowsBeforeSelectedDate.filter((row) => row.normalizedKind === "use"));
+  const adjustmentEffectsBeforeDate = sumReplaySigned(replay.rowsBeforeSelectedDate.filter((row) => row.normalizedKind === "set_balance"));
+  const stockCheckIgnoredBeforeDate = sumReplayQuantity(replay.ignoredRows.filter((row) => row.movementDate < selectedDate && row.normalizedKind === "stock_check"));
 
   return {
     selectedDate,
@@ -85,14 +85,14 @@ function toAuditRow(row: LedgerReplayRow, partName: string, bucket: MarinationMo
   return { id: row.id, date: row.movementDate, partName, movementType: row.movementType, quantityKg: row.quantityKg, signedQuantityKg: row.signedEffect, balanceBefore: row.balanceBefore, balanceAfter: row.balanceAfter, bucket, reason: row.reason, note: row.note ?? null, createdAt: row.createdAt };
 }
 
-function getTodayBucket(movementType: string): MarinationMovementAuditBucket {
-  if (movementType === "received") return "today_receive";
-  if (movementType === "used") return "today_use";
-  if (movementType === "adjustment") return "today_adjustment";
+function getTodayBucket(normalizedKind: string): MarinationMovementAuditBucket {
+  if (normalizedKind === "receive") return "today_receive";
+  if (normalizedKind === "use") return "today_use";
+  if (normalizedKind === "set_balance") return "today_adjustment";
   return "ignored";
 }
 
-function sumSigned(rows: MarinationMovementAuditRow[]) { return rows.reduce((sum, row) => sum + row.signedQuantityKg, 0); }
-function sumQuantity(rows: MarinationMovementAuditRow[]) { return rows.reduce((sum, row) => sum + row.quantityKg, 0); }
+function sumReplaySigned(rows: LedgerReplayRow[]) { return rows.reduce((sum, row) => sum + row.signedEffect, 0); }
+function sumReplayQuantity(rows: LedgerReplayRow[]) { return rows.reduce((sum, row) => sum + row.quantityKg, 0); }
 function findDuplicateIds(movements: AuditMovement[]) { const seen = new Set<string>(); const duplicates = new Set<string>(); for (const movement of movements) { if (seen.has(movement.id)) duplicates.add(movement.id); seen.add(movement.id); } return Array.from(duplicates); }
 function shortId(id: string) { return id.slice(0, 8); }

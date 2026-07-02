@@ -22,7 +22,7 @@ const movements = [
   movement("m6", "2026-07-01", "offal", "received", 100, "รับเข้าเมื่อวาน"),
   movement("m7", "2026-07-01", "offal", "used", 15),
   movement("m8", "2026-07-01", "whole-offal", "adjustment", 15, "ปิดยอดเครื่องในไม่ผ่า"),
-  movement("m8-adjust", "2026-07-01", "bl-scrap", "adjustment", 50, "ตั้งยอดใหม่ให้เหลือ 50 กก.", "2026-07-01T07:00:00.000Z"),
+  movement("m8-adjust", "2026-07-01", "bl-scrap", "set_balance", 50, "ตั้งยอดใหม่ให้เหลือ 50 กก.", "2026-07-01T07:00:00.000Z"),
   movement("m8-use", "2026-07-01", "bl-scrap", "used", 50, "ใช้หมัก 50 กก. หลังตั้งยอดใหม่", "2026-07-01T08:00:00.000Z"),
   movement("m8-receive-70", "2026-07-01", "bl-scrap", "received", 70, "รับเข้า 70 กก.", "2026-07-01T09:00:00.000Z"),
   movement("m8-receive-10", "2026-07-01", "bl-scrap", "received", 10, "รับเข้า 10 กก. ยอดปิดต้องเป็น 80 กก.", "2026-07-01T10:00:00.000Z"),
@@ -48,6 +48,7 @@ assert.equal(blScrapAudit.receivedKg, 100);
 assert.equal(blScrapAudit.usedKg, 80);
 assert.equal(blScrapAudit.systemRemainingKg, 100);
 assert.equal(blScrapAudit.adjustmentKg, 0);
+assert.equal(blScrapAudit.formulaText, "80 + 100 - 80 + 0 = 100");
 assert.equal(blScrap.adjustmentKg, 0);
 assert.equal(blScrapAudit.totalReceiveBeforeDate, 200);
 assert.equal(blScrapAudit.totalUseBeforeDate, 90);
