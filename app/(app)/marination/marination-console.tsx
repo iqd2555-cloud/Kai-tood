@@ -5,8 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase-client";
 import { buildMarinationSummaries, calculateMarinationSystemBalance, movementTypeLabels, type ChickenPart, type MarinationMovementType, type MarinationStockMovement } from "@/lib/marination";
 import { formatThaiDate, numberFormatter, todayISO } from "@/lib/format";
+import { buildMarinationCalculationAudit, type MarinationMovementAuditRow, type MarinationPartCalculationAudit } from "@/lib/marination/stock-audit";
 
-type Props = { parts: ChickenPart[]; initialMovements: MarinationStockMovement[]; userId: string; selectedDate: string };
+type Props = { parts: ChickenPart[]; initialMovements: MarinationStockMovement[]; userId: string; selectedDate: string; canViewAudit: boolean };
 
 type MovementFormState = {
   movement_date: string;
@@ -22,23 +23,27 @@ function buildAdjustmentNote(userNote: string, targetBalance: number, currentSys
   const trimmedNote = userNote.trim();
   return trimmedNote ? `${trimmedNote} | ${autoNote}` : autoNote;
 }
+function signedKg(value: number) { const prefix = value > 0 ? "+" : ""; return `${prefix}${numberFormatter.format(value)} กก.`; }
 function time(value: string) { return new Date(value).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Bangkok" }); }
 
 function initialFormState(selectedDate: string, parts: ChickenPart[]): MovementFormState {
   return { movement_date: selectedDate || todayISO(), chicken_part_id: parts[0]?.id ?? "", movement_type: "received", quantity_kg: "", note: "" };
 }
 
-export function MarinationConsole({ parts, initialMovements, userId, selectedDate }: Props) {
+export function MarinationConsole({ parts, initialMovements, userId, selectedDate, canViewAudit }: Props) {
   const [movements, setMovements] = useState(initialMovements);
   const [dateValue, setDateValue] = useState(selectedDate);
   const [message, setMessage] = useState("");
   const [editingMovementId, setEditingMovementId] = useState<string | null>(null);
   const [formState, setFormState] = useState<MovementFormState>(() => initialFormState(selectedDate, parts));
+  const [activeAuditPartId, setActiveAuditPartId] = useState<string | "all" | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const pathname = usePathname();
   const partsById = useMemo(() => Object.fromEntries(parts.map((part) => [part.id, part])), [parts]);
   const { summaries, totals } = useMemo(() => buildMarinationSummaries(parts, movements, selectedDate), [parts, movements, selectedDate]);
+  const calculationAudits = useMemo(() => parts.map((part) => buildMarinationCalculationAudit({ selectedDate, part, movements })), [parts, movements, selectedDate]);
+  const activeAudits = useMemo(() => activeAuditPartId === "all" ? calculationAudits : calculationAudits.filter((audit) => parts.find((part) => part.name === audit.partName)?.id === activeAuditPartId), [activeAuditPartId, calculationAudits, parts]);
   const selectedDateMovements = useMemo(() => movements.filter((movement) => movement.movement_date === selectedDate), [movements, selectedDate]);
   const isEditing = editingMovementId !== null;
   const isAdjustment = formState.movement_type === "adjustment";
@@ -203,16 +208,18 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
             </label>
             <button type="button" onClick={goToday} disabled={isPending || dateValue === todayISO()} className="focus-ring min-h-14 rounded-2xl bg-black px-5 text-lg font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-black/30">วันนี้</button>
           </div>
-          <div><p className="text-sm font-black text-black/50">ภาพรวมโรงหมัก</p><h2 className="text-2xl font-black">สรุปวันที่ {formatThaiDate(selectedDate)}</h2></div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-black text-black/50">ภาพรวมโรงหมัก</p><h2 className="text-2xl font-black">สรุปวันที่ {formatThaiDate(selectedDate)}</h2></div>{canViewAudit && <button type="button" onClick={() => setActiveAuditPartId("all")} className="focus-ring min-h-12 rounded-2xl bg-[#E60012] px-4 font-black text-white shadow-sm">ตรวจสอบสูตรคำนวณทั้งหมด</button>}</div>
           {selectedDateMovements.length === 0 && <p className="rounded-2xl bg-black/5 px-4 py-3 text-sm font-bold text-black/60">ยังไม่มีรายการบันทึกในวันที่นี้</p>}
         </div>
         <div className="mt-4 overflow-x-auto rounded-2xl border border-black/10">
           <table className="w-full min-w-[860px] text-left text-sm">
-            <thead className="bg-[#111111] text-white"><tr>{["ชิ้นส่วนไก่","ยอดยกมา","รับเข้า","ใช้หมัก","ปรับยอด","คงเหลือตามระบบ","ตรวจนับจริงล่าสุด","ส่วนต่าง","หมายเหตุล่าสุด"].map(h => <th key={h} className="p-3">{h}</th>)}</tr></thead>
-            <tbody>{summaries.map(row => <tr key={row.part.id} className="border-t border-black/10 font-bold"><td className="p-3 text-base font-black">{row.part.name}</td><td className="p-3">{kg(row.openingKg)}</td><td className="p-3">{kg(row.received)}</td><td className="p-3">{kg(row.used)}</td><td className="p-3">{kg(row.adjustment)}</td><td className="p-3">{kg(row.systemBalance)}</td><td className="p-3">{kg(row.latestCounted)}</td><td className={`p-3 ${row.variance && row.variance < 0 ? "text-red-600" : ""}`}>{kg(row.variance)}</td><td className="p-3">{row.latestNote ?? "-"}</td></tr>)}</tbody>
+            <thead className="bg-[#111111] text-white"><tr>{["ชิ้นส่วนไก่","ยอดยกมา","รับเข้า","ใช้หมัก","ปรับยอด","คงเหลือตามระบบ","ตรวจนับจริงล่าสุด","ส่วนต่าง","หมายเหตุล่าสุด", ...(canViewAudit ? ["ตรวจสอบ"] : [])].map(h => <th key={h} className="p-3">{h}</th>)}</tr></thead>
+            <tbody>{summaries.map(row => <tr key={row.part.id} className="border-t border-black/10 font-bold"><td className="p-3 text-base font-black">{row.part.name}</td><td className="p-3">{kg(row.openingKg)}</td><td className="p-3">{kg(row.received)}</td><td className="p-3">{kg(row.used)}</td><td className="p-3">{kg(row.adjustment)}</td><td className="p-3">{kg(row.systemBalance)}</td><td className="p-3">{kg(row.latestCounted)}</td><td className={`p-3 ${row.variance && row.variance < 0 ? "text-red-600" : ""}`}>{kg(row.variance)}</td><td className="p-3">{row.latestNote ?? "-"}</td>{canViewAudit && <td className="p-3"><button type="button" onClick={() => setActiveAuditPartId(row.part.id)} className="focus-ring min-h-10 rounded-xl bg-black px-3 font-black text-white">ดูวิธีคิด</button></td>}</tr>)}</tbody>
           </table>
         </div>
       </section>
+
+      {canViewAudit && activeAuditPartId && <AuditModal audits={activeAudits} selectedDate={selectedDate} onClose={() => setActiveAuditPartId(null)} />}
 
       <section id="input" className={`rounded-[1.75rem] border bg-white p-5 shadow-sm ${isEditing ? "border-[#E60012] ring-4 ring-[#E60012]/15" : "border-black/10"}`}>
         <p className="text-sm font-black text-black/50">บันทึกรับเข้า / ใช้หมัก / ตรวจนับ / ปรับยอด</p><h2 className="text-2xl font-black">ฟอร์ม Staff โรงหมัก</h2>
@@ -256,3 +263,47 @@ function Stat({ label, value, highlight, danger }: { label: string; value: strin
   );
 }
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label><span className="mb-2 block font-black">{label}</span>{children}</label>; }
+
+function AuditModal({ audits, selectedDate, onClose }: { audits: MarinationPartCalculationAudit[]; selectedDate: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/60 p-2 sm:items-center sm:p-6" role="dialog" aria-modal="true">
+      <div className="max-h-[92vh] w-full overflow-y-auto rounded-[1.75rem] bg-white p-4 shadow-2xl sm:mx-auto sm:max-w-5xl sm:p-6">
+        <div className="sticky top-0 z-10 -mx-4 -mt-4 flex items-center justify-between gap-3 bg-white p-4 sm:-mx-6 sm:-mt-6 sm:p-6">
+          <div><p className="text-sm font-black text-black/50">Calculation Audit</p><h2 className="text-2xl font-black">ตรวจสอบสูตรคำนวณ {formatThaiDate(selectedDate)}</h2></div>
+          <button type="button" onClick={onClose} className="focus-ring min-h-12 rounded-2xl bg-black px-4 font-black text-white">ปิด</button>
+        </div>
+        <div className="space-y-5">
+          {audits.map((audit) => <AuditPart key={audit.partName} audit={audit} />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AuditPart({ audit }: { audit: MarinationPartCalculationAudit }) {
+  return (
+    <article className="rounded-3xl border border-black/10 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div><p className="text-sm font-black text-black/50">{formatThaiDate(audit.selectedDate)}</p><h3 className="text-2xl font-black">{audit.partName}</h3><p className="mt-1 font-bold text-black/60">คงเหลือ = ยกมา + รับเข้า - ใช้หมัก + ปรับยอด</p><p className="font-black text-[#E60012]">{audit.formulaText}</p></div>
+        <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">{[["ยกมา", audit.openingKg], ["รับเข้า", audit.receivedKg], ["ใช้หมัก", audit.usedKg], ["ปรับยอด", audit.adjustmentKg], ["คงเหลือ", audit.systemRemainingKg]].map(([label, value]) => <div key={label} className="rounded-2xl bg-black/5 p-3"><div className="font-black text-black/50">{label}</div><div className="text-lg font-black">{kg(value as number)}</div></div>)}</div>
+      </div>
+      {audit.warnings.length > 0 && <div className="mt-4 rounded-2xl bg-yellow-100 p-3 font-black text-yellow-900"><p>คำเตือน</p><ul className="mt-1 list-disc pl-5">{audit.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}
+      <AuditRows title="รายการที่นำมาคิดเป็นยอดยกมา" rows={audit.openingRows} />
+      <AuditRows title="รายการรับเข้าวันนี้" rows={audit.todayReceiveRows} />
+      <AuditRows title="รายการใช้หมักวันนี้" rows={audit.todayUseRows} />
+      <AuditRows title="รายการปรับยอดวันนี้" rows={audit.todayAdjustmentRows} />
+      <AuditRows title="รายการที่ไม่ถูกนำมาคิด" rows={audit.ignoredRows} showReason />
+    </article>
+  );
+}
+
+function AuditRows({ title, rows, showReason }: { title: string; rows: MarinationMovementAuditRow[]; showReason?: boolean }) {
+  return (
+    <section className="mt-4">
+      <h4 className="font-black">{title}</h4>
+      {rows.length === 0 ? <p className="mt-2 rounded-2xl bg-black/5 p-3 font-bold text-black/50">ไม่มีรายการ</p> : (
+        <div className="mt-2 overflow-x-auto rounded-2xl border border-black/10"><table className="w-full min-w-[760px] text-left text-xs sm:text-sm"><thead className="bg-black text-white"><tr>{["วันที่", "ประเภท", "จำนวน", "ผลต่อสต๊อก", "หมายเหตุ", "id", ...(showReason ? ["เหตุผล"] : [])].map((head) => <th key={head} className="p-2">{head}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={`${row.id}-${row.bucket}`} className="border-t border-black/10 font-bold"><td className="p-2">{formatThaiDate(row.date)}<span className="block text-black/40">{row.createdAt ? time(row.createdAt) : "-"}</span></td><td className="p-2">{movementTypeLabels[row.movementType as MarinationMovementType] ?? row.movementType}</td><td className="p-2">{kg(row.quantityKg)}</td><td className={`p-2 font-black ${row.signedQuantityKg > 0 ? "text-green-700" : row.signedQuantityKg < 0 ? "text-red-600" : "text-black/50"}`}>{signedKg(row.signedQuantityKg)}</td><td className="p-2">{row.note ?? "-"}</td><td className="p-2 font-mono">{row.id.slice(0, 8)}</td>{showReason && <td className="p-2">{row.reason}</td>}</tr>)}</tbody></table></div>
+      )}
+    </section>
+  );
+}
