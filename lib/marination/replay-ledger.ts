@@ -63,6 +63,7 @@ export function replayMarinationLedgerForDate(movements: RawMarinationLedgerMove
   const ignoredRows: ReplayRow[] = [];
   const warnings: string[] = [];
   const normalizedMovements = sortMarinationLedgerMovements(movements.map(normalizeMovement));
+  const effectiveSetBalanceMovements = getEffectiveDailySetBalanceMovements(normalizedMovements);
   const replayPartId = partId ?? normalizedMovements.find((movement) => movement.partId)?.partId ?? "";
 
   for (const movement of normalizedMovements) {
@@ -72,9 +73,12 @@ export function replayMarinationLedgerForDate(movements: RawMarinationLedgerMove
     let signedEffect = 0;
     let balanceAfter = balanceBefore;
     let reason = "ตรวจนับจริงใช้แสดงผลเท่านั้น ไม่กระทบยอดระบบ";
-    const bucket = getBucket(movement.movementDate, selectedDate, normalizedKind);
+    const isSupersededSetBalance = normalizedKind === "set_balance" && !effectiveSetBalanceMovements.has(movement);
+    const bucket = isSupersededSetBalance ? "ignored" : getBucket(movement.movementDate, selectedDate, normalizedKind);
 
-    if (normalizedKind === "receive") {
+    if (isSupersededSetBalance) {
+      reason = "ปรับยอดถูกแทนที่ด้วยรายการปรับยอดล่าสุดของวันเดียวกัน";
+    } else if (normalizedKind === "receive") {
       signedEffect = quantityKg;
       balance += signedEffect;
       balanceAfter = balance;
@@ -102,8 +106,8 @@ export function replayMarinationLedgerForDate(movements: RawMarinationLedgerMove
       normalizedKind,
       quantityKg,
       balanceBefore,
-      signedEffect: isSystemLedgerKind(normalizedKind) ? signedEffect : 0,
-      balanceAfter: isSystemLedgerKind(normalizedKind) ? balanceAfter : balanceBefore,
+      signedEffect: isSystemLedgerKind(normalizedKind) && !isSupersededSetBalance ? signedEffect : 0,
+      balanceAfter: isSystemLedgerKind(normalizedKind) && !isSupersededSetBalance ? balanceAfter : balanceBefore,
       bucket,
       reason,
       note: movement.note ?? null,
@@ -124,14 +128,16 @@ export function replayMarinationLedgerForDate(movements: RawMarinationLedgerMove
 }
 
 export function replayMarinationLedger(movements: RawMarinationLedgerMovement[], initialBalance = 0) {
-  return sortMarinationLedgerMovements(movements.map(normalizeMovement)).reduce((state, movement) => {
+  const normalizedMovements = sortMarinationLedgerMovements(movements.map(normalizeMovement));
+  const effectiveSetBalanceMovements = getEffectiveDailySetBalanceMovements(normalizedMovements);
+  return normalizedMovements.reduce((state, movement) => {
     const previousBalance = state.balance;
     const quantity = Number(movement.quantityKg) || 0;
     const kind = normalizeMovementKind(movement.movementType);
     if (kind === "receive") state.balance += quantity;
     if (kind === "use") state.balance -= quantity;
-    if (kind === "set_balance") state.balance = quantity;
-    if (kind === "set_balance") state.adjustmentEffectKg += state.balance - previousBalance;
+    if (kind === "set_balance" && effectiveSetBalanceMovements.has(movement)) state.balance = quantity;
+    if (kind === "set_balance" && effectiveSetBalanceMovements.has(movement)) state.adjustmentEffectKg += state.balance - previousBalance;
     return state;
   }, { balance: initialBalance, adjustmentEffectKg: 0 });
 }
@@ -164,6 +170,26 @@ function normalizeMovement(movement: RawMarinationLedgerMovement): MarinationLed
     quantityKg: Number(movement.quantityKg ?? movement.quantity_kg) || 0,
     note: movement.note ?? null,
   };
+}
+
+function getEffectiveDailySetBalanceMovements(movements: MarinationLedgerMovement[]) {
+  const latestByPartAndDate = new Map<string, MarinationLedgerMovement>();
+
+  for (const movement of movements) {
+    if (normalizeMovementKind(movement.movementType) !== "set_balance") continue;
+
+    const key = `${movement.partId}::${movement.movementDate}`;
+    const current = latestByPartAndDate.get(key);
+    if (!current || compareSetBalanceRecency(movement, current) > 0) {
+      latestByPartAndDate.set(key, movement);
+    }
+  }
+
+  return new Set(latestByPartAndDate.values());
+}
+
+function compareSetBalanceRecency(a: MarinationLedgerMovement, b: MarinationLedgerMovement) {
+  return a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
 }
 
 function getBucket(movementDate: string, selectedDate: string, kind: NormalizedMovementKind): ReplayBucket {
