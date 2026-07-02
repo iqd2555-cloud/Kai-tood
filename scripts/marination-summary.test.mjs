@@ -54,6 +54,23 @@ assert.equal(blScrapAudit.totalReceiveBeforeDate, 200);
 assert.equal(blScrapAudit.totalUseBeforeDate, 90);
 assert.equal(blScrapAudit.adjustmentEffectsBeforeDate, -30);
 assert.equal(blScrapAudit.stockCheckIgnoredBeforeDate, 120);
+
+const blScrapOutOfEntryOrderMovements = [
+  movement("late-use", "2026-07-01", "bl-scrap", "used", 50, "ใช้หมักก่อนบันทึกปรับยอด", "2026-07-01T07:00:00.000Z"),
+  movement("late-receive-70", "2026-07-01", "bl-scrap", "received", 70, "รับเข้า 70 กก.", "2026-07-01T08:00:00.000Z"),
+  movement("late-receive-10", "2026-07-01", "bl-scrap", "received", 10, "รับเข้า 10 กก.", "2026-07-01T09:00:00.000Z"),
+  movement("late-adjust", "2026-07-01", "bl-scrap", "adjustment", 50, "ตั้งยอดใหม่ให้เหลือ 50 กก. แม้บันทึกทีหลัง", "2026-07-01T23:00:00.000Z"),
+  movement("next-receive", "2026-07-02", "bl-scrap", "received", 100, "รับเข้าวันที่เลือก"),
+  movement("next-use", "2026-07-02", "bl-scrap", "used", 80, "ใช้หมักวันที่เลือก"),
+];
+const outOfEntryOrderAudit = buildMarinationCalculationAudit({ selectedDate: "2026-07-02", part: parts[0], movements: blScrapOutOfEntryOrderMovements });
+assert.equal(outOfEntryOrderAudit.openingKg, 80, "2026-07-02 opening must use 2026-07-01 closing of 50 - 50 + 70 + 10 even if the adjustment was entered later");
+assert.equal(outOfEntryOrderAudit.receivedKg, 100);
+assert.equal(outOfEntryOrderAudit.usedKg, 80);
+assert.equal(outOfEntryOrderAudit.adjustmentKg, 0);
+assert.equal(outOfEntryOrderAudit.systemRemainingKg, 100);
+assert.equal(outOfEntryOrderAudit.formulaText, "80 + 100 - 80 + 0 = 100");
+
 assertPart("bb-scrap", 30, 30, 0);
 assertPart("skin", 40, 40, 0);
 assertPart("small-drumstick", 10, 10, 0);

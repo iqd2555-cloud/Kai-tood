@@ -139,6 +139,7 @@ export function replayMarinationLedger(movements: RawMarinationLedgerMovement[],
 export function sortMarinationLedgerMovements<T extends RawMarinationLedgerMovement | MarinationLedgerMovement>(movements: T[]) {
   return movements.slice().sort((a, b) =>
     getMovementDate(a).localeCompare(getMovementDate(b)) ||
+    getMovementKindSortOrder(a) - getMovementKindSortOrder(b) ||
     getCreatedAt(a).localeCompare(getCreatedAt(b)) ||
     getId(a).localeCompare(getId(b))
   );
@@ -185,5 +186,14 @@ function getCreatedAt(movement: RawMarinationLedgerMovement | MarinationLedgerMo
   if ("createdAt" in movement && movement.createdAt !== undefined) return String(movement.createdAt);
   if ("created_at" in movement && movement.created_at !== undefined) return String(movement.created_at);
   return "";
+}
+function getMovementKindSortOrder(movement: RawMarinationLedgerMovement | MarinationLedgerMovement) {
+  const movementType = "movementType" in movement && movement.movementType !== undefined ? movement.movementType : "movement_type" in movement ? movement.movement_type : "";
+  const kind = normalizeMovementKind(movementType);
+  if (kind === "set_balance") return 0;
+  if (kind === "use") return 1;
+  if (kind === "receive") return 2;
+  if (kind === "stock_check") return 3;
+  return 4;
 }
 function getId(movement: RawMarinationLedgerMovement | MarinationLedgerMovement) { return String(movement.id ?? ""); }
