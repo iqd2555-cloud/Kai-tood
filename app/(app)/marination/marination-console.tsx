@@ -166,6 +166,7 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
         <p className="text-sm font-bold text-[#E60012]">ระบบหลังบ้าน Kai-tood</p>
         <h1 className="mt-2 text-3xl font-black">โรงหมักไก่</h1>
         <p className="mt-2 text-white/70">บันทึกและติดตามไก่สดรับเข้า ใช้หมัก คงเหลือตามระบบ และยอดตรวจนับจริงแบบ Real-time</p>
+        <p className="mt-3 rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-white/80">กติกาสต๊อก: ยอดยกมาของวันที่เลือก = ยอดคงเหลือตามระบบของวันก่อนหน้า หลังรวมรับเข้า ใช้หมัก และปรับยอดครบแล้ว</p>
         <div className="mt-4 rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-800">เชื่อมต่อ Supabase Realtime สำหรับ Owner Dashboard แล้ว</div>
       </section>
 
@@ -179,7 +180,7 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
       </nav>
 
       <section className="grid gap-3 sm:grid-cols-6">
-        <Stat label="ยอดยกมา" value={kg(totals.opening)} highlight />
+        <Stat label="ยอดยกมา (ปิดยอดวันก่อน)" value={kg(totals.opening)} highlight />
         <Stat label="รับเข้าวันที่เลือก" value={kg(totals.received)} />
         <Stat label="ใช้หมักวันที่เลือก" value={kg(totals.used)} />
         <Stat label="คงเหลือตามระบบ" value={kg(totals.systemBalance)} />

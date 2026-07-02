@@ -125,6 +125,18 @@ export function buildMarinationSummaries(parts: ChickenPart[], movements: Marina
 }
 
 export function calculateMarinationOpeningBalance(movements: Pick<MarinationStockMovement, "movement_date" | "movement_type" | "quantity_kg">[]) {
+  const movementsByDate = groupMarinationMovementsByDate(movements);
+
+  return Array.from(movementsByDate.keys()).sort().reduce((closingBalance, date) => {
+    return closingBalance + calculateMarinationSystemBalance(movementsByDate.get(date) ?? []);
+  }, 0);
+}
+
+export function calculateMarinationClosingBalanceOnDate(movements: Pick<MarinationStockMovement, "movement_date" | "movement_type" | "quantity_kg">[], closingDate: string) {
+  return calculateMarinationOpeningBalance(movements.filter((movement) => movement.movement_date <= closingDate));
+}
+
+function groupMarinationMovementsByDate(movements: Pick<MarinationStockMovement, "movement_date" | "movement_type" | "quantity_kg">[]) {
   const movementsByDate = new Map<string, Pick<MarinationStockMovement, "movement_type" | "quantity_kg">[]>();
 
   for (const movement of movements) {
@@ -133,9 +145,7 @@ export function calculateMarinationOpeningBalance(movements: Pick<MarinationStoc
     movementsByDate.set(movement.movement_date, dateMovements);
   }
 
-  return Array.from(movementsByDate.keys()).sort().reduce((closingBalance, date) => {
-    return closingBalance + calculateMarinationSystemBalance(movementsByDate.get(date) ?? []);
-  }, 0);
+  return movementsByDate;
 }
 
 export function calculateMarinationSystemBalance(movements: Pick<MarinationStockMovement, "movement_type" | "quantity_kg">[]) {
