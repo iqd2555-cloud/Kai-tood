@@ -1,3 +1,5 @@
+import { replayMarinationLedger, replayMarinationLedgerForDate, sortMarinationLedgerMovements, type RawMarinationLedgerMovement, type ReplayRow } from "./marination/replay-ledger.ts";
+
 export type MarinationMovementType = "received" | "used" | "counted" | "adjustment";
 
 export type ChickenPart = {
@@ -20,33 +22,9 @@ export type MarinationStockMovement = {
   updated_at?: string | null;
 };
 
-export type LedgerMovement = Pick<MarinationStockMovement, "movement_date" | "movement_type" | "quantity_kg"> &
-  Partial<Pick<MarinationStockMovement, "id" | "created_at" | "note">>;
-
-export type LedgerReplayRow = {
-  id: string;
-  movementDate: string;
-  createdAt: string | null;
-  movementType: string;
-  quantityKg: number;
-  balanceBefore: number;
-  signedEffect: number;
-  balanceAfter: number;
-  reason: string;
-  note?: string | null;
-};
-
-export type LedgerReplayResult = {
-  openingKg: number;
-  receivedKg: number;
-  usedKg: number;
-  adjustmentDeltaKg: number;
-  systemRemainingKg: number;
-  rowsBeforeDate: LedgerReplayRow[];
-  rowsOnDate: LedgerReplayRow[];
-  ignoredRows: LedgerReplayRow[];
-  warnings: string[];
-};
+export type LedgerMovement = RawMarinationLedgerMovement;
+export type LedgerReplayRow = ReplayRow;
+export type LedgerReplayResult = ReturnType<typeof replayMarinationLedgerForDate>;
 
 export type MarinationPartStockSummary = {
   partId: string;
@@ -152,95 +130,16 @@ export function buildMarinationSummaries(parts: ChickenPart[], movements: Marina
   return { summaries, totals };
 }
 
-export function replayMarinationLedgerForDate(movements: LedgerMovement[], selectedDate: string): LedgerReplayResult {
-  let balance = 0;
-  const rowsBeforeDate: LedgerReplayRow[] = [];
-  const rowsOnDate: LedgerReplayRow[] = [];
-  const ignoredRows: LedgerReplayRow[] = [];
-  const warnings: string[] = [];
-
-  for (const movement of sortMarinationLedgerMovements(movements)) {
-    const movementType = movement.movement_type;
-    const quantityKg = Number(movement.quantity_kg) || 0;
-    const balanceBefore = balance;
-    let signedEffect = 0;
-    let reason = "ตรวจนับจริงใช้แสดงผลเท่านั้น ไม่กระทบยอดระบบ";
-    const isLedgerMovement = movementType === "received" || movementType === "used" || movementType === "adjustment";
-
-    if (movementType === "received") {
-      signedEffect = quantityKg;
-      balance += signedEffect;
-      reason = "รับเข้า นับเป็นบวก";
-    } else if (movementType === "used") {
-      signedEffect = -quantityKg;
-      balance += signedEffect;
-      reason = "ใช้หมัก นับเป็นลบ";
-    } else if (movementType === "adjustment") {
-      balance = quantityKg;
-      signedEffect = balance - balanceBefore;
-      reason = "ปรับยอดแบบตั้งยอดใหม่ ผลต่อสต๊อกคือ target ลบยอดก่อนหน้า";
-    } else if (movementType !== "counted") {
-      warnings.push(`พบ movement_type ที่ไม่รู้จัก: ${movementType || "(ว่าง)"} ในรายการ ${movement.id ?? "ไม่มี id"}`);
-      reason = "movement_type ไม่รู้จัก จึงไม่นำมาคิด";
-    }
-
-    const row: LedgerReplayRow = {
-      id: movement.id ?? `${movement.movement_date}-${movementType}-${rowsBeforeDate.length + rowsOnDate.length + ignoredRows.length}`,
-      movementDate: movement.movement_date,
-      createdAt: movement.created_at ?? null,
-      movementType,
-      quantityKg,
-      balanceBefore,
-      signedEffect: isLedgerMovement ? signedEffect : 0,
-      balanceAfter: isLedgerMovement ? balance : balanceBefore,
-      reason,
-      note: movement.note ?? null,
-    };
-
-    if (movement.movement_date < selectedDate && isLedgerMovement) rowsBeforeDate.push(row);
-    else if (movement.movement_date === selectedDate && isLedgerMovement) rowsOnDate.push(row);
-    else ignoredRows.push(row);
-  }
-
-  const openingKg = rowsBeforeDate.length > 0 ? rowsBeforeDate[rowsBeforeDate.length - 1].balanceAfter : 0;
-  const receivedKg = rowsOnDate.filter((row) => row.movementType === "received").reduce((sum, row) => sum + row.quantityKg, 0);
-  const usedKg = rowsOnDate.filter((row) => row.movementType === "used").reduce((sum, row) => sum + row.quantityKg, 0);
-  const systemRemainingKg = rowsOnDate.length > 0 ? rowsOnDate[rowsOnDate.length - 1].balanceAfter : openingKg;
-  const adjustmentDeltaKg = systemRemainingKg - openingKg - receivedKg + usedKg;
-
-  return { openingKg, receivedKg, usedKg, adjustmentDeltaKg, systemRemainingKg, rowsBeforeDate, rowsOnDate, ignoredRows, warnings: Array.from(new Set(warnings)) };
-}
+export { replayMarinationLedgerForDate, replayMarinationLedger, sortMarinationLedgerMovements };
 
 export function calculateMarinationOpeningBalance(movements: LedgerMovement[]) {
   return replayMarinationLedger(movements).balance;
 }
 
 export function calculateMarinationClosingBalanceOnDate(movements: LedgerMovement[], closingDate: string) {
-  return calculateMarinationOpeningBalance(movements.filter((movement) => movement.movement_date <= closingDate));
+  return calculateMarinationOpeningBalance(movements.filter((movement) => String(movement.movement_date ?? movement.movementDate ?? "") <= closingDate));
 }
 
 export function calculateMarinationSystemBalance(movements: LedgerMovement[]) {
   return replayMarinationLedger(movements).balance;
-}
-
-export function replayMarinationLedger(movements: LedgerMovement[], initialBalance = 0) {
-  return sortMarinationLedgerMovements(movements).reduce((state, movement) => {
-    const previousBalance = state.balance;
-    const quantity = Number(movement.quantity_kg) || 0;
-
-    if (movement.movement_type === "received") state.balance += quantity;
-    if (movement.movement_type === "used") state.balance -= quantity;
-    if (movement.movement_type === "adjustment") state.balance = quantity;
-
-    if (movement.movement_type === "adjustment") state.adjustmentEffectKg += state.balance - previousBalance;
-    return state;
-  }, { balance: initialBalance, adjustmentEffectKg: 0 });
-}
-
-export function sortMarinationLedgerMovements<T extends LedgerMovement>(movements: T[]) {
-  return movements.slice().sort((a, b) =>
-    a.movement_date.localeCompare(b.movement_date) ||
-    (a.created_at ?? "").localeCompare(b.created_at ?? "") ||
-    (a.id ?? "").localeCompare(b.id ?? "")
-  );
 }
