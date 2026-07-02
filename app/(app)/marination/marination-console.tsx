@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase-client";
-import { buildMarinationSummaries, movementTypeLabels, type ChickenPart, type MarinationMovementType, type MarinationStockMovement } from "@/lib/marination";
+import { buildMarinationSummaries, calculateMarinationSystemBalance, movementTypeLabels, type ChickenPart, type MarinationMovementType, type MarinationStockMovement } from "@/lib/marination";
 import { formatThaiDate, numberFormatter, todayISO } from "@/lib/format";
 
 type Props = { parts: ChickenPart[]; initialMovements: MarinationStockMovement[]; userId: string; selectedDate: string };
@@ -17,14 +17,6 @@ type MovementFormState = {
 };
 
 function kg(value: number | null) { return value === null ? "-" : `${numberFormatter.format(value)} กก.`; }
-function calculateSystemBalance(movements: Pick<MarinationStockMovement, "movement_type" | "quantity_kg">[]) {
-  return movements.reduce((balance, movement) => {
-    const quantity = Number(movement.quantity_kg);
-    if (movement.movement_type === "received" || movement.movement_type === "adjustment") return balance + quantity;
-    if (movement.movement_type === "used") return balance - quantity;
-    return balance;
-  }, 0);
-}
 function buildAdjustmentNote(userNote: string, targetBalance: number, currentSystemBalance: number) {
   const autoNote = `ปรับยอดให้คงเหลือเป็น ${numberFormatter.format(targetBalance)} กก. จากยอดเดิม ${numberFormatter.format(currentSystemBalance)} กก.`;
   const trimmedNote = userNote.trim();
@@ -46,12 +38,13 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
   const router = useRouter();
   const pathname = usePathname();
   const partsById = useMemo(() => Object.fromEntries(parts.map((part) => [part.id, part])), [parts]);
-  const { summaries, totals } = useMemo(() => buildMarinationSummaries(parts, movements), [parts, movements]);
+  const { summaries, totals } = useMemo(() => buildMarinationSummaries(parts, movements, selectedDate), [parts, movements, selectedDate]);
+  const selectedDateMovements = useMemo(() => movements.filter((movement) => movement.movement_date === selectedDate), [movements, selectedDate]);
   const isEditing = editingMovementId !== null;
   const isAdjustment = formState.movement_type === "adjustment";
   const isDirectAdjustmentEdit = isEditing && isAdjustment;
-  const selectedPartMovements = useMemo(() => movements.filter((movement) => movement.chicken_part_id === formState.chicken_part_id), [movements, formState.chicken_part_id]);
-  const selectedPartSystemBalance = useMemo(() => calculateSystemBalance(selectedPartMovements), [selectedPartMovements]);
+  const selectedPartMovements = useMemo(() => movements.filter((movement) => movement.chicken_part_id === formState.chicken_part_id && movement.movement_date <= formState.movement_date), [movements, formState.chicken_part_id, formState.movement_date]);
+  const selectedPartSystemBalance = useMemo(() => calculateMarinationSystemBalance(selectedPartMovements), [selectedPartMovements]);
 
   useEffect(() => {
     setMovements(initialMovements);
@@ -67,7 +60,7 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
       .on("postgres_changes", { event: "*", schema: "public", table: "marination_stock_movements" }, (payload) => {
         const newMovementDate = (payload.new as Partial<MarinationStockMovement>).movement_date;
         const oldMovementDate = (payload.old as Partial<MarinationStockMovement>).movement_date;
-        if (newMovementDate === selectedDate || oldMovementDate === selectedDate) router.refresh();
+        if ((newMovementDate && newMovementDate <= selectedDate) || (oldMovementDate && oldMovementDate <= selectedDate)) router.refresh();
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -149,12 +142,12 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
       const { data: currentMovements, error: balanceError } = await supabase
         .from("marination_stock_movements")
         .select("movement_type, quantity_kg")
-        .eq("movement_date", formState.movement_date)
+        .lte("movement_date", formState.movement_date)
         .eq("chicken_part_id", formState.chicken_part_id)
         .returns<Pick<MarinationStockMovement, "movement_type" | "quantity_kg">[]>();
       if (balanceError) { setMessage(`คำนวณยอดคงเหลือปัจจุบันไม่สำเร็จ: ${balanceError.message}`); return; }
 
-      const currentSystemBalance = calculateSystemBalance(currentMovements ?? []);
+      const currentSystemBalance = calculateMarinationSystemBalance(currentMovements ?? []);
       const adjustmentDelta = inputQuantityKg - currentSystemBalance;
       insertPayload.quantity_kg = adjustmentDelta;
       insertPayload.note = buildAdjustmentNote(formState.note, inputQuantityKg, currentSystemBalance);
@@ -185,8 +178,9 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
         <a className="focus-ring rounded-2xl bg-white px-3 py-3 shadow-sm" href="#history">รายงานย้อนหลัง</a>
       </nav>
 
-      <section className="grid gap-3 sm:grid-cols-5">
-        <Stat label="รับเข้าวันที่เลือก" value={kg(totals.received)} highlight />
+      <section className="grid gap-3 sm:grid-cols-6">
+        <Stat label="ยอดยกมา" value={kg(totals.opening)} highlight />
+        <Stat label="รับเข้าวันที่เลือก" value={kg(totals.received)} />
         <Stat label="ใช้หมักวันที่เลือก" value={kg(totals.used)} />
         <Stat label="คงเหลือตามระบบ" value={kg(totals.systemBalance)} />
         <Stat label="ตรวจนับจริงล่าสุด" value={kg(totals.latestCounted)} />
@@ -209,12 +203,12 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
             <button type="button" onClick={goToday} disabled={isPending || dateValue === todayISO()} className="focus-ring min-h-14 rounded-2xl bg-black px-5 text-lg font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-black/30">วันนี้</button>
           </div>
           <div><p className="text-sm font-black text-black/50">ภาพรวมโรงหมัก</p><h2 className="text-2xl font-black">สรุปวันที่ {formatThaiDate(selectedDate)}</h2></div>
-          {movements.length === 0 && <p className="rounded-2xl bg-black/5 px-4 py-3 text-sm font-bold text-black/60">ยังไม่มีรายการบันทึกในวันที่นี้</p>}
+          {selectedDateMovements.length === 0 && <p className="rounded-2xl bg-black/5 px-4 py-3 text-sm font-bold text-black/60">ยังไม่มีรายการบันทึกในวันที่นี้</p>}
         </div>
         <div className="mt-4 overflow-x-auto rounded-2xl border border-black/10">
           <table className="w-full min-w-[860px] text-left text-sm">
-            <thead className="bg-[#111111] text-white"><tr>{["ชิ้นส่วนไก่","รับเข้า","ใช้หมัก","ปรับยอด","คงเหลือตามระบบ","ตรวจนับจริงล่าสุด","ส่วนต่าง","หมายเหตุล่าสุด"].map(h => <th key={h} className="p-3">{h}</th>)}</tr></thead>
-            <tbody>{summaries.map(row => <tr key={row.part.id} className="border-t border-black/10 font-bold"><td className="p-3 text-base font-black">{row.part.name}</td><td className="p-3">{kg(row.received)}</td><td className="p-3">{kg(row.used)}</td><td className="p-3">{kg(row.adjustment)}</td><td className="p-3">{kg(row.systemBalance)}</td><td className="p-3">{kg(row.latestCounted)}</td><td className={`p-3 ${row.variance && row.variance < 0 ? "text-red-600" : ""}`}>{kg(row.variance)}</td><td className="p-3">{row.latestNote}</td></tr>)}</tbody>
+            <thead className="bg-[#111111] text-white"><tr>{["ชิ้นส่วนไก่","ยอดยกมา","รับเข้า","ใช้หมัก","ปรับยอด","คงเหลือตามระบบ","ตรวจนับจริงล่าสุด","ส่วนต่าง","หมายเหตุล่าสุด"].map(h => <th key={h} className="p-3">{h}</th>)}</tr></thead>
+            <tbody>{summaries.map(row => <tr key={row.part.id} className="border-t border-black/10 font-bold"><td className="p-3 text-base font-black">{row.part.name}</td><td className="p-3">{kg(row.openingKg)}</td><td className="p-3">{kg(row.received)}</td><td className="p-3">{kg(row.used)}</td><td className="p-3">{kg(row.adjustment)}</td><td className="p-3">{kg(row.systemBalance)}</td><td className="p-3">{kg(row.latestCounted)}</td><td className={`p-3 ${row.variance && row.variance < 0 ? "text-red-600" : ""}`}>{kg(row.variance)}</td><td className="p-3">{row.latestNote}</td></tr>)}</tbody>
           </table>
         </div>
       </section>
@@ -246,7 +240,7 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
 
       <section id="history" className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
         <h2 className="text-2xl font-black">รายการล่าสุดของวันที่เลือก</h2>
-        <div className="mt-4 space-y-3">{movements.length === 0 ? <p className="font-bold text-black/50">ยังไม่มีรายการ</p> : movements.slice(0, 40).map(m => <article key={m.id} className="rounded-2xl border border-black/10 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:justify-between"><div><h3 className="text-lg font-black">{partsById[m.chicken_part_id]?.name || "ไม่พบชิ้นส่วน"} · {movementTypeLabels[m.movement_type]}</h3><p className="text-sm font-bold text-black/50">ผู้บันทึก {m.created_by || "-"} · {time(m.created_at)}</p>{m.updated_at && <p className="text-xs font-bold text-[#E60012]">แก้ไขล่าสุด {time(m.updated_at)}</p>}</div><div className="text-left text-2xl font-black sm:text-right">{kg(Number(m.quantity_kg))}</div></div>{m.note && <p className="mt-2 rounded-xl bg-black/5 p-3 font-bold">{m.note}</p>}<button type="button" onClick={() => startEditMovement(m)} className="focus-ring mt-3 min-h-12 w-full rounded-2xl bg-[#111111] px-4 text-lg font-black text-white sm:w-auto">แก้ไข</button></article>)}</div>
+        <div className="mt-4 space-y-3">{selectedDateMovements.length === 0 ? <p className="font-bold text-black/50">ยังไม่มีรายการ</p> : selectedDateMovements.slice(0, 40).map(m => <article key={m.id} className="rounded-2xl border border-black/10 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:justify-between"><div><h3 className="text-lg font-black">{partsById[m.chicken_part_id]?.name || "ไม่พบชิ้นส่วน"} · {movementTypeLabels[m.movement_type]}</h3><p className="text-sm font-bold text-black/50">ผู้บันทึก {m.created_by || "-"} · {time(m.created_at)}</p>{m.updated_at && <p className="text-xs font-bold text-[#E60012]">แก้ไขล่าสุด {time(m.updated_at)}</p>}</div><div className="text-left text-2xl font-black sm:text-right">{kg(Number(m.quantity_kg))}</div></div>{m.note && <p className="mt-2 rounded-xl bg-black/5 p-3 font-bold">{m.note}</p>}<button type="button" onClick={() => startEditMovement(m)} className="focus-ring mt-3 min-h-12 w-full rounded-2xl bg-[#111111] px-4 text-lg font-black text-white sm:w-auto">แก้ไข</button></article>)}</div>
       </section>
     </div>
   );

@@ -44,7 +44,8 @@ export default async function MarinationPage({ searchParams }: Props) {
     supabase
       .from("marination_stock_movements")
       .select("id, movement_date, chicken_part_id, movement_type, quantity_kg, note, created_by, created_at, updated_at")
-      .eq("movement_date", selectedDate)
+      .lte("movement_date", selectedDate)
+      .order("movement_date", { ascending: false })
       .order("created_at", { ascending: false })
       .returns<MarinationStockMovement[]>(),
   ]);
