@@ -65,6 +65,10 @@ export const movementTypeLabels: Record<MarinationMovementType, string> = {
 };
 
 export function buildMarinationSummaries(parts: ChickenPart[], movements: MarinationStockMovement[], selectedDate: string) {
+  // Stock ledger rule: opening balance must come from every system-affecting
+  // movement before the selected date. The selected date then adds receipts,
+  // subtracts usage, and applies adjustment deltas. Physical counts are only
+  // displayed for variance and never mutate the system balance here.
   const summaries = parts.map<MarinationPartSummary>((part) => {
     const partMovements = movements.filter((movement) => movement.chicken_part_id === part.id);
     const previousMovements = partMovements.filter((movement) => movement.movement_date < selectedDate);
