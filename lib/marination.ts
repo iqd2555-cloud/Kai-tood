@@ -20,8 +20,33 @@ export type MarinationStockMovement = {
   updated_at?: string | null;
 };
 
-type LedgerMovement = Pick<MarinationStockMovement, "movement_date" | "movement_type" | "quantity_kg"> &
-  Partial<Pick<MarinationStockMovement, "id" | "created_at">>;
+export type LedgerMovement = Pick<MarinationStockMovement, "movement_date" | "movement_type" | "quantity_kg"> &
+  Partial<Pick<MarinationStockMovement, "id" | "created_at" | "note">>;
+
+export type LedgerReplayRow = {
+  id: string;
+  movementDate: string;
+  createdAt: string | null;
+  movementType: string;
+  quantityKg: number;
+  balanceBefore: number;
+  signedEffect: number;
+  balanceAfter: number;
+  reason: string;
+  note?: string | null;
+};
+
+export type LedgerReplayResult = {
+  openingKg: number;
+  receivedKg: number;
+  usedKg: number;
+  adjustmentDeltaKg: number;
+  systemRemainingKg: number;
+  rowsBeforeDate: LedgerReplayRow[];
+  rowsOnDate: LedgerReplayRow[];
+  ignoredRows: LedgerReplayRow[];
+  warnings: string[];
+};
 
 export type MarinationPartStockSummary = {
   partId: string;
@@ -76,13 +101,13 @@ export function buildMarinationSummaries(parts: ChickenPart[], movements: Marina
   // additional positive movement.
   const summaries = parts.map<MarinationPartSummary>((part) => {
     const partMovements = movements.filter((movement) => movement.chicken_part_id === part.id);
-    const previousMovements = partMovements.filter((movement) => movement.movement_date < selectedDate);
     const selectedDateMovements = partMovements.filter((movement) => movement.movement_date === selectedDate);
-    const opening = calculateMarinationOpeningBalance(previousMovements);
-    const received = sumByType(selectedDateMovements, "received");
-    const used = sumByType(selectedDateMovements, "used");
-    const systemBalance = replayMarinationLedger(selectedDateMovements, opening).balance;
-    const adjustment = systemBalance - opening - received + used;
+    const replay = replayMarinationLedgerForDate(partMovements, selectedDate);
+    const opening = replay.openingKg;
+    const received = replay.receivedKg;
+    const used = replay.usedKg;
+    const systemBalance = replay.systemRemainingKg;
+    const adjustment = replay.adjustmentDeltaKg;
     const latestCount = selectedDateMovements.find((movement) => movement.movement_type === "counted");
     const latestWithNote = selectedDateMovements.find((movement) => movement.note?.trim());
     const latestMovement = selectedDateMovements[0];
@@ -127,6 +152,65 @@ export function buildMarinationSummaries(parts: ChickenPart[], movements: Marina
   return { summaries, totals };
 }
 
+export function replayMarinationLedgerForDate(movements: LedgerMovement[], selectedDate: string): LedgerReplayResult {
+  let balance = 0;
+  const rowsBeforeDate: LedgerReplayRow[] = [];
+  const rowsOnDate: LedgerReplayRow[] = [];
+  const ignoredRows: LedgerReplayRow[] = [];
+  const warnings: string[] = [];
+
+  for (const movement of sortMarinationLedgerMovements(movements)) {
+    const movementType = movement.movement_type;
+    const quantityKg = Number(movement.quantity_kg) || 0;
+    const balanceBefore = balance;
+    let signedEffect = 0;
+    let reason = "ตรวจนับจริงใช้แสดงผลเท่านั้น ไม่กระทบยอดระบบ";
+    const isLedgerMovement = movementType === "received" || movementType === "used" || movementType === "adjustment";
+
+    if (movementType === "received") {
+      signedEffect = quantityKg;
+      balance += signedEffect;
+      reason = "รับเข้า นับเป็นบวก";
+    } else if (movementType === "used") {
+      signedEffect = -quantityKg;
+      balance += signedEffect;
+      reason = "ใช้หมัก นับเป็นลบ";
+    } else if (movementType === "adjustment") {
+      balance = quantityKg;
+      signedEffect = balance - balanceBefore;
+      reason = "ปรับยอดแบบตั้งยอดใหม่ ผลต่อสต๊อกคือ target ลบยอดก่อนหน้า";
+    } else if (movementType !== "counted") {
+      warnings.push(`พบ movement_type ที่ไม่รู้จัก: ${movementType || "(ว่าง)"} ในรายการ ${movement.id ?? "ไม่มี id"}`);
+      reason = "movement_type ไม่รู้จัก จึงไม่นำมาคิด";
+    }
+
+    const row: LedgerReplayRow = {
+      id: movement.id ?? `${movement.movement_date}-${movementType}-${rowsBeforeDate.length + rowsOnDate.length + ignoredRows.length}`,
+      movementDate: movement.movement_date,
+      createdAt: movement.created_at ?? null,
+      movementType,
+      quantityKg,
+      balanceBefore,
+      signedEffect: isLedgerMovement ? signedEffect : 0,
+      balanceAfter: isLedgerMovement ? balance : balanceBefore,
+      reason,
+      note: movement.note ?? null,
+    };
+
+    if (movement.movement_date < selectedDate && isLedgerMovement) rowsBeforeDate.push(row);
+    else if (movement.movement_date === selectedDate && isLedgerMovement) rowsOnDate.push(row);
+    else ignoredRows.push(row);
+  }
+
+  const openingKg = rowsBeforeDate.length > 0 ? rowsBeforeDate[rowsBeforeDate.length - 1].balanceAfter : 0;
+  const receivedKg = rowsOnDate.filter((row) => row.movementType === "received").reduce((sum, row) => sum + row.quantityKg, 0);
+  const usedKg = rowsOnDate.filter((row) => row.movementType === "used").reduce((sum, row) => sum + row.quantityKg, 0);
+  const systemRemainingKg = rowsOnDate.length > 0 ? rowsOnDate[rowsOnDate.length - 1].balanceAfter : openingKg;
+  const adjustmentDeltaKg = systemRemainingKg - openingKg - receivedKg + usedKg;
+
+  return { openingKg, receivedKg, usedKg, adjustmentDeltaKg, systemRemainingKg, rowsBeforeDate, rowsOnDate, ignoredRows, warnings: Array.from(new Set(warnings)) };
+}
+
 export function calculateMarinationOpeningBalance(movements: LedgerMovement[]) {
   return replayMarinationLedger(movements).balance;
 }
@@ -159,10 +243,4 @@ export function sortMarinationLedgerMovements<T extends LedgerMovement>(movement
     (a.created_at ?? "").localeCompare(b.created_at ?? "") ||
     (a.id ?? "").localeCompare(b.id ?? "")
   );
-}
-
-function sumByType(movements: MarinationStockMovement[], type: MarinationMovementType) {
-  return movements
-    .filter((movement) => movement.movement_type === type)
-    .reduce((sum, movement) => sum + Number(movement.quantity_kg), 0);
 }
