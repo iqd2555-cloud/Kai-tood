@@ -68,7 +68,6 @@ export default async function MarinationPage({ searchParams }: Props) {
     <MarinationConsole
       parts={partsData ?? []}
       initialMovements={movementsData ?? []}
-      userId={profile.id}
       selectedDate={selectedDate}
       canViewAudit={canManageMovements}
       canAdjustMovements={canManageMovements}

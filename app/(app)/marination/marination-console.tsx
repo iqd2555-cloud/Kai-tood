@@ -5,10 +5,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase-client";
 import { buildMarinationSummaries, calculateMarinationSystemBalance, movementTypeLabels, type ChickenPart, type MarinationMovementType, type MarinationStockMovement } from "@/lib/marination";
 import { formatThaiDate, numberFormatter, todayISO } from "@/lib/format";
-import { voidMarinationMovement } from "./actions";
+import { saveMarinationMovement, voidMarinationMovement } from "./actions";
 import { buildMarinationCalculationAudit, type MarinationMovementAuditRow, type MarinationPartCalculationAudit } from "@/lib/marination/stock-audit";
 
-type Props = { parts: ChickenPart[]; initialMovements: MarinationStockMovement[]; userId: string; selectedDate: string; canViewAudit: boolean; canAdjustMovements: boolean; canVoidMovements: boolean };
+type Props = { parts: ChickenPart[]; initialMovements: MarinationStockMovement[]; selectedDate: string; canViewAudit: boolean; canAdjustMovements: boolean; canVoidMovements: boolean };
 
 type MovementFormState = {
   movement_date: string;
@@ -22,11 +22,6 @@ const STAFF_ALLOWED_MOVEMENT_TYPES: MarinationMovementType[] = ["received", "use
 const OWNER_ONLY_MOVEMENT_TYPES: MarinationMovementType[] = ["adjustment"];
 
 function kg(value: number | null) { return value === null ? "-" : `${numberFormatter.format(value)} กก.`; }
-function buildAdjustmentNote(userNote: string, targetBalance: number, currentSystemBalance: number) {
-  const autoNote = `ปรับยอดให้คงเหลือเป็น ${numberFormatter.format(targetBalance)} กก. จากยอดเดิม ${numberFormatter.format(currentSystemBalance)} กก.`;
-  const trimmedNote = userNote.trim();
-  return trimmedNote ? `${trimmedNote} | ${autoNote}` : autoNote;
-}
 function signedKg(value: number) { const prefix = value > 0 ? "+" : ""; return `${prefix}${numberFormatter.format(value)} กก.`; }
 function time(value: string) { return new Date(value).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Bangkok" }); }
 
@@ -34,7 +29,7 @@ function initialFormState(selectedDate: string, parts: ChickenPart[]): MovementF
   return { movement_date: selectedDate || todayISO(), chicken_part_id: parts[0]?.id ?? "", movement_type: "received", quantity_kg: "", note: "" };
 }
 
-export function MarinationConsole({ parts, initialMovements, userId, selectedDate, canViewAudit, canAdjustMovements, canVoidMovements }: Props) {
+export function MarinationConsole({ parts, initialMovements, selectedDate, canViewAudit, canAdjustMovements, canVoidMovements }: Props) {
   const [movements, setMovements] = useState(initialMovements);
   const [dateValue, setDateValue] = useState(selectedDate);
   const [message, setMessage] = useState("");
@@ -103,8 +98,8 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
   }
 
   function startEditMovement(movement: MarinationStockMovement) {
-    if (movement.movement_type === "adjustment" && !canAdjustMovements) {
-      setMessage("เฉพาะ Owner เท่านั้นที่แก้ไขรายการปรับยอดได้");
+    if (!canAdjustMovements) {
+      setMessage("เฉพาะ Owner เท่านั้นที่แก้ไขรายการที่กระทบ ledger ได้");
       return;
     }
     setEditingMovementId(movement.id);
@@ -138,40 +133,18 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
       setMessage(isDirectAdjustmentEdit ? "กรุณากรอกค่าเดลต้าปรับยอดที่ไม่ใช่ 0" : isAdjustment ? "กรุณากรอกยอดคงเหลือที่ต้องการให้เป็นตั้งแต่ 0 กก. ขึ้นไป" : "กรุณากรอกจำนวนกิโลกรัมให้มากกว่า 0");
       return;
     }
-    const supabase = createSupabaseBrowserClient();
-    if (!supabase) { setMessage("ยังไม่ได้ตั้งค่า Supabase"); return; }
+    const result = await saveMarinationMovement({
+      movementId: editingMovementId,
+      movementDate: formState.movement_date,
+      chickenPartId: formState.chicken_part_id,
+      movementType: formState.movement_type as MarinationMovementType,
+      quantityKg: inputQuantityKg,
+      note: formState.note,
+    });
 
-    if (editingMovementId) {
-      const { error } = await supabase.from("marination_stock_movements").update({
-        movement_date: formState.movement_date,
-        chicken_part_id: formState.chicken_part_id,
-        movement_type: formState.movement_type,
-        quantity_kg: inputQuantityKg,
-        note: formState.note.trim() || null,
-        updated_at: new Date().toISOString(),
-      }).eq("id", editingMovementId);
-      if (error) { setMessage(`บันทึกการแก้ไขไม่สำเร็จ: ${error.message}`); return; }
-      setMessage("บันทึกการแก้ไขรายการเดิมสำเร็จ");
-      setEditingMovementId(null);
-      setFormState(initialFormState(selectedDate, parts));
-      startTransition(() => router.refresh());
-      return;
-    }
-
-    const insertPayload = {
-      movement_date: formState.movement_date,
-      chicken_part_id: formState.chicken_part_id,
-      movement_type: formState.movement_type,
-      quantity_kg: inputQuantityKg,
-      note: formState.note.trim() || null as string | null,
-      created_by: userId,
-    };
-
-    if (isAdjustment) insertPayload.note = buildAdjustmentNote(formState.note, inputQuantityKg, selectedPartSystemBalance);
-
-    const { error } = await supabase.from("marination_stock_movements").insert(insertPayload);
-    if (error) { setMessage(`บันทึกไม่สำเร็จ: ${error.message}`); return; }
-    setMessage("บันทึกข้อมูลโรงหมักไก่สำเร็จ");
+    setMessage(result.message);
+    if (!result.ok) return;
+    setEditingMovementId(null);
     setFormState(initialFormState(selectedDate, parts));
     startTransition(() => router.refresh());
   }
@@ -259,7 +232,7 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
 
       <section id="history" className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
         <h2 className="text-2xl font-black">รายการล่าสุดของวันที่เลือก</h2>
-        <div className="mt-4 space-y-3">{selectedDateMovements.length === 0 ? <p className="font-bold text-black/50">ยังไม่มีรายการ</p> : selectedDateMovements.slice(0, 40).map(m => <article key={m.id} className="rounded-2xl border border-black/10 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:justify-between"><div><h3 className="text-lg font-black">{partsById[m.chicken_part_id]?.name || "ไม่พบชิ้นส่วน"} · {movementTypeLabels[m.movement_type]}</h3><p className="text-sm font-bold text-black/50">ผู้บันทึก {m.created_by || "-"} · {time(m.created_at)}</p>{m.updated_at && <p className="text-xs font-bold text-[#E60012]">แก้ไขล่าสุด {time(m.updated_at)}</p>}</div><div className="text-left text-2xl font-black sm:text-right">{kg(Number(m.quantity_kg))}</div></div>{m.note && <p className="mt-2 rounded-xl bg-black/5 p-3 font-bold">{m.note}</p>}{(canAdjustMovements || m.movement_type !== "adjustment") && <button type="button" onClick={() => startEditMovement(m)} className="focus-ring mt-3 min-h-12 w-full rounded-2xl bg-[#111111] px-4 text-lg font-black text-white sm:w-auto">แก้ไข</button>}</article>)}</div>
+        <div className="mt-4 space-y-3">{selectedDateMovements.length === 0 ? <p className="font-bold text-black/50">ยังไม่มีรายการ</p> : selectedDateMovements.slice(0, 40).map(m => <article key={m.id} className="rounded-2xl border border-black/10 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:justify-between"><div><h3 className="text-lg font-black">{partsById[m.chicken_part_id]?.name || "ไม่พบชิ้นส่วน"} · {movementTypeLabels[m.movement_type]}</h3><p className="text-sm font-bold text-black/50">ผู้บันทึก {m.created_by || "-"} · {time(m.created_at)}</p>{m.updated_at && <p className="text-xs font-bold text-[#E60012]">แก้ไขล่าสุด {time(m.updated_at)}</p>}</div><div className="text-left text-2xl font-black sm:text-right">{kg(Number(m.quantity_kg))}</div></div>{m.note && <p className="mt-2 rounded-xl bg-black/5 p-3 font-bold">{m.note}</p>}{canAdjustMovements && <button type="button" onClick={() => startEditMovement(m)} className="focus-ring mt-3 min-h-12 w-full rounded-2xl bg-[#111111] px-4 text-lg font-black text-white sm:w-auto">แก้ไข</button>}</article>)}</div>
       </section>
     </div>
   );

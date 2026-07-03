@@ -1,3 +1,4 @@
+import { numberFormatter } from "./format.ts";
 import { replayMarinationLedger, replayMarinationLedgerForDate, sortMarinationLedgerMovements, type RawMarinationLedgerMovement, type ReplayRow } from "./marination/replay-ledger.ts";
 
 export type MarinationMovementType = "received" | "used" | "counted" | "adjustment";
@@ -73,6 +74,12 @@ export const movementTypeLabels: Record<MarinationMovementType, string> = {
   counted: "ตรวจนับจริง",
   adjustment: "ปรับยอด",
 };
+
+export function buildAdjustmentNoteForMarination(userNote: string, targetBalance: number, currentSystemBalance: number) {
+  const autoNote = `ปรับยอดให้คงเหลือเป็น ${numberFormatter.format(targetBalance)} กก. จากยอดเดิม ${numberFormatter.format(currentSystemBalance)} กก.`;
+  const trimmedNote = userNote.trim();
+  return trimmedNote ? `${trimmedNote} | ${autoNote}` : autoNote;
+}
 
 export function buildMarinationSummaries(parts: ChickenPart[], movements: MarinationStockMovement[], selectedDate: string) {
   // Daily closed-ledger rule: opening balance for the selected date is the
