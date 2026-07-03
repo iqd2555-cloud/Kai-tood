@@ -71,6 +71,7 @@ export default async function MarinationPage({ searchParams }: Props) {
       userId={profile.id}
       selectedDate={selectedDate}
       canViewAudit={canManageMovements}
+      canAdjustMovements={canManageMovements}
       canVoidMovements={canManageMovements}
     />
   );
