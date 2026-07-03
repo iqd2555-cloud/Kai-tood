@@ -31,8 +31,8 @@ export function isOwnerEmail(email: string | null | undefined) {
   return includesEmail(OWNER_EMAILS, email);
 }
 
-export function canManageMarinationMovements(profile: Pick<Profile, "email" | "role">, authEmail?: string | null) {
-  return profile.role === "owner" || isOwnerEmail(profile.email) || isOwnerEmail(authEmail);
+export function canManageMarinationMovements(profile: Pick<Profile, "role">) {
+  return profile.role === "owner";
 }
 
 export function isMarinationOnlyStaff(profile: Pick<Profile, "email">) {

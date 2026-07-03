@@ -18,6 +18,9 @@ type MovementFormState = {
   note: string;
 };
 
+const STAFF_ALLOWED_MOVEMENT_TYPES: MarinationMovementType[] = ["received", "used", "counted"];
+const OWNER_ONLY_MOVEMENT_TYPES: MarinationMovementType[] = ["adjustment"];
+
 function kg(value: number | null) { return value === null ? "-" : `${numberFormatter.format(value)} กก.`; }
 function buildAdjustmentNote(userNote: string, targetBalance: number, currentSystemBalance: number) {
   const autoNote = `ปรับยอดให้คงเหลือเป็น ${numberFormatter.format(targetBalance)} กก. จากยอดเดิม ${numberFormatter.format(currentSystemBalance)} กก.`;
@@ -50,7 +53,7 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
   const isVoidMode = formState.movement_type === "void_mistake";
   const isAdjustment = formState.movement_type === "adjustment";
   const isDirectAdjustmentEdit = isEditing && isAdjustment;
-  const movementTypeOptions = useMemo(() => (Object.keys(movementTypeLabels) as MarinationMovementType[]).filter((type) => canAdjustMovements || type !== "adjustment"), [canAdjustMovements]);
+  const movementTypeOptions = useMemo(() => canAdjustMovements ? [...STAFF_ALLOWED_MOVEMENT_TYPES, ...OWNER_ONLY_MOVEMENT_TYPES] : STAFF_ALLOWED_MOVEMENT_TYPES, [canAdjustMovements]);
   const selectedPartMovements = useMemo(() => movements.filter((movement) => movement.chicken_part_id === formState.chicken_part_id && movement.movement_date <= formState.movement_date), [movements, formState.chicken_part_id, formState.movement_date]);
   const selectedPartSystemBalance = useMemo(() => calculateMarinationSystemBalance(selectedPartMovements), [selectedPartMovements]);
 
@@ -59,6 +62,15 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
     setDateValue(selectedDate);
     if (!editingMovementId) setFormState(initialFormState(selectedDate, parts));
   }, [initialMovements, selectedDate, parts, editingMovementId]);
+
+  useEffect(() => {
+    if (!canAdjustMovements && formState.movement_type === "adjustment") {
+      setFormState((current) => ({ ...current, movement_type: "received" }));
+    }
+    if (!canVoidMovements && formState.movement_type === "void_mistake") {
+      setFormState((current) => ({ ...current, movement_type: "received" }));
+    }
+  }, [canAdjustMovements, canVoidMovements, formState.movement_type]);
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();

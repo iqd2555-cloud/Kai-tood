@@ -21,7 +21,7 @@ export default async function MarinationPage({ searchParams }: Props) {
   } = await supabase.auth.getUser();
   const authEmail = user?.email ?? null;
   const canAccessMarination = canAccessMarinationByEmail(authEmail ?? profile.email);
-  const canManageMovements = canManageMarinationMovements(profile, authEmail);
+  const canManageMovements = canManageMarinationMovements(profile);
 
   if (!canAccessMarination) {
     return (
