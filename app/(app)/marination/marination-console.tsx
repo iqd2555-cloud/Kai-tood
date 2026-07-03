@@ -5,14 +5,15 @@ import { usePathname, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase-client";
 import { buildMarinationSummaries, calculateMarinationSystemBalance, movementTypeLabels, type ChickenPart, type MarinationMovementType, type MarinationStockMovement } from "@/lib/marination";
 import { formatThaiDate, numberFormatter, todayISO } from "@/lib/format";
+import { voidMarinationMovement } from "./actions";
 import { buildMarinationCalculationAudit, type MarinationMovementAuditRow, type MarinationPartCalculationAudit } from "@/lib/marination/stock-audit";
 
-type Props = { parts: ChickenPart[]; initialMovements: MarinationStockMovement[]; userId: string; selectedDate: string; canViewAudit: boolean };
+type Props = { parts: ChickenPart[]; initialMovements: MarinationStockMovement[]; userId: string; selectedDate: string; canViewAudit: boolean; canVoidMovements: boolean };
 
 type MovementFormState = {
   movement_date: string;
   chicken_part_id: string;
-  movement_type: MarinationMovementType;
+  movement_type: MarinationMovementType | "void_mistake";
   quantity_kg: string;
   note: string;
 };
@@ -30,7 +31,7 @@ function initialFormState(selectedDate: string, parts: ChickenPart[]): MovementF
   return { movement_date: selectedDate || todayISO(), chicken_part_id: parts[0]?.id ?? "", movement_type: "received", quantity_kg: "", note: "" };
 }
 
-export function MarinationConsole({ parts, initialMovements, userId, selectedDate, canViewAudit }: Props) {
+export function MarinationConsole({ parts, initialMovements, userId, selectedDate, canViewAudit, canVoidMovements }: Props) {
   const [movements, setMovements] = useState(initialMovements);
   const [dateValue, setDateValue] = useState(selectedDate);
   const [message, setMessage] = useState("");
@@ -46,6 +47,7 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
   const activeAudits = useMemo(() => activeAuditPartId === "all" ? calculationAudits : calculationAudits.filter((audit) => parts.find((part) => part.name === audit.partName)?.id === activeAuditPartId), [activeAuditPartId, calculationAudits, parts]);
   const selectedDateMovements = useMemo(() => movements.filter((movement) => movement.movement_date === selectedDate), [movements, selectedDate]);
   const isEditing = editingMovementId !== null;
+  const isVoidMode = formState.movement_type === "void_mistake";
   const isAdjustment = formState.movement_type === "adjustment";
   const isDirectAdjustmentEdit = isEditing && isAdjustment;
   const selectedPartMovements = useMemo(() => movements.filter((movement) => movement.chicken_part_id === formState.chicken_part_id && movement.movement_date <= formState.movement_date), [movements, formState.chicken_part_id, formState.movement_date]);
@@ -109,6 +111,7 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
   async function submitMovement(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
+    if (isVoidMode) return;
     const inputQuantityKg = Number(formState.quantity_kg);
     if (!Number.isFinite(inputQuantityKg) || (isDirectAdjustmentEdit ? inputQuantityKg === 0 : inputQuantityKg < 0 || (!isAdjustment && inputQuantityKg === 0))) {
       setMessage(isDirectAdjustmentEdit ? "กรุณากรอกค่าเดลต้าปรับยอดที่ไม่ใช่ 0" : isAdjustment ? "กรุณากรอกยอดคงเหลือที่ต้องการให้เป็นตั้งแต่ 0 กก. ขึ้นไป" : "กรุณากรอกจำนวนกิโลกรัมให้มากกว่า 0");
@@ -211,10 +214,10 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
       <section id="input" className={`rounded-[1.75rem] border bg-white p-5 shadow-sm ${isEditing ? "border-[#E60012] ring-4 ring-[#E60012]/15" : "border-black/10"}`}>
         <p className="text-sm font-black text-black/50">บันทึกรับเข้า / ใช้หมัก / ตรวจนับ / ปรับยอด</p><h2 className="text-2xl font-black">ฟอร์ม Staff โรงหมัก</h2>
         {isEditing && <div className="mt-3 rounded-2xl bg-yellow-100 p-3 font-black text-yellow-900">กำลังแก้ไขรายการเดิม ไม่ใช่การบันทึกเพิ่ม</div>}
-        <form onSubmit={submitMovement} className="mt-4 grid gap-4 sm:grid-cols-2">
+        {isVoidMode && canVoidMovements ? <div className="mt-4 grid gap-4"><Field label="ประเภทการบันทึก"><select className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold shadow-sm" name="movement_type" value={formState.movement_type} onChange={(event) => updateForm("movement_type", event.target.value as MovementFormState["movement_type"])} required>{(Object.keys(movementTypeLabels) as MarinationMovementType[]).map(type => <option key={type} value={type}>{movementTypeLabels[type]}</option>)}<option value="void_mistake">ยกเลิกรายการผิด</option></select></Field><VoidMovementPanel movements={selectedDateMovements} partsById={partsById} onDone={(nextMessage) => { setMessage(nextMessage); startTransition(() => router.refresh()); }} /></div> : <form onSubmit={submitMovement} className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field label="วันที่"><input className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold shadow-sm" type="date" name="movement_date" value={formState.movement_date} onChange={(event) => updateForm("movement_date", event.target.value)} required /></Field>
           <Field label="ชิ้นส่วนไก่"><select className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold shadow-sm" name="chicken_part_id" value={formState.chicken_part_id} onChange={(event) => updateForm("chicken_part_id", event.target.value)} required>{parts.map(part => <option key={part.id} value={part.id}>{part.name}</option>)}</select></Field>
-          <Field label="ประเภทการบันทึก"><select className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold shadow-sm" name="movement_type" value={formState.movement_type} onChange={(event) => updateForm("movement_type", event.target.value as MarinationMovementType)} required>{(Object.keys(movementTypeLabels) as MarinationMovementType[]).map(type => <option key={type} value={type}>{movementTypeLabels[type]}</option>)}</select></Field>
+          <Field label="ประเภทการบันทึก"><select className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold shadow-sm" name="movement_type" value={formState.movement_type} onChange={(event) => updateForm("movement_type", event.target.value as MovementFormState["movement_type"])} required>{(Object.keys(movementTypeLabels) as MarinationMovementType[]).map(type => <option key={type} value={type}>{movementTypeLabels[type]}</option>)}{canVoidMovements && <option value="void_mistake">ยกเลิกรายการผิด</option>}</select></Field>
           <Field label={isAdjustment && !isEditing ? "ยอดคงเหลือที่ต้องการให้เป็น" : "จำนวนกิโลกรัม"}>
             <input className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold shadow-sm" type="number" inputMode="decimal" min={isDirectAdjustmentEdit ? undefined : "0"} step="0.01" name="quantity_kg" value={formState.quantity_kg} onChange={(event) => updateForm("quantity_kg", event.target.value)} placeholder={isAdjustment && !isEditing ? "เช่น ต้องการให้คงเหลือเป็น 50 ให้กรอก 50" : "เช่น 30"} required />
             {isAdjustment && !isEditing && (
@@ -225,11 +228,11 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
             )}
           </Field>
           <label className="sm:col-span-2"><span className="mb-2 block font-black">หมายเหตุ</span><textarea className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold shadow-sm min-h-28 py-3" name="note" value={formState.note} onChange={(event) => updateForm("note", event.target.value)} placeholder="เช่น ปรับยอดเพราะชั่งผิด / ตรวจนับรอบเย็น" /></label>
-          <div className="grid gap-3 sm:col-span-2 sm:grid-cols-2">
+          {!isVoidMode && <div className="grid gap-3 sm:col-span-2 sm:grid-cols-2">
             <button disabled={isPending} className="focus-ring min-h-14 rounded-2xl bg-[#E60012] px-5 text-xl font-black text-white shadow-lg">{isPending ? "กำลังบันทึก..." : isEditing ? "บันทึกการแก้ไข" : "บันทึกข้อมูล"}</button>
             {isEditing && <button type="button" onClick={cancelEdit} className="focus-ring min-h-14 rounded-2xl bg-black px-5 text-xl font-black text-white shadow-lg">ยกเลิก/ปิดฟอร์มแก้ไข</button>}
-          </div>
-        </form>
+          </div>}
+        </form>}
         {message && <div className="mt-3 rounded-2xl bg-[#E60012]/20 p-3 font-black">{message}</div>}
       </section>
 
@@ -238,6 +241,48 @@ export function MarinationConsole({ parts, initialMovements, userId, selectedDat
         <div className="mt-4 space-y-3">{selectedDateMovements.length === 0 ? <p className="font-bold text-black/50">ยังไม่มีรายการ</p> : selectedDateMovements.slice(0, 40).map(m => <article key={m.id} className="rounded-2xl border border-black/10 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:justify-between"><div><h3 className="text-lg font-black">{partsById[m.chicken_part_id]?.name || "ไม่พบชิ้นส่วน"} · {movementTypeLabels[m.movement_type]}</h3><p className="text-sm font-bold text-black/50">ผู้บันทึก {m.created_by || "-"} · {time(m.created_at)}</p>{m.updated_at && <p className="text-xs font-bold text-[#E60012]">แก้ไขล่าสุด {time(m.updated_at)}</p>}</div><div className="text-left text-2xl font-black sm:text-right">{kg(Number(m.quantity_kg))}</div></div>{m.note && <p className="mt-2 rounded-xl bg-black/5 p-3 font-bold">{m.note}</p>}<button type="button" onClick={() => startEditMovement(m)} className="focus-ring mt-3 min-h-12 w-full rounded-2xl bg-[#111111] px-4 text-lg font-black text-white sm:w-auto">แก้ไข</button></article>)}</div>
       </section>
     </div>
+  );
+}
+
+function VoidMovementPanel({ movements, partsById, onDone }: { movements: MarinationStockMovement[]; partsById: Record<string, ChickenPart>; onDone: (message: string) => void }) {
+  const [selectedId, setSelectedId] = useState(movements[0]?.id ?? "");
+  const [reason, setReason] = useState("");
+  const [isSubmitting, startSubmit] = useTransition();
+  const latestMovements = useMemo(() => movements.slice().sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id)), [movements]);
+  const selected = latestMovements.find((movement) => movement.id === selectedId);
+
+  useEffect(() => {
+    setSelectedId((current) => latestMovements.some((movement) => movement.id === current) ? current : latestMovements[0]?.id ?? "");
+  }, [latestMovements]);
+
+  function submitVoid() {
+    if (!selectedId) { onDone("กรุณาเลือกรายการที่ต้องการยกเลิก"); return; }
+    if (!reason.trim()) { onDone("กรุณาระบุเหตุผลในการยกเลิกรายการ"); return; }
+    startSubmit(async () => {
+      const result = await voidMarinationMovement({ movementId: selectedId, reason });
+      onDone(result.message);
+      if (result.ok) setReason("");
+    });
+  }
+
+  return (
+    <section className="rounded-3xl border-2 border-[#E60012] bg-red-50 p-4">
+      <p className="text-sm font-black text-[#E60012]">Owner เท่านั้น</p>
+      <h3 className="text-2xl font-black">ยกเลิกรายการผิด</h3>
+      <p className="mt-1 font-bold text-black/60">ระบบจะทำ soft delete/void รายการที่เลือก และไม่นำรายการนั้นไปคำนวณยอดโรงหมักอีก</p>
+      {movements.length === 0 ? <p className="mt-3 rounded-2xl bg-white p-3 font-bold text-black/50">ไม่มีรายการของวันที่เลือกให้ยกเลิก</p> : (
+        <div className="mt-4 grid gap-4">
+          <Field label="เลือกรายการล่าสุดของวันที่เลือก">
+            <select className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold shadow-sm" value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>
+              {latestMovements.slice(0, 40).map((movement) => <option key={movement.id} value={movement.id}>{partsById[movement.chicken_part_id]?.name || "ไม่พบชิ้นส่วน"} | {movementTypeLabels[movement.movement_type]} | {signedKg(Number(movement.quantity_kg))} | id: {movement.id.slice(0, 8)}</option>)}
+            </select>
+          </Field>
+          {selected && <div className="rounded-2xl bg-white p-3 font-bold"><p>{partsById[selected.chicken_part_id]?.name || "ไม่พบชิ้นส่วน"} · {movementTypeLabels[selected.movement_type]} · {kg(Number(selected.quantity_kg))}</p><p className="text-sm text-black/50">วันที่ {formatThaiDate(selected.movement_date)} · id: {selected.id}</p>{selected.note && <p className="mt-2 rounded-xl bg-black/5 p-2">{selected.note}</p>}</div>}
+          <label><span className="mb-2 block font-black">เหตุผลที่ยกเลิก</span><textarea className="focus-ring min-h-28 w-full rounded-2xl border-2 border-black/10 bg-white px-4 py-3 text-lg font-bold shadow-sm" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="เช่น บันทึกปรับยอดผิดเป็น -50 กก. ความจริงต้องตั้งยอดคงเหลือ 50 กก." /></label>
+          <button type="button" disabled={isSubmitting} onClick={submitVoid} className="focus-ring min-h-14 rounded-2xl bg-[#E60012] px-5 text-xl font-black text-white shadow-lg disabled:bg-black/30">{isSubmitting ? "กำลังยกเลิก..." : "ยืนยันยกเลิกรายการนี้"}</button>
+        </div>
+      )}
+    </section>
   );
 }
 
