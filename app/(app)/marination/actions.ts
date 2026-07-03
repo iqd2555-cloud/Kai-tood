@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getCurrentProfile, isOwner } from "@/lib/auth";
+import { getCurrentProfile } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { canManageMarinationMovements } from "@/lib/marination-access";
 
 type VoidMovementInput = {
   movementId: string;
@@ -16,10 +17,13 @@ export async function voidMarinationMovement(input: VoidMovementInput) {
   if (!reason) return { ok: false, message: "กรุณาระบุเหตุผลในการยกเลิกรายการ" };
 
   const profile = await getCurrentProfile();
-  if (!isOwner(profile)) return { ok: false, message: "เฉพาะ Owner เท่านั้นที่ยกเลิกรายการผิดได้" };
-
   const supabase = await createSupabaseServerClient();
   if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase" };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!canManageMarinationMovements(profile, user?.email ?? null)) return { ok: false, message: "เฉพาะ Owner เท่านั้นที่ยกเลิกรายการผิดได้" };
 
   const { data: existing, error: readError } = await supabase
     .from("marination_stock_movements")

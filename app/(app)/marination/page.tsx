@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
-import { getCurrentProfile, isOwner } from "@/lib/auth";
+import { getCurrentProfile } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { todayISO } from "@/lib/format";
 import { MarinationConsole } from "./marination-console";
 import type { ChickenPart, MarinationStockMovement } from "@/lib/marination";
-import { canAccessMarinationByEmail } from "@/lib/marination-access";
+import { canAccessMarinationByEmail, canManageMarinationMovements } from "@/lib/marination-access";
 
 type Props = { searchParams?: Promise<{ date?: string }> };
 
@@ -19,7 +19,9 @@ export default async function MarinationPage({ searchParams }: Props) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const canAccessMarination = canAccessMarinationByEmail(user?.email ?? profile.email);
+  const authEmail = user?.email ?? null;
+  const canAccessMarination = canAccessMarinationByEmail(authEmail ?? profile.email);
+  const canManageMovements = canManageMarinationMovements(profile, authEmail);
 
   if (!canAccessMarination) {
     return (
@@ -68,8 +70,8 @@ export default async function MarinationPage({ searchParams }: Props) {
       initialMovements={movementsData ?? []}
       userId={profile.id}
       selectedDate={selectedDate}
-      canViewAudit={isOwner(profile)}
-      canVoidMovements={isOwner(profile)}
+      canViewAudit={canManageMovements}
+      canVoidMovements={canManageMovements}
     />
   );
 }
