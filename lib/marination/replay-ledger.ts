@@ -8,6 +8,7 @@ export type MarinationLedgerMovement = {
   movementType: string;
   quantityKg: number;
   note?: string | null;
+  isVoided?: boolean;
 };
 
 export type ReplayBucket = "before_selected_date" | "on_selected_date" | "ignored";
@@ -54,6 +55,8 @@ export type RawMarinationLedgerMovement = {
   quantity_kg?: number | string | null;
   quantityKg?: number | string | null;
   note?: string | null;
+  is_voided?: boolean | null;
+  isVoided?: boolean | null;
 };
 
 export function replayMarinationLedgerForDate(movements: RawMarinationLedgerMovement[], selectedDate: string, partId?: string): ReplayResult {
@@ -62,7 +65,7 @@ export function replayMarinationLedgerForDate(movements: RawMarinationLedgerMove
   const rowsOnSelectedDate: ReplayRow[] = [];
   const ignoredRows: ReplayRow[] = [];
   const warnings: string[] = [];
-  const normalizedMovements = sortMarinationLedgerMovements(movements.map(normalizeMovement));
+  const normalizedMovements = sortMarinationLedgerMovements(movements.map(normalizeMovement).filter((movement) => !movement.isVoided));
   const effectiveSetBalanceMovements = getEffectiveDailySetBalanceMovements(normalizedMovements);
   const replayPartId = partId ?? normalizedMovements.find((movement) => movement.partId)?.partId ?? "";
 
@@ -128,7 +131,7 @@ export function replayMarinationLedgerForDate(movements: RawMarinationLedgerMove
 }
 
 export function replayMarinationLedger(movements: RawMarinationLedgerMovement[], initialBalance = 0) {
-  const normalizedMovements = sortMarinationLedgerMovements(movements.map(normalizeMovement));
+  const normalizedMovements = sortMarinationLedgerMovements(movements.map(normalizeMovement).filter((movement) => !movement.isVoided));
   const effectiveSetBalanceMovements = getEffectiveDailySetBalanceMovements(normalizedMovements);
   return normalizedMovements.reduce((state, movement) => {
     const previousBalance = state.balance;
@@ -169,6 +172,7 @@ function normalizeMovement(movement: RawMarinationLedgerMovement): MarinationLed
     movementType: String(movement.movementType ?? movement.movement_type ?? ""),
     quantityKg: Number(movement.quantityKg ?? movement.quantity_kg) || 0,
     note: movement.note ?? null,
+    isVoided: Boolean(movement.isVoided ?? movement.is_voided),
   };
 }
 

@@ -20,6 +20,10 @@ export type MarinationStockMovement = {
   created_by: string;
   created_at: string;
   updated_at?: string | null;
+  is_voided?: boolean | null;
+  voided_at?: string | null;
+  voided_by?: string | null;
+  void_reason?: string | null;
 };
 
 export type LedgerMovement = RawMarinationLedgerMovement;

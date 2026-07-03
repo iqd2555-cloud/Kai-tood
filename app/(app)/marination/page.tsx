@@ -43,7 +43,8 @@ export default async function MarinationPage({ searchParams }: Props) {
       .returns<ChickenPart[]>(),
     supabase
       .from("marination_stock_movements")
-      .select("id, movement_date, chicken_part_id, movement_type, quantity_kg, note, created_by, created_at, updated_at")
+      .select("id, movement_date, chicken_part_id, movement_type, quantity_kg, note, created_by, created_at, updated_at, is_voided, voided_at, voided_by, void_reason")
+      .eq("is_voided", false)
       .lte("movement_date", selectedDate)
       .order("movement_date", { ascending: true })
       .order("created_at", { ascending: true })
@@ -68,6 +69,7 @@ export default async function MarinationPage({ searchParams }: Props) {
       userId={profile.id}
       selectedDate={selectedDate}
       canViewAudit={isOwner(profile)}
+      canVoidMovements={isOwner(profile)}
     />
   );
 }
