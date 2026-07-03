@@ -20,10 +20,7 @@ export async function voidMarinationMovement(input: VoidMovementInput) {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase" };
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!canManageMarinationMovements(profile, user?.email ?? null)) return { ok: false, message: "เฉพาะ Owner เท่านั้นที่ยกเลิกรายการผิดได้" };
+  if (!canManageMarinationMovements(profile)) return { ok: false, message: "เฉพาะ Owner เท่านั้นที่ยกเลิกรายการผิดได้" };
 
   const { data: existing, error: readError } = await supabase
     .from("marination_stock_movements")
