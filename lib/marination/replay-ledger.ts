@@ -30,6 +30,7 @@ export type ReplayRow = {
 
 export type ReplayResult = {
   selectedDate: string;
+  stockResetDate: string | null;
   partId: string;
   openingKg: number;
   receivedKg: number;
@@ -59,13 +60,14 @@ export type RawMarinationLedgerMovement = {
   isVoided?: boolean | null;
 };
 
-export function replayMarinationLedgerForDate(movements: RawMarinationLedgerMovement[], selectedDate: string, partId?: string): ReplayResult {
+export function replayMarinationLedgerForDate(movements: RawMarinationLedgerMovement[], selectedDate: string, partId?: string, stockResetDate: string | null = null): ReplayResult {
   let balance = 0;
   const rowsBeforeSelectedDate: ReplayRow[] = [];
   const rowsOnSelectedDate: ReplayRow[] = [];
   const ignoredRows: ReplayRow[] = [];
   const warnings: string[] = [];
   const normalizedMovements = sortMarinationLedgerMovements(movements.map(normalizeMovement).filter((movement) => !movement.isVoided));
+  const effectiveResetDate = stockResetDate && stockResetDate <= selectedDate ? stockResetDate : null;
   const effectiveSetBalanceMovements = getEffectiveDailySetBalanceMovements(normalizedMovements);
   const replayPartId = partId ?? normalizedMovements.find((movement) => movement.partId)?.partId ?? "";
 
@@ -77,9 +79,12 @@ export function replayMarinationLedgerForDate(movements: RawMarinationLedgerMove
     let balanceAfter = balanceBefore;
     let reason = "ตรวจนับจริงใช้แสดงผลเท่านั้น ไม่กระทบยอดระบบ";
     const isSupersededSetBalance = normalizedKind === "set_balance" && !effectiveSetBalanceMovements.has(movement);
-    const bucket = isSupersededSetBalance ? "ignored" : getBucket(movement.movementDate, selectedDate, normalizedKind);
+    const isBeforeActiveReset = Boolean(effectiveResetDate && movement.movementDate < effectiveResetDate);
+    const bucket = isSupersededSetBalance || isBeforeActiveReset ? "ignored" : getBucket(movement.movementDate, selectedDate, normalizedKind);
 
-    if (isSupersededSetBalance) {
+    if (isBeforeActiveReset) {
+      reason = `รายการก่อน Stock Reset Date (${effectiveResetDate}) จึงไม่ถูกนำมาคำนวณยอดปัจจุบัน`;
+    } else if (isSupersededSetBalance) {
       reason = "ปรับยอดถูกแทนที่ด้วยรายการปรับยอดล่าสุดของวันเดียวกัน";
     } else if (normalizedKind === "receive") {
       signedEffect = quantityKg;
@@ -127,11 +132,11 @@ export function replayMarinationLedgerForDate(movements: RawMarinationLedgerMove
   const systemRemainingKg = rowsOnSelectedDate.length > 0 ? rowsOnSelectedDate[rowsOnSelectedDate.length - 1].balanceAfter : openingKg;
   const adjustmentDeltaKg = systemRemainingKg - openingKg - receivedKg + usedKg;
 
-  return { selectedDate, partId: replayPartId, openingKg, receivedKg, usedKg, adjustmentDeltaKg, systemRemainingKg, rowsBeforeSelectedDate, rowsOnSelectedDate, ignoredRows, warnings: Array.from(new Set(warnings)) };
+  return { selectedDate, stockResetDate: effectiveResetDate, partId: replayPartId, openingKg, receivedKg, usedKg, adjustmentDeltaKg, systemRemainingKg, rowsBeforeSelectedDate, rowsOnSelectedDate, ignoredRows, warnings: Array.from(new Set(warnings)) };
 }
 
-export function replayMarinationLedger(movements: RawMarinationLedgerMovement[], initialBalance = 0) {
-  const normalizedMovements = sortMarinationLedgerMovements(movements.map(normalizeMovement).filter((movement) => !movement.isVoided));
+export function replayMarinationLedger(movements: RawMarinationLedgerMovement[], initialBalance = 0, stockResetDate: string | null = null) {
+  const normalizedMovements = sortMarinationLedgerMovements(movements.map(normalizeMovement).filter((movement) => !movement.isVoided && (!stockResetDate || String(movement.movementDate ?? "") >= stockResetDate)));
   const effectiveSetBalanceMovements = getEffectiveDailySetBalanceMovements(normalizedMovements);
   return normalizedMovements.reduce((state, movement) => {
     const previousBalance = state.balance;

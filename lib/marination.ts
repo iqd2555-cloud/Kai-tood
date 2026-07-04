@@ -11,6 +11,16 @@ export type ChickenPart = {
   created_at?: string;
 };
 
+export type MarinationStockReset = {
+  id: string;
+  reset_date: string;
+  branch_id: string | null;
+  note: string | null;
+  created_at: string;
+  created_by: string | null;
+  is_active: boolean;
+};
+
 export type MarinationStockMovement = {
   id: string;
   movement_date: string;
@@ -81,7 +91,7 @@ export function buildAdjustmentNoteForMarination(userNote: string, targetBalance
   return trimmedNote ? `${trimmedNote} | ${autoNote}` : autoNote;
 }
 
-export function buildMarinationSummaries(parts: ChickenPart[], movements: MarinationStockMovement[], selectedDate: string) {
+export function buildMarinationSummaries(parts: ChickenPart[], movements: MarinationStockMovement[], selectedDate: string, stockResetDate: string | null = null) {
   // Daily closed-ledger rule: opening balance for the selected date is the
   // system closing balance from the previous business day. Rebuild it by
   // replaying every movement in business-date order: received = +kg, used =
@@ -91,7 +101,7 @@ export function buildMarinationSummaries(parts: ChickenPart[], movements: Marina
   const summaries = parts.map<MarinationPartSummary>((part) => {
     const partMovements = movements.filter((movement) => movement.chicken_part_id === part.id);
     const selectedDateMovements = partMovements.filter((movement) => movement.movement_date === selectedDate);
-    const replay = replayMarinationLedgerForDate(partMovements, selectedDate);
+    const replay = replayMarinationLedgerForDate(partMovements, selectedDate, part.id, stockResetDate);
     const opening = replay.openingKg;
     const received = replay.receivedKg;
     const used = replay.usedKg;
@@ -143,14 +153,14 @@ export function buildMarinationSummaries(parts: ChickenPart[], movements: Marina
 
 export { replayMarinationLedgerForDate, replayMarinationLedger, sortMarinationLedgerMovements };
 
-export function calculateMarinationOpeningBalance(movements: LedgerMovement[]) {
-  return replayMarinationLedger(movements).balance;
+export function calculateMarinationOpeningBalance(movements: LedgerMovement[], stockResetDate: string | null = null) {
+  return replayMarinationLedger(movements, 0, stockResetDate).balance;
 }
 
-export function calculateMarinationClosingBalanceOnDate(movements: LedgerMovement[], closingDate: string) {
-  return calculateMarinationOpeningBalance(movements.filter((movement) => String(movement.movement_date ?? movement.movementDate ?? "") <= closingDate));
+export function calculateMarinationClosingBalanceOnDate(movements: LedgerMovement[], closingDate: string, stockResetDate: string | null = null) {
+  return calculateMarinationOpeningBalance(movements.filter((movement) => String(movement.movement_date ?? movement.movementDate ?? "") <= closingDate), stockResetDate && stockResetDate <= closingDate ? stockResetDate : null);
 }
 
-export function calculateMarinationSystemBalance(movements: LedgerMovement[]) {
-  return replayMarinationLedger(movements).balance;
+export function calculateMarinationSystemBalance(movements: LedgerMovement[], stockResetDate: string | null = null) {
+  return replayMarinationLedger(movements, 0, stockResetDate).balance;
 }
