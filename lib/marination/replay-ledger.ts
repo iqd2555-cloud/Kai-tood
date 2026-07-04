@@ -70,6 +70,9 @@ export function replayMarinationLedgerForDate(movements: RawMarinationLedgerMove
   const effectiveResetDate = stockResetDate && stockResetDate <= selectedDate ? stockResetDate : null;
   const effectiveSetBalanceMovements = getEffectiveDailySetBalanceMovements(normalizedMovements);
   const replayPartId = partId ?? normalizedMovements.find((movement) => movement.partId)?.partId ?? "";
+  const resetSnapshotMovement = effectiveResetDate && selectedDate > effectiveResetDate
+    ? findEffectiveResetSnapshotMovement(normalizedMovements, effectiveSetBalanceMovements, effectiveResetDate, replayPartId)
+    : null;
 
   for (const movement of normalizedMovements) {
     const normalizedKind = normalizeMovementKind(movement.movementType);
@@ -80,12 +83,15 @@ export function replayMarinationLedgerForDate(movements: RawMarinationLedgerMove
     let reason = "ตรวจนับจริงใช้แสดงผลเท่านั้น ไม่กระทบยอดระบบ";
     const isSupersededSetBalance = normalizedKind === "set_balance" && !effectiveSetBalanceMovements.has(movement);
     const isBeforeActiveReset = Boolean(effectiveResetDate && movement.movementDate < effectiveResetDate);
-    const bucket = isSupersededSetBalance || isBeforeActiveReset ? "ignored" : getBucket(movement.movementDate, selectedDate, normalizedKind);
+    const isResetSnapshotDayNonSnapshotMovement = Boolean(resetSnapshotMovement && movement.movementDate === effectiveResetDate && movement !== resetSnapshotMovement);
+    const bucket = isSupersededSetBalance || isBeforeActiveReset || isResetSnapshotDayNonSnapshotMovement ? "ignored" : getBucket(movement.movementDate, selectedDate, normalizedKind);
 
     if (isBeforeActiveReset) {
       reason = `รายการก่อน Stock Reset Date (${effectiveResetDate}) จึงไม่ถูกนำมาคำนวณยอดปัจจุบัน`;
     } else if (isSupersededSetBalance) {
       reason = "ปรับยอดถูกแทนที่ด้วยรายการปรับยอดล่าสุดของวันเดียวกัน";
+    } else if (isResetSnapshotDayNonSnapshotMovement) {
+      reason = `รายการอื่นใน Stock Reset Date (${effectiveResetDate}) ไม่ถูกนำมาคำนวณ เพราะใช้รายการปรับยอดล่าสุดเป็น snapshot ตั้งต้นใหม่`;
     } else if (normalizedKind === "receive") {
       signedEffect = quantityKg;
       balance += signedEffect;
@@ -138,10 +144,14 @@ export function replayMarinationLedgerForDate(movements: RawMarinationLedgerMove
 export function replayMarinationLedger(movements: RawMarinationLedgerMovement[], initialBalance = 0, stockResetDate: string | null = null) {
   const normalizedMovements = sortMarinationLedgerMovements(movements.map(normalizeMovement).filter((movement) => !movement.isVoided && (!stockResetDate || String(movement.movementDate ?? "") >= stockResetDate)));
   const effectiveSetBalanceMovements = getEffectiveDailySetBalanceMovements(normalizedMovements);
+  const replayPartId = normalizedMovements.find((movement) => movement.partId)?.partId ?? "";
+  const resetSnapshotMovement = stockResetDate ? findEffectiveResetSnapshotMovement(normalizedMovements, effectiveSetBalanceMovements, stockResetDate, replayPartId) : null;
   return normalizedMovements.reduce((state, movement) => {
     const previousBalance = state.balance;
     const quantity = Number(movement.quantityKg) || 0;
     const kind = normalizeMovementKind(movement.movementType);
+    const isResetSnapshotDayNonSnapshotMovement = Boolean(resetSnapshotMovement && movement.movementDate === stockResetDate && movement !== resetSnapshotMovement);
+    if (isResetSnapshotDayNonSnapshotMovement) return state;
     if (kind === "receive") state.balance += quantity;
     if (kind === "use") state.balance -= quantity;
     if (kind === "set_balance" && effectiveSetBalanceMovements.has(movement)) state.balance = quantity;
@@ -195,6 +205,15 @@ function getEffectiveDailySetBalanceMovements(movements: MarinationLedgerMovemen
   }
 
   return new Set(latestByPartAndDate.values());
+}
+
+function findEffectiveResetSnapshotMovement(movements: MarinationLedgerMovement[], effectiveSetBalanceMovements: Set<MarinationLedgerMovement>, resetDate: string, partId: string) {
+  return movements.find((movement) =>
+    movement.movementDate === resetDate &&
+    movement.partId === partId &&
+    normalizeMovementKind(movement.movementType) === "set_balance" &&
+    effectiveSetBalanceMovements.has(movement)
+  ) ?? null;
 }
 
 function compareSetBalanceRecency(a: MarinationLedgerMovement, b: MarinationLedgerMovement) {
