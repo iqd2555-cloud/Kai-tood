@@ -36,14 +36,15 @@ export type MarinationPartCalculationAudit = {
   todayAdjustmentRows: MarinationMovementAuditRow[];
   ignoredRows: MarinationMovementAuditRow[];
   warnings: string[];
+  stockResetDate: string | null;
 };
 
 type AuditMovement = MarinationStockMovement & { movement_type: string };
 
-export function buildMarinationCalculationAudit({ selectedDate, part, movements }: { selectedDate: string; part: Pick<ChickenPart, "id" | "name">; movements: AuditMovement[]; }): MarinationPartCalculationAudit {
+export function buildMarinationCalculationAudit({ selectedDate, part, movements, stockResetDate = null }: { selectedDate: string; part: Pick<ChickenPart, "id" | "name">; movements: AuditMovement[]; stockResetDate?: string | null; }): MarinationPartCalculationAudit {
   const partMovements = movements.filter((movement) => movement.chicken_part_id === part.id);
   const duplicateIds = findDuplicateIds(partMovements);
-  const replay = replayMarinationLedgerForDate(partMovements, selectedDate);
+  const replay = replayMarinationLedgerForDate(partMovements, selectedDate, part.id, stockResetDate);
   const warnings = [...replay.warnings];
   if (duplicateIds.length > 0) warnings.push(`พบ duplicate id: ${duplicateIds.map(shortId).join(", ")}`);
 
@@ -78,6 +79,7 @@ export function buildMarinationCalculationAudit({ selectedDate, part, movements 
     todayAdjustmentRows,
     ignoredRows,
     warnings: Array.from(new Set(warnings)),
+    stockResetDate: replay.stockResetDate,
   };
 }
 

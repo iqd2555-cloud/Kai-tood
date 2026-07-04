@@ -52,18 +52,31 @@ export async function saveMarinationMovement(input: SaveMovementInput) {
 
   let finalNote = note;
   if (movementType === "adjustment" && !movementId) {
-    const { data: previousMovements, error: readError } = await supabase
-      .from("marination_stock_movements")
-      .select("id, movement_date, chicken_part_id, movement_type, quantity_kg, note, created_by, created_at, updated_at, is_voided, voided_at, voided_by, void_reason")
-      .eq("is_voided", false)
-      .eq("chicken_part_id", input.chickenPartId)
-      .lte("movement_date", input.movementDate)
-      .order("movement_date", { ascending: true })
-      .order("created_at", { ascending: true })
-      .order("id", { ascending: true })
-      .returns<MarinationStockMovement[]>();
+    const [{ data: previousMovements, error: readError }, { data: resetRows, error: resetError }] = await Promise.all([
+      supabase
+        .from("marination_stock_movements")
+        .select("id, movement_date, chicken_part_id, movement_type, quantity_kg, note, created_by, created_at, updated_at, is_voided, voided_at, voided_by, void_reason")
+        .eq("is_voided", false)
+        .eq("chicken_part_id", input.chickenPartId)
+        .lte("movement_date", input.movementDate)
+        .order("movement_date", { ascending: true })
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .returns<MarinationStockMovement[]>(),
+      supabase
+        .from("marination_stock_resets")
+        .select("reset_date")
+        .eq("is_active", true)
+        .lte("reset_date", input.movementDate)
+        .order("reset_date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .returns<{ reset_date: string }[]>(),
+    ]);
     if (readError) return { ok: false, message: `ตรวจสอบยอดก่อนปรับไม่สำเร็จ: ${readError.message}` };
-    finalNote = buildAdjustmentNoteForMarination(note ?? "", input.quantityKg, calculateMarinationSystemBalance(previousMovements ?? []));
+    if (resetError) return { ok: false, message: `ตรวจสอบวันตั้งต้นสต๊อกไม่สำเร็จ: ${resetError.message}` };
+    const activeResetDate = resetRows?.[0]?.reset_date ?? null;
+    finalNote = buildAdjustmentNoteForMarination(note ?? "", input.quantityKg, calculateMarinationSystemBalance(previousMovements ?? [], activeResetDate));
   }
 
   const payload = {

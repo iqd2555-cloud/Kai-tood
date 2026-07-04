@@ -8,7 +8,7 @@ import { formatThaiDate, numberFormatter, todayISO } from "@/lib/format";
 import { saveMarinationMovement, voidMarinationMovement } from "./actions";
 import { buildMarinationCalculationAudit, type MarinationMovementAuditRow, type MarinationPartCalculationAudit } from "@/lib/marination/stock-audit";
 
-type Props = { parts: ChickenPart[]; initialMovements: MarinationStockMovement[]; selectedDate: string; canViewAudit: boolean; canAdjustMovements: boolean; canVoidMovements: boolean };
+type Props = { parts: ChickenPart[]; initialMovements: MarinationStockMovement[]; selectedDate: string; canViewAudit: boolean; canAdjustMovements: boolean; canVoidMovements: boolean; stockResetDate: string | null; stockResetNote: string | null };
 
 type MovementFormState = {
   movement_date: string;
@@ -29,7 +29,7 @@ function initialFormState(selectedDate: string, parts: ChickenPart[]): MovementF
   return { movement_date: selectedDate || todayISO(), chicken_part_id: parts[0]?.id ?? "", movement_type: "received", quantity_kg: "", note: "" };
 }
 
-export function MarinationConsole({ parts, initialMovements, selectedDate, canViewAudit, canAdjustMovements, canVoidMovements }: Props) {
+export function MarinationConsole({ parts, initialMovements, selectedDate, canViewAudit, canAdjustMovements, canVoidMovements, stockResetDate, stockResetNote }: Props) {
   const [movements, setMovements] = useState(initialMovements);
   const [dateValue, setDateValue] = useState(selectedDate);
   const [message, setMessage] = useState("");
@@ -40,8 +40,8 @@ export function MarinationConsole({ parts, initialMovements, selectedDate, canVi
   const router = useRouter();
   const pathname = usePathname();
   const partsById = useMemo(() => Object.fromEntries(parts.map((part) => [part.id, part])), [parts]);
-  const { summaries, totals } = useMemo(() => buildMarinationSummaries(parts, movements, selectedDate), [parts, movements, selectedDate]);
-  const calculationAudits = useMemo(() => parts.map((part) => buildMarinationCalculationAudit({ selectedDate, part, movements })), [parts, movements, selectedDate]);
+  const { summaries, totals } = useMemo(() => buildMarinationSummaries(parts, movements, selectedDate, stockResetDate), [parts, movements, selectedDate, stockResetDate]);
+  const calculationAudits = useMemo(() => parts.map((part) => buildMarinationCalculationAudit({ selectedDate, part, movements, stockResetDate })), [parts, movements, selectedDate, stockResetDate]);
   const activeAudits = useMemo(() => activeAuditPartId === "all" ? calculationAudits : calculationAudits.filter((audit) => parts.find((part) => part.name === audit.partName)?.id === activeAuditPartId), [activeAuditPartId, calculationAudits, parts]);
   const selectedDateMovements = useMemo(() => movements.filter((movement) => movement.movement_date === selectedDate), [movements, selectedDate]);
   const isEditing = editingMovementId !== null;
@@ -50,7 +50,7 @@ export function MarinationConsole({ parts, initialMovements, selectedDate, canVi
   const isDirectAdjustmentEdit = isEditing && isAdjustment;
   const movementTypeOptions = useMemo(() => canAdjustMovements ? [...STAFF_ALLOWED_MOVEMENT_TYPES, ...OWNER_ONLY_MOVEMENT_TYPES] : STAFF_ALLOWED_MOVEMENT_TYPES, [canAdjustMovements]);
   const selectedPartMovements = useMemo(() => movements.filter((movement) => movement.chicken_part_id === formState.chicken_part_id && movement.movement_date <= formState.movement_date), [movements, formState.chicken_part_id, formState.movement_date]);
-  const selectedPartSystemBalance = useMemo(() => calculateMarinationSystemBalance(selectedPartMovements), [selectedPartMovements]);
+  const selectedPartSystemBalance = useMemo(() => calculateMarinationSystemBalance(selectedPartMovements, stockResetDate && stockResetDate <= formState.movement_date ? stockResetDate : null), [selectedPartMovements, stockResetDate, formState.movement_date]);
 
   useEffect(() => {
     setMovements(initialMovements);
@@ -156,6 +156,7 @@ export function MarinationConsole({ parts, initialMovements, selectedDate, canVi
         <h1 className="mt-2 text-3xl font-black">โรงหมักไก่</h1>
         <p className="mt-2 text-white/70">บันทึกและติดตามไก่สดรับเข้า ใช้หมัก คงเหลือตามระบบ และยอดตรวจนับจริงแบบ Real-time</p>
         <p className="mt-3 rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-white/80">กติกาสต๊อก: ยอดยกมาของวันที่เลือก = ยอดคงเหลือตามระบบของวันก่อนหน้า หลังรวมรับเข้า ใช้หมัก และปรับยอดครบแล้ว</p>
+        {stockResetDate && <p className="mt-3 rounded-2xl bg-yellow-100 px-4 py-3 text-sm font-black text-yellow-950">Stock Reset Date: {formatThaiDate(stockResetDate)} — ระบบจะไม่เอา movement ก่อนวันนี้มาคำนวณยอดปัจจุบัน{stockResetNote ? ` (${stockResetNote})` : ""}</p>}
         <div className="mt-4 rounded-2xl bg-green-50 px-4 py-3 text-sm font-black text-green-800">เชื่อมต่อ Supabase Realtime สำหรับ Owner Dashboard แล้ว</div>
       </section>
 
@@ -310,7 +311,7 @@ function AuditPart({ audit }: { audit: MarinationPartCalculationAudit }) {
   return (
     <article className="rounded-3xl border border-black/10 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div><p className="text-sm font-black text-black/50">{formatThaiDate(audit.selectedDate)}</p><h3 className="text-2xl font-black">{audit.partName}</h3><p className="mt-1 font-bold text-black/60">คงเหลือ = ยกมา + รับเข้า - ใช้หมัก + ปรับยอด</p><p className="font-black text-[#E60012]">{audit.formulaText}</p></div>
+        <div><p className="text-sm font-black text-black/50">{formatThaiDate(audit.selectedDate)}</p><h3 className="text-2xl font-black">{audit.partName}</h3><p className="mt-1 font-bold text-black/60">คงเหลือ = ยกมา + รับเข้า - ใช้หมัก + ปรับยอด</p>{audit.stockResetDate && <p className="font-black text-yellow-800">เริ่ม replay ตั้งแต่ Stock Reset Date: {formatThaiDate(audit.stockResetDate)}</p>}<p className="font-black text-[#E60012]">{audit.formulaText}</p></div>
         <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">{[["ยกมา", audit.openingKg], ["รับเข้า", audit.receivedKg], ["ใช้หมัก", audit.usedKg], ["ปรับยอด", audit.adjustmentKg], ["คงเหลือ", audit.systemRemainingKg]].map(([label, value]) => <div key={label} className="rounded-2xl bg-black/5 p-3"><div className="font-black text-black/50">{label}</div><div className="text-lg font-black">{kg(value as number)}</div></div>)}</div>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">

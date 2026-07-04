@@ -3,7 +3,7 @@ import { getCurrentProfile } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { todayISO } from "@/lib/format";
 import { MarinationConsole } from "./marination-console";
-import type { ChickenPart, MarinationStockMovement } from "@/lib/marination";
+import type { ChickenPart, MarinationStockMovement, MarinationStockReset } from "@/lib/marination";
 import { canAccessMarinationByEmail, canManageMarinationMovements } from "@/lib/marination-access";
 
 type Props = { searchParams?: Promise<{ date?: string }> };
@@ -36,7 +36,7 @@ export default async function MarinationPage({ searchParams }: Props) {
   const params = searchParams ? await searchParams : {};
   const selectedDate = normalizeDate(params.date);
 
-  const [{ data: partsData, error: partsError }, { data: movementsData, error: movementsError }] = await Promise.all([
+  const [{ data: partsData, error: partsError }, { data: movementsData, error: movementsError }, { data: resetData, error: resetError }] = await Promise.all([
     supabase
       .from("chicken_parts")
       .select("id, name, sort_order, is_active")
@@ -52,14 +52,23 @@ export default async function MarinationPage({ searchParams }: Props) {
       .order("created_at", { ascending: true })
       .order("id", { ascending: true })
       .returns<MarinationStockMovement[]>(),
+    supabase
+      .from("marination_stock_resets")
+      .select("id, reset_date, branch_id, note, created_at, created_by, is_active")
+      .eq("is_active", true)
+      .lte("reset_date", selectedDate)
+      .order("reset_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .returns<MarinationStockReset[]>(),
   ]);
 
-  if (partsError || movementsError) {
+  if (partsError || movementsError || resetError) {
     return (
       <section className="rounded-[2rem] bg-white p-5 shadow-sm">
         <h1 className="text-2xl font-black">ยังเปิดระบบโรงหมักไก่ไม่ได้</h1>
         <p className="mt-2 font-bold text-black/60">กรุณารัน migration Supabase สำหรับตาราง chicken_parts และ marination_stock_movements ก่อนใช้งาน</p>
-        <pre className="mt-4 overflow-auto rounded-2xl bg-black p-4 text-xs text-white">{partsError?.message ?? movementsError?.message}</pre>
+        <pre className="mt-4 overflow-auto rounded-2xl bg-black p-4 text-xs text-white">{partsError?.message ?? movementsError?.message ?? resetError?.message}</pre>
       </section>
     );
   }
@@ -72,6 +81,8 @@ export default async function MarinationPage({ searchParams }: Props) {
       canViewAudit={canManageMovements}
       canAdjustMovements={canManageMovements}
       canVoidMovements={canManageMovements}
+      stockResetDate={resetData?.[0]?.reset_date ?? null}
+      stockResetNote={resetData?.[0]?.note ?? null}
     />
   );
 }

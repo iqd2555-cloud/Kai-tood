@@ -109,6 +109,19 @@ assert.equal(sumOpeningByPart(movements.filter((item) => item.movement_date < "2
 assert.equal(sumClosingByPart(movements, "2026-07-01"), totals.opening, "2026-07-02 opening must equal 2026-07-01 system closing after received, used, and adjustments");
 assert.equal(sumSystemBalanceByPart(movements), totals.systemBalance);
 
+const stockResetMovements = [
+  movement("old-receive", "2026-07-01", "bl-scrap", "received", 30, "ข้อมูลเก่าก่อน reset ต้องไม่ถูกนำมาคิด"),
+  movement("reset-adjust", "2026-07-03", "bl-scrap", "adjustment", 100, "ตั้งต้นเศษ BL ใหม่เป็น 100 กก.", "2026-07-03T08:00:00.000Z"),
+];
+const stockResetSummary = buildMarinationSummaries(parts, stockResetMovements, "2026-07-04", "2026-07-03").summaries.find((summary) => summary.partId === "bl-scrap");
+assert.equal(stockResetSummary.openingKg, 100, "2026-07-04 opening must start from the reset-date adjustment only");
+assert.equal(stockResetSummary.receivedKg, 0);
+assert.equal(stockResetSummary.usedKg, 0);
+assert.equal(stockResetSummary.systemRemainingKg, 100, "old 30 kg before stock reset must not leak into current balance");
+const stockResetAudit = buildMarinationCalculationAudit({ selectedDate: "2026-07-04", part: parts[0], movements: stockResetMovements, stockResetDate: "2026-07-03" });
+assert.equal(stockResetAudit.stockResetDate, "2026-07-03");
+assert.equal(stockResetAudit.ignoredRows.filter((row) => row.id === "old-receive" && row.reason.includes("Stock Reset Date")).length, 1);
+
 console.log("marination-summary tests passed");
 
 function assertPart(partId, openingKg, usedKg, systemRemainingKg) {
