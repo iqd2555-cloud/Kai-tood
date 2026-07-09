@@ -42,6 +42,45 @@ const benefits = [
   "ระบบหลังบ้าน",
   "การดูแลหลังเปิดร้าน",
 ];
+
+const franchiseModels = [
+  {
+    badge: "เหมาะกับพื้นที่จำกัด",
+    title: "รูปแบบเคาน์เตอร์",
+    price: "55,000 บาท",
+    placeholder: "พื้นที่สำหรับใส่รูปภาพรูปแบบเคาน์เตอร์",
+    area: "พื้นที่อย่างต่ำ 2 × 3 เมตร",
+    location: "เหมาะกับพื้นที่ในอาคาร หรือพื้นที่ที่มีหลังคา เช่น หน้าร้าน ห้องเช่า พื้นที่ตลาดในร่ม หรือพื้นที่หน้าบ้านที่มีหลังคาคลุม",
+    suitableFor:
+      "ผู้เริ่มต้นที่มีพื้นที่จำกัด แต่อยากเริ่มขายจริงแบบเป็นระบบ",
+    description:
+      "รูปแบบเคาน์เตอร์เหมาะกับผู้เริ่มต้นที่ต้องการควบคุมงบประมาณ ใช้พื้นที่ไม่มาก แต่ยังได้ภาพลักษณ์ร้านที่ดูเป็นระบบ พร้อมเริ่มต้นขายข้าวเหนียวไก่ทอดได้จริง",
+    highlights: [
+      "ใช้พื้นที่ไม่มาก",
+      "ควบคุมงบเริ่มต้นได้ง่าย",
+      "เหมาะกับจุดขายในอาคารหรือพื้นที่มีหลังคา",
+    ],
+  },
+  {
+    badge: "พื้นที่ทำงานคล่องตัวขึ้น",
+    title: "รูปแบบซุ้ม",
+    price: "99,000 บาท",
+    placeholder: "พื้นที่สำหรับใส่รูปภาพรูปแบบซุ้ม",
+    area: "พื้นที่อย่างน้อย 3 × 4 เมตร",
+    location:
+      "เหมาะกับพื้นที่ขายที่ต้องการความเป็นร้านมากขึ้น เช่น พื้นที่หน้าถนน จุดขายประจำ ตลาด พื้นที่เช่า หรือจุดที่ต้องการให้ลูกค้ามองเห็นได้ชัด",
+    suitableFor:
+      "ผู้ที่ต้องการพื้นที่ทำงานคล่องตัวขึ้น และต้องการภาพลักษณ์ร้านที่เด่นกว่า",
+    description:
+      "รูปแบบซุ้มเหมาะกับผู้ที่ต้องการความพร้อมมากขึ้น มีพื้นที่จัดวางอุปกรณ์ ทำงานได้คล่องตัว และสร้างภาพจำของแบรนด์ได้ดีกว่ารูปแบบเคาน์เตอร์",
+    highlights: [
+      "พื้นที่ทำงานกว้างขึ้น",
+      "จัดวางอุปกรณ์ได้เป็นระบบกว่า",
+      "สร้างภาพจำหน้าร้านได้ชัดเจน",
+    ],
+  },
+];
+
 const contact = [
   "โทร: 089-272-2789",
   "Id Line: kaikoy",
@@ -96,6 +135,100 @@ function SectionHeader({
         </p>
       ) : null}
     </div>
+  );
+}
+
+
+function FranchiseModelsSection() {
+  return (
+    <Section className="pt-0">
+      <div className="rounded-[2.5rem] bg-[#fff9df] p-5 shadow-inner shadow-yellow-200/40 sm:p-8 lg:p-10">
+        <SectionHeader
+          kicker="Franchise Models"
+          title="รูปแบบแฟรนไชส์ที่เลือกได้"
+          text="เลือกขนาดการลงทุนให้เหมาะกับพื้นที่ งบประมาณ และรูปแบบการขายของคุณ"
+        />
+        <div className="grid gap-5 lg:grid-cols-2">
+          {franchiseModels.map((model) => (
+            <article
+              key={model.title}
+              className="flex flex-col rounded-[2rem] border border-black/10 bg-white p-5 shadow-xl shadow-black/5 sm:p-7"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <span className="rounded-full bg-[#ffc400] px-4 py-2 text-sm font-black text-black shadow-sm shadow-yellow-300/30">
+                  {model.badge}
+                </span>
+                <span className="rounded-full border border-black/10 bg-[#fff9df] px-4 py-2 text-sm font-black text-black/60">
+                  จะเพิ่มรูปภาพภายหลัง
+                </span>
+              </div>
+              <h3 className="mt-5 text-3xl font-black leading-tight text-black sm:text-4xl">
+                {model.title}
+              </h3>
+              <p className="mt-3 text-4xl font-black text-black sm:text-5xl">
+                {model.price}
+              </p>
+
+              <div className="mt-6 flex min-h-56 items-center justify-center rounded-[1.75rem] border-2 border-dashed border-black/15 bg-[#f8f8f8] p-6 text-center sm:min-h-64">
+                <div>
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl shadow-lg shadow-black/5">
+                    🖼️
+                  </div>
+                  <p className="mt-4 text-lg font-black text-black/55">
+                    {model.placeholder}
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-black/40">
+                    จะเพิ่มรูปภาพภายหลัง
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-3">
+                <div className="rounded-2xl bg-[#fff9df] p-4">
+                  <p className="text-sm font-black text-black/45">พื้นที่แนะนำ</p>
+                  <p className="mt-1 text-lg font-black text-black">{model.area}</p>
+                </div>
+                <div className="rounded-2xl border border-black/10 bg-white p-4">
+                  <p className="text-sm font-black text-black/45">ลักษณะพื้นที่</p>
+                  <p className="mt-1 font-bold leading-7 text-black/65">
+                    {model.location}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-black/10 bg-white p-4">
+                  <p className="text-sm font-black text-black/45">เหมาะสำหรับ</p>
+                  <p className="mt-1 font-bold leading-7 text-black/65">
+                    {model.suitableFor}
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-5 flex-1 text-base font-bold leading-8 text-black/62">
+                {model.description}
+              </p>
+              <ul className="mt-5 grid gap-2">
+                {model.highlights.map((highlight) => (
+                  <li
+                    key={highlight}
+                    className="flex gap-3 rounded-2xl bg-black px-4 py-3 font-black text-white"
+                  >
+                    <span className="text-[#ffc400]">✓</span>
+                    <span>{highlight}</span>
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ))}
+        </div>
+        <div className="mt-8 rounded-[2rem] bg-black p-6 text-center text-white sm:p-8">
+          <p className="text-2xl font-black">
+            ยังไม่แน่ใจว่ารูปแบบไหนเหมาะกับพื้นที่ของคุณ?
+          </p>
+          <Link href="/franchise/apply" className={`${primaryButton} mt-5`}>
+            สอบถามรูปแบบที่เหมาะกับฉัน
+          </Link>
+        </div>
+      </div>
+    </Section>
   );
 }
 
@@ -297,6 +430,8 @@ export default function LandingPage() {
           ))}
         </div>
       </Section>
+
+      <FranchiseModelsSection />
 
       <Section className="pt-0">
         <div className="overflow-hidden rounded-[2.5rem] bg-black p-8 text-center text-white shadow-2xl shadow-black/20 sm:p-12">
