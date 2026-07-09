@@ -364,7 +364,7 @@ export default function LandingPage() {
           <div className="overflow-hidden rounded-[2rem] bg-[#ffc400] p-4 shadow-xl shadow-black/10">
             {/* eslint-disable-next-line @next/next/no-img-element -- Existing brand imagery from public assets. */}
             <img
-              src="/Front%20shop"
+              src="/fronshop.jpg"
               alt="หน้าร้านเหนียวไก่เยอะโคตร"
               className="h-72 w-full rounded-[1.5rem] object-cover"
             />
