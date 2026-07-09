@@ -21,10 +21,6 @@ export function BrandLogo({ size = 56, className = "", priority = false }: Brand
       height={size}
       loading={priority ? "eager" : "lazy"}
       fetchPriority={priority ? "high" : "auto"}
-      onError={(event) => {
-        if (event.currentTarget.src.endsWith("/brand-logo.svg")) return;
-        event.currentTarget.src = "/brand-logo.svg";
-      }}
       className={`shrink-0 rounded-2xl bg-white object-contain ${className}`}
     />
   );
