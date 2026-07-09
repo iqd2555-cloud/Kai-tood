@@ -171,14 +171,20 @@ function FranchiseModelsSection() {
                 {model.price}
               </p>
 
-              <div className="mt-6 flex min-h-56 items-center justify-center overflow-hidden rounded-[1.75rem] border-2 border-dashed border-black/15 bg-[#f8f8f8] p-3 text-center sm:min-h-64">
+              <div
+                className={`mt-6 flex h-64 items-center justify-center overflow-hidden rounded-[1.75rem] text-center sm:h-72 ${
+                  model.imageSrc
+                    ? "border border-black/10 bg-white p-2"
+                    : "border-2 border-dashed border-black/15 bg-[#f8f8f8] p-3"
+                }`}
+              >
                 {model.imageSrc ? (
                   <>
-                    {/* eslint-disable-next-line @next/next/no-img-element -- Uploaded franchise counter image is a static public asset. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element -- Uploaded franchise counter image is a static public asset from /public/kiosk.png. */}
                     <img
                       src={model.imageSrc}
                       alt={model.imageAlt}
-                      className="h-full min-h-52 w-full rounded-[1.35rem] bg-white object-contain sm:min-h-60"
+                      className="h-full w-full rounded-[1.35rem] bg-white object-contain"
                     />
                   </>
                 ) : (
