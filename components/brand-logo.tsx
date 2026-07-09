@@ -9,11 +9,11 @@ type BrandLogoProps = {
   variant?: "default" | "red";
 };
 
-export function BrandLogo({ size = 56, className = "", priority = false, variant = "default" }: BrandLogoProps) {
-  const src = variant === "red" ? "/images/logo-red-full.png" : "/brand-logo.svg";
+export function BrandLogo({ size = 56, className = "", priority = false }: BrandLogoProps) {
+  const src = "/kaitoodlogo.jpeg";
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- Needed to swap to the existing logo when optional redesigned logo assets are not uploaded yet.
+    // eslint-disable-next-line @next/next/no-img-element -- Uses the logo file uploaded separately to public/kaitoodlogo.jpeg.
     <img
       src={src}
       alt={`${BRAND_NAME} logo`}
