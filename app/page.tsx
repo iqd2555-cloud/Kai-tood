@@ -49,6 +49,8 @@ const franchiseModels = [
     title: "รูปแบบเคาน์เตอร์",
     price: "55,000 บาท",
     placeholder: "พื้นที่สำหรับใส่รูปภาพรูปแบบเคาน์เตอร์",
+    imageSrc: "/kiosk.png",
+    imageAlt: "รูปแบบแฟรนไชส์เคาน์เตอร์ เหนียวไก่เยอะโคตร",
     area: "พื้นที่อย่างต่ำ 2 × 3 เมตร",
     location: "เหมาะกับพื้นที่ในอาคาร หรือพื้นที่ที่มีหลังคา เช่น หน้าร้าน ห้องเช่า พื้นที่ตลาดในร่ม หรือพื้นที่หน้าบ้านที่มีหลังคาคลุม",
     suitableFor:
@@ -159,7 +161,7 @@ function FranchiseModelsSection() {
                   {model.badge}
                 </span>
                 <span className="rounded-full border border-black/10 bg-[#fff9df] px-4 py-2 text-sm font-black text-black/60">
-                  จะเพิ่มรูปภาพภายหลัง
+                  {model.imageSrc ? "ภาพรูปแบบจริง" : "จะเพิ่มรูปภาพภายหลัง"}
                 </span>
               </div>
               <h3 className="mt-5 text-3xl font-black leading-tight text-black sm:text-4xl">
@@ -169,18 +171,29 @@ function FranchiseModelsSection() {
                 {model.price}
               </p>
 
-              <div className="mt-6 flex min-h-56 items-center justify-center rounded-[1.75rem] border-2 border-dashed border-black/15 bg-[#f8f8f8] p-6 text-center sm:min-h-64">
-                <div>
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl shadow-lg shadow-black/5">
-                    🖼️
+              <div className="mt-6 flex min-h-56 items-center justify-center overflow-hidden rounded-[1.75rem] border-2 border-dashed border-black/15 bg-[#f8f8f8] p-3 text-center sm:min-h-64">
+                {model.imageSrc ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- Uploaded franchise counter image is a static public asset. */}
+                    <img
+                      src={model.imageSrc}
+                      alt={model.imageAlt}
+                      className="h-full min-h-52 w-full rounded-[1.35rem] bg-white object-contain sm:min-h-60"
+                    />
+                  </>
+                ) : (
+                  <div>
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl shadow-lg shadow-black/5">
+                      🖼️
+                    </div>
+                    <p className="mt-4 text-lg font-black text-black/55">
+                      {model.placeholder}
+                    </p>
+                    <p className="mt-1 text-sm font-bold text-black/40">
+                      จะเพิ่มรูปภาพภายหลัง
+                    </p>
                   </div>
-                  <p className="mt-4 text-lg font-black text-black/55">
-                    {model.placeholder}
-                  </p>
-                  <p className="mt-1 text-sm font-bold text-black/40">
-                    จะเพิ่มรูปภาพภายหลัง
-                  </p>
-                </div>
+                )}
               </div>
 
               <div className="mt-6 grid gap-3">
