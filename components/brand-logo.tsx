@@ -1,12 +1,10 @@
 "use client";
 
-import { BRAND_NAME } from "@/lib/brand";
-
 type BrandLogoProps = {
   size?: number;
   className?: string;
   priority?: boolean;
-  variant?: "default" | "red";
+  variant?: "default" | "red" | "light" | (string & {});
 };
 
 export function BrandLogo({ size = 56, className = "", priority = false }: BrandLogoProps) {
@@ -16,7 +14,7 @@ export function BrandLogo({ size = 56, className = "", priority = false }: Brand
     // eslint-disable-next-line @next/next/no-img-element -- Uses the logo file uploaded separately to public/kaitoodlogo.jpeg.
     <img
       src={src}
-      alt={`${BRAND_NAME} logo`}
+      alt="เหนียวไก่เยอะโคตร logo"
       width={size}
       height={size}
       loading={priority ? "eager" : "lazy"}
