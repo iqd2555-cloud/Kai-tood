@@ -50,7 +50,7 @@ const franchiseModels = [
     price: "55,000 บาท",
     placeholder: "พื้นที่สำหรับใส่รูปภาพรูปแบบเคาน์เตอร์",
     imageSrc: "/kiosk.png",
-    imageAlt: "รูปแบบแฟรนไชส์เคาน์เตอร์ เหนียวไก่เยอะโคตร",
+    imageAlt: "แฟรนไชส์รูปแบบเคาน์เตอร์ 55,000 บาท",
     area: "พื้นที่อย่างต่ำ 2 × 3 เมตร",
     location: "เหมาะกับพื้นที่ในอาคาร หรือพื้นที่ที่มีหลังคา เช่น หน้าร้าน ห้องเช่า พื้นที่ตลาดในร่ม หรือพื้นที่หน้าบ้านที่มีหลังคาคลุม",
     suitableFor:
@@ -68,6 +68,8 @@ const franchiseModels = [
     title: "รูปแบบซุ้ม",
     price: "99,000 บาท",
     placeholder: "พื้นที่สำหรับใส่รูปภาพรูปแบบซุ้ม",
+    imageSrc: "/stand-alone.png",
+    imageAlt: "แฟรนไชส์รูปแบบซุ้ม 99,000 บาท",
     area: "พื้นที่อย่างน้อย 3 × 4 เมตร",
     location:
       "เหมาะกับพื้นที่ขายที่ต้องการความเป็นร้านมากขึ้น เช่น พื้นที่หน้าถนน จุดขายประจำ ตลาด พื้นที่เช่า หรือจุดที่ต้องการให้ลูกค้ามองเห็นได้ชัด",
@@ -180,7 +182,7 @@ function FranchiseModelsSection() {
               >
                 {model.imageSrc ? (
                   <>
-                    {/* eslint-disable-next-line @next/next/no-img-element -- Uploaded franchise counter image is a static public asset from /public/kiosk.png. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element -- Uploaded franchise model images are static public assets. */}
                     <img
                       src={model.imageSrc}
                       alt={model.imageAlt}
