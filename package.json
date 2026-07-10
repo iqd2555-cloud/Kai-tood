@@ -14,7 +14,8 @@
     "fix:auth-redirect": "node scripts/fix-auth-redirect.mjs",
     "test:dashboard-summary": "node --experimental-strip-types scripts/dashboard-summary.test.mjs",
     "test:cash-flow-summary": "node --experimental-strip-types scripts/cash-flow-summary.test.mjs",
-    "test:marination-summary": "node --experimental-strip-types scripts/marination-summary.test.mjs"
+    "test:marination-summary": "node --experimental-strip-types scripts/marination-summary.test.mjs",
+    "test:thai-address": "node --experimental-strip-types scripts/thai-address-audit.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
