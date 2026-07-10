@@ -1,14 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { Kanit } from "next/font/google";
 import { PwaRegistrar } from "@/components/pwa-registrar";
 import { BRAND_DESCRIPTION, BRAND_NAME } from "@/lib/brand";
-
-const kanit = Kanit({
-  subsets: ["thai", "latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
-  variable: "--font-kanit",
-});
 
 export const metadata: Metadata = {
   title: BRAND_NAME,
@@ -40,7 +33,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="th">
-      <body className={`${kanit.variable} font-kanit antialiased`}>
+      <body className="font-kanit antialiased">
         {children}
         <PwaRegistrar />
       </body>
