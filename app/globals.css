@@ -3,15 +3,22 @@
 
 :root {
   --font-kanit: "Kanit", Arial, Helvetica, sans-serif;
-  --background: #ffffff;
-  --foreground: #111111;
-  --brand-red: #e60012;
-  --brand-gray: #f3f3f3;
-  --border-gray: #e5e5e5;
+  --background: #fffaf0;
+  --surface: #ffffff;
+  --surface-soft: #fff4d6;
+  --foreground: #171717;
+  --text-main: #171717;
+  --text-muted: #666666;
+  --brand-yellow: #f6c400;
+  --brand-yellow-soft: #fff2b8;
+  --brand-red: #d71920;
+  --border-soft: #eadfca;
+  --brand-gray: #f7f3ea;
+  --border-gray: #eadfca;
   --text-gray: #666666;
-  --brand-black: #111111;
+  --brand-black: #171717;
   --card: #ffffff;
-  --muted: #6b7280;
+  --muted: #666666;
 }
 
 * {
@@ -19,7 +26,7 @@
 }
 
 html {
-  background: var(--brand-black);
+  background: var(--background);
 }
 
 body {
@@ -57,6 +64,6 @@ textarea {
 }
 
 .focus-ring:focus-visible {
-  outline: 3px solid #e60012;
+  outline: 3px solid var(--brand-red);
   outline-offset: 3px;
 }
