@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { thaiAddress, thaiProvinces } from "@/lib/thai-address";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 const leadSchema = z.object({
@@ -9,7 +10,7 @@ const leadSchema = z.object({
   phone: z.string().trim().min(1),
   line_id: z.string().trim().optional(),
   province: z.string().trim().min(1),
-  district: z.string().trim().optional(),
+  district: z.string().trim().min(1),
   has_location: z.string().trim().min(1),
   location_type: z.string().trim().min(1),
   budget_range: z.string().trim().min(1),
@@ -18,6 +19,12 @@ const leadSchema = z.object({
   business_experience: z.string().trim().min(1),
   expected_daily_income: z.string().trim().min(1),
   understanding_confirmed: z.literal("true"),
+}).refine((data) => thaiProvinces.includes(data.province as (typeof thaiProvinces)[number]), {
+  message: "invalid province",
+  path: ["province"],
+}).refine((data) => thaiAddress[data.province]?.includes(data.district), {
+  message: "invalid district",
+  path: ["district"],
 });
 
 export type ApplyFormState = { ok: boolean; message: string };
