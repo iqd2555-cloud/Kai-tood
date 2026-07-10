@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useMemo, useState } from "react";
+import { thaiAddress, thaiProvinces } from "@/lib/thai-address";
 import { submitFranchiseLead, type ApplyFormState } from "./actions";
 
 const initialState: ApplyFormState = { ok: false, message: "" };
@@ -47,6 +48,8 @@ function SelectField({ label, name, options }: { label: string; name: string; op
 
 export function ApplyForm() {
   const [state, action, pending] = useActionState(submitFranchiseLead, initialState);
+  const [selectedProvince, setSelectedProvince] = useState("");
+  const districtOptions = useMemo(() => thaiAddress[selectedProvince] ?? [], [selectedProvince]);
   return (
     <form action={action} className="grid gap-5 rounded-[2.25rem] border border-black/10 bg-[#fff9df] p-4 shadow-xl shadow-black/5 sm:p-6">
       {state.message && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-black text-red-700">{state.message}</div>}
@@ -55,7 +58,26 @@ export function ApplyForm() {
         <Field label="ชื่อ-นามสกุล" name="full_name" required />
         <Field label="เบอร์โทร" name="phone" required><input name="phone" required inputMode="tel" className={fieldClass} /></Field>
         <Field label="Line ID" name="line_id" />
-        <div className="grid gap-4 sm:grid-cols-2"><Field label="จังหวัด" name="province" required /><Field label="อำเภอ/เขต" name="district" /></div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="จังหวัด" name="province" required>
+            <select
+              name="province"
+              required
+              value={selectedProvince}
+              onChange={(event) => setSelectedProvince(event.target.value)}
+              className={fieldClass}
+            >
+              <option value="">เลือกจังหวัด</option>
+              {thaiProvinces.map((province) => <option key={province} value={province}>{province}</option>)}
+            </select>
+          </Field>
+          <Field label="อำเภอ/เขต" name="district" required>
+            <select name="district" required disabled={!selectedProvince} className={fieldClass}>
+              <option value="">{selectedProvince ? "เลือกอำเภอ/เขต" : "เลือกจังหวัดก่อน"}</option>
+              {districtOptions.map((district) => <option key={district} value={district}>{district}</option>)}
+            </select>
+          </Field>
+        </div>
       </Section>
 
       <Section eyebrow="Step 02" title="ความพร้อมเบื้องต้น">
