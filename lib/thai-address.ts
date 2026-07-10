@@ -160,4 +160,9 @@ export const thaiDistrictsByProvince: Record<(typeof thaiProvinces)[number], str
 
 export const thaiAddress: Record<string, string[]> = thaiDistrictsByProvince;
 
+export const thaiDistrictDatasetSummary = {
+  provinceCount: thaiProvinces.length,
+  districtCount: Object.values(thaiDistrictsByProvince).reduce((total, districts) => total + districts.length, 0),
+} as const;
+
 export const provincesWithIncompleteDistricts = thaiProvinces.filter((province) => thaiAddress[province].length <= 1);
