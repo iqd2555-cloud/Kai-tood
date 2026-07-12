@@ -187,6 +187,10 @@ export type FranchiseLead = {
   line_id: string | null;
   province: string;
   district: string | null;
+  has_capital: string | null;
+  preferred_model: string | null;
+  available_area: string | null;
+  experience: string | null;
   has_location: string;
   location_type: string;
   budget_range: string;

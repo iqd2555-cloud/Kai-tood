@@ -44,12 +44,13 @@ export default async function LeadsPage({ searchParams }: { searchParams?: Promi
             <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
               <div><b>Line:</b> {lead.line_id || "-"}</div>
               <div><b>จังหวัด/อำเภอ:</b> {lead.province}{lead.district ? ` / ${lead.district}` : ""}</div>
-              <div><b>มีทำเล:</b> {lead.has_location}</div>
+              <div><b>มีทำเล / พื้นที่:</b> {lead.has_location || lead.available_area || "-"}</div>
               <div><b>ประเภททำเล:</b> {lead.location_type}</div>
               <div><b>งบ:</b> {lead.budget_range}</div>
-              <div><b>ทุนสำรอง:</b> {lead.working_capital}</div>
+              <div><b>ทุนสำรอง:</b> {lead.working_capital || lead.has_capital || "-"}</div>
+              <div><b>รูปแบบที่สนใจ:</b> {lead.preferred_model || "-"}</div>
               <div><b>เวลา:</b> {lead.available_time_per_day}</div>
-              <div><b>ประสบการณ์:</b> {lead.business_experience}</div>
+              <div><b>ประสบการณ์:</b> {lead.business_experience || lead.experience || "-"}</div>
               <div><b>รายได้คาดหวัง:</b> {lead.expected_daily_income}</div>
               <div><b>ยืนยันความเข้าใจ:</b> {lead.understanding_confirmed ? "ยืนยันแล้ว" : "ยังไม่ยืนยัน"}</div>
             </dl>

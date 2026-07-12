@@ -36,7 +36,16 @@ export async function submitFranchiseLead(_prevState: ApplyFormState, formData: 
   const supabase = await createSupabaseServerClient();
   if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase สำหรับรับข้อมูล" };
 
-  const lead = { ...parsed.data, understanding_confirmed: true };
+  const lead = {
+    ...parsed.data,
+    has_capital: parsed.data.working_capital,
+    preferred_model: "ยังไม่ระบุ",
+    available_area: parsed.data.has_location,
+    experience: parsed.data.business_experience,
+    understanding_confirmed: true,
+    status: "new",
+    source: "website",
+  };
   const { error } = await supabase.from("franchise_leads").insert(lead);
   if (error) return { ok: false, message: `ส่งข้อมูลไม่สำเร็จ: ${error.message}` };
   redirect("/franchise/apply?success=1");
