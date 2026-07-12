@@ -3,8 +3,9 @@ import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { FranchiseLead, LeadStatus } from "@/lib/types";
 import { updateLead } from "./actions";
+import { ExportLeadsButton } from "./export-button";
 
-const statusLabels: Record<LeadStatus, string> = { new: "ใหม่", contacted: "ติดต่อแล้ว", qualified: "ผ่านคัดกรอง", not_qualified: "ไม่ผ่าน", pending_payment: "รอชำระเงิน", converted: "เป็นแฟรนไชส์แล้ว" };
+const statusLabels: Record<LeadStatus, string> = { new: "ใหม่", contacted: "ติดต่อแล้ว", awaiting_info: "รอข้อมูลเพิ่มเติม", interested: "สนใจจริง", appointment_scheduled: "นัดคุยแล้ว", not_ready: "ไม่พร้อมลงทุน", not_qualified: "ไม่ผ่านการคัดกรอง", converted: "ปิดการขายแล้ว" };
 const statuses = Object.keys(statusLabels) as LeadStatus[];
 
 type SearchParams = { status?: string; q?: string };
@@ -30,7 +31,7 @@ export default async function LeadsPage({ searchParams }: { searchParams?: Promi
 
   return (
     <div className="space-y-5">
-      <div><h1 className="text-3xl font-black">รายชื่อผู้สนใจแฟรนไชส์</h1><p className="mt-1 font-bold text-black/55">ดู ค้นหา และอัปเดตสถานะ Lead จากเว็บไซต์</p></div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h1 className="text-3xl font-black">รายชื่อผู้สนใจแฟรนไชส์</h1><p className="mt-1 font-bold text-black/55">ดู ค้นหา อัปเดตสถานะ และ Export รายชื่อ Lead จากเว็บไซต์</p></div><ExportLeadsButton leads={leads} /></div>
       <form className="grid gap-3 rounded-[1.5rem] bg-white p-4 shadow-sm sm:grid-cols-[1fr_220px_auto]">
         <input name="q" defaultValue={q} placeholder="ค้นหาชื่อ เบอร์โทร จังหวัด" className="rounded-2xl border border-black/10 px-4 py-3 font-bold" />
         <select name="status" defaultValue={status} className="rounded-2xl border border-black/10 px-4 py-3 font-bold"><option value="">ทุกสถานะ</option>{statuses.map((s) => <option key={s} value={s}>{statusLabels[s]}</option>)}</select>
@@ -55,7 +56,7 @@ export default async function LeadsPage({ searchParams }: { searchParams?: Promi
               <div><b>ยืนยันความเข้าใจ:</b> {lead.understanding_confirmed ? "ยืนยันแล้ว" : "ยังไม่ยืนยัน"}</div>
             </dl>
             {lead.note && <p className="mt-3 text-sm"><b>หมายเหตุผู้สมัคร:</b> {lead.note}</p>}
-            <form action={updateLead} className="mt-4 grid gap-3 border-t border-black/10 pt-4 sm:grid-cols-[220px_1fr_auto]"><input type="hidden" name="id" value={lead.id} /><select name="status" defaultValue={lead.status} className="rounded-2xl border border-black/10 px-4 py-3 font-bold">{statuses.map((s) => <option key={s} value={s}>{statusLabels[s]}</option>)}</select><input name="internal_note" defaultValue={lead.internal_note ?? ""} placeholder="บันทึกภายใน" className="rounded-2xl border border-black/10 px-4 py-3 font-bold" /><button className="rounded-2xl bg-[#E60012] px-5 py-3 font-black text-white">บันทึก</button></form>
+            <form action={updateLead} className="mt-4 grid gap-3 border-t border-black/10 pt-4 sm:grid-cols-[220px_1fr_auto]"><input type="hidden" name="id" value={lead.id} /><label className="grid gap-1 text-sm font-black text-black/65"><span>สถานะการติดตาม</span><select name="status" defaultValue={lead.status} className="rounded-2xl border border-black/10 px-4 py-3 font-bold text-black">{statuses.map((s) => <option key={s} value={s}>{statusLabels[s]}</option>)}</select></label><label className="grid gap-1 text-sm font-black text-black/65"><span>บันทึกภายใน</span><input name="internal_note" defaultValue={lead.internal_note ?? ""} placeholder="จดบันทึกการติดตาม เช่น โทรแล้ว / นัดคุย / สนใจแบบซุ้ม" className="rounded-2xl border border-black/10 px-4 py-3 font-bold text-black" /></label><button className="self-end rounded-2xl bg-[#E60012] px-5 py-3 font-black text-white">บันทึกการติดตาม</button></form>
           </article>
         ))}
         {leads.length === 0 && <div className="rounded-[1.5rem] bg-white p-6 text-center font-black text-black/50">ยังไม่มีข้อมูลตามเงื่อนไขนี้</div>}

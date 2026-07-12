@@ -178,7 +178,7 @@ export type CounterOrder = {
 };
 
 
-export type LeadStatus = "new" | "contacted" | "qualified" | "not_qualified" | "pending_payment" | "converted";
+export type LeadStatus = "new" | "contacted" | "awaiting_info" | "interested" | "appointment_scheduled" | "not_ready" | "not_qualified" | "converted";
 
 export type FranchiseLead = {
   id: string;
