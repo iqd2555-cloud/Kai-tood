@@ -6,7 +6,7 @@ import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { LeadStatus } from "@/lib/types";
 
-const statuses: LeadStatus[] = ["new", "contacted", "qualified", "not_qualified", "pending_payment", "converted"];
+const statuses: LeadStatus[] = ["new", "contacted", "awaiting_info", "interested", "appointment_scheduled", "not_ready", "not_qualified", "converted"];
 
 export async function updateLead(formData: FormData) {
   const profile = await getCurrentProfile();
