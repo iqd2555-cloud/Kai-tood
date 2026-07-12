@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { z } from "zod";
 import { thaiAddress, thaiProvinces } from "@/lib/thai-address";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
@@ -37,16 +36,26 @@ export async function submitFranchiseLead(_prevState: ApplyFormState, formData: 
   if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase สำหรับรับข้อมูล" };
 
   const lead = {
-    ...parsed.data,
-    has_capital: parsed.data.working_capital,
-    preferred_model: "ยังไม่ระบุ",
-    available_area: parsed.data.has_location,
-    experience: parsed.data.business_experience,
-    understanding_confirmed: true,
+    full_name: parsed.data.full_name,
+    phone: parsed.data.phone,
+    line_id: parsed.data.line_id || null,
+    province: parsed.data.province,
+    district: parsed.data.district,
+    has_capital: parsed.data.working_capital || null,
+    budget_range: parsed.data.budget_range || null,
+    preferred_model: null,
+    available_area: parsed.data.has_location || null,
+    location_type: parsed.data.location_type || null,
+    experience: parsed.data.business_experience || null,
+    note: null,
     status: "new",
-    source: "website",
   };
+
   const { error } = await supabase.from("franchise_leads").insert(lead);
-  if (error) return { ok: false, message: `ส่งข้อมูลไม่สำเร็จ: ${error.message}` };
-  redirect("/franchise/apply?success=1");
+  if (error) {
+    console.error("Failed to insert franchise lead:", error);
+    return { ok: false, message: `ส่งข้อมูลไม่สำเร็จ: ${error.message}` };
+  }
+
+  return { ok: true, message: "ส่งใบสมัครสำเร็จ ทีมงานได้รับข้อมูลแล้วและจะติดต่อกลับตามเบอร์ที่แจ้งไว้" };
 }
