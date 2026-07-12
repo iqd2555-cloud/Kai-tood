@@ -20,7 +20,7 @@ const stats = [
 ];
 
 const catalogCards = [
-  { title: "แพ็กเกจเริ่มต้น", text: "สำหรับพื้นที่เล็ก คุมงบง่าย เหมาะกับคนเริ่มขายจริง", image: "/kiosk.png", tag: "Counter" },
+  { title: "แพ็กเกจเริ่มต้น", text: "สำหรับพื้นที่เล็ก คุมงบง่าย เหมาะกับคนเริ่มขายจริง", image: "/new-kiosk.png", tag: "Counter" },
   { title: "หน้าร้านเด่น", text: "ซุ้มขนาดใหญ่ขึ้น เห็นชัด เหมาะกับทำเลถนนหรือตลาด", image: "/stand-alone.png", tag: "Kiosk" },
   { title: "แบรนด์ร้านจริง", text: "ภาพจำข้าวเหนียวไก่ทอดพร้อมระบบทำงานหลังร้าน", image: "/fronshop.jpg", tag: "Brand" },
 ];
@@ -30,7 +30,7 @@ const franchiseModels = [
     badge: "Starter Pack",
     title: "รูปแบบเคาน์เตอร์",
     price: "55,000 บาท",
-    imageSrc: "/kiosk.png",
+    imageSrc: "/new-kiosk.png",
     imageAlt: "แฟรนไชส์รูปแบบเคาน์เตอร์ 55,000 บาท",
     area: "พื้นที่อย่างต่ำ 2 × 3 เมตร",
     location: "เหมาะกับพื้นที่ในอาคาร พื้นที่ที่มีหลังคา หน้าร้าน ห้องเช่า ตลาดในร่ม หรือพื้นที่หน้าบ้านที่มีหลังคาคลุม",
