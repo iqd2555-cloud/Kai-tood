@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
+import { CategoryMenuToggle } from "@/components/category-menu-toggle";
 import { BRAND_NAME, BRAND_SUBTITLE } from "@/lib/brand";
 
 const categoryMenu = [
@@ -88,7 +89,7 @@ function PublicHeader() {
       <nav className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 px-4 py-3 sm:px-6 lg:flex lg:items-center lg:justify-between lg:px-8">
         <Link href="/" className="flex min-w-0 items-center gap-3 rounded-2xl focus-ring">
           <span className="shrink-0 rounded-2xl bg-white p-1"><BrandLogo size={54} priority /></span>
-          <div className="min-w-0"><div className="text-base font-black leading-tight sm:text-xl lg:text-2xl">{BRAND_NAME}</div></div>
+          <div className="min-w-0"><div className="max-w-[12.5rem] whitespace-normal break-words text-lg font-black leading-tight sm:max-w-none sm:text-2xl lg:text-3xl">{BRAND_NAME}</div></div>
         </Link>
         <div className="flex shrink-0 flex-col items-stretch gap-1.5 lg:items-end">
           <div className="grid grid-cols-2 gap-2 text-xs font-black sm:text-sm lg:flex lg:items-center">
@@ -110,9 +111,7 @@ function HeroCatalog() {
       <div className="grid gap-5 lg:grid-cols-[290px_1fr]">
         <aside className="rounded-[1.75rem] border border-black/10 bg-white p-4 shadow-xl shadow-black/5">
           <div className="rounded-2xl bg-[#1f1f1f] px-5 py-4 text-white"><p className="text-sm font-black text-[#f6c400]">CATEGORY MENU</p><h2 className="mt-1 text-2xl font-black">เลือกดูข้อมูล</h2></div>
-          <div className="mt-3 grid gap-2">
-            {categoryMenu.map((item) => <a key={item.href} href={item.href} className="group rounded-2xl border border-[#eadfca] bg-[#fff8ed] p-4 transition hover:border-[#f47b00] hover:bg-[#fff1df]"><div className="flex items-center justify-between gap-3"><span className="font-black text-[#151515]">{item.label}</span><span className="text-[#f47b00] transition group-hover:translate-x-1">→</span></div><p className="mt-1 text-sm font-bold text-[#666666]">{item.detail}</p></a>)}
-          </div>
+          <CategoryMenuToggle items={categoryMenu} />
         </aside>
 
         <div className="overflow-hidden rounded-[2rem] bg-[#f47b00] shadow-2xl shadow-[#f47b00]/20">
