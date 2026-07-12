@@ -53,7 +53,11 @@ export function ApplyForm() {
   const districtOptions = useMemo(() => thaiAddress[selectedProvince] ?? [], [selectedProvince]);
   return (
     <form action={action} className="grid gap-5 rounded-[2.25rem] border border-black/10 bg-[#fff9df] p-4 shadow-xl shadow-black/5 sm:p-6">
-      {state.message && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-black text-red-700">{state.message}</div>}
+      {state.message && (
+        <div className={`rounded-2xl border p-4 text-sm font-black ${state.ok ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-700"}`}>
+          {state.message}
+        </div>
+      )}
 
       <Section eyebrow="Step 01" title="ข้อมูลติดต่อ">
         <Field label="ชื่อ-นามสกุล" name="full_name" required />
