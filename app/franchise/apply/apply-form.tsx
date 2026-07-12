@@ -49,6 +49,7 @@ function SelectField({ label, name, options }: { label: string; name: string; op
 export function ApplyForm() {
   const [state, action, pending] = useActionState(submitFranchiseLead, initialState);
   const [selectedProvince, setSelectedProvince] = useState("");
+  const [selectedDistrict, setSelectedDistrict] = useState("");
   const districtOptions = useMemo(() => thaiAddress[selectedProvince] ?? [], [selectedProvince]);
   return (
     <form action={action} className="grid gap-5 rounded-[2.25rem] border border-black/10 bg-[#fff9df] p-4 shadow-xl shadow-black/5 sm:p-6">
@@ -64,7 +65,10 @@ export function ApplyForm() {
               name="province"
               required
               value={selectedProvince}
-              onChange={(event) => setSelectedProvince(event.target.value)}
+              onChange={(event) => {
+                setSelectedProvince(event.target.value);
+                setSelectedDistrict("");
+              }}
               className={fieldClass}
             >
               <option value="">เลือกจังหวัด</option>
@@ -72,7 +76,14 @@ export function ApplyForm() {
             </select>
           </Field>
           <Field label="อำเภอ/เขต" name="district" required>
-            <select name="district" required disabled={!selectedProvince} className={fieldClass}>
+            <select
+              name="district"
+              required
+              disabled={!selectedProvince}
+              value={selectedDistrict}
+              onChange={(event) => setSelectedDistrict(event.target.value)}
+              className={fieldClass}
+            >
               <option value="">{selectedProvince ? "เลือกอำเภอ/เขต" : "เลือกจังหวัดก่อน"}</option>
               {districtOptions.map((district) => <option key={district} value={district}>{district}</option>)}
             </select>
