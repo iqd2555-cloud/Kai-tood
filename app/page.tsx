@@ -4,11 +4,11 @@ import { BrandLogo } from "@/components/brand-logo";
 import { BRAND_NAME, BRAND_SUBTITLE } from "@/lib/brand";
 
 const categoryMenu = [
-  { label: "ภาพรวมธุรกิจ", href: "#overview", detail: "ข้าวเหนียวไก่ทอดพร้อมขาย" },
-  { label: "แพ็กเกจแฟรนไชส์", href: "#models", detail: "55,000 / 99,000 บาท" },
-  { label: "พื้นที่ที่ต้องใช้", href: "#space", detail: "เริ่ม 2 × 3 เมตร" },
-  { label: "เหมาะกับใคร", href: "#fit", detail: "ผู้เริ่มต้นและคนมีทำเล" },
-  { label: "ระบบหลังบ้าน", href: "#system", detail: "ยอดขาย วัตถุดิบ สต็อก" },
+  { label: "ภาพรวมธุรกิจ", href: "#business-overview", detail: "ข้าวเหนียวไก่ทอดพร้อมขาย" },
+  { label: "แพ็กเกจแฟรนไชส์", href: "#franchise-packages", detail: "55,000 / 99,000 บาท" },
+  { label: "พื้นที่ที่ต้องใช้", href: "#required-space", detail: "เริ่ม 2 × 3 เมตร" },
+  { label: "เหมาะกับใคร", href: "#target-audience", detail: "ผู้เริ่มต้นและคนมีทำเล" },
+  { label: "ระบบหลังบ้าน", href: "#back-office-system", detail: "ยอดขาย วัตถุดิบ สต็อก" },
 ];
 
 const stats = [
@@ -69,7 +69,7 @@ const primaryButton = "inline-flex min-h-14 items-center justify-center rounded-
 const secondaryButton = "inline-flex min-h-14 items-center justify-center rounded-xl bg-[#1f1f1f] px-7 py-4 text-base font-black text-white shadow-lg shadow-black/15 transition hover:-translate-y-0.5 hover:bg-black focus-ring";
 
 function Section({ children, className = "", id }: { children: React.ReactNode; className?: string; id?: string }) {
-  return <section id={id} className={`mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8 ${className}`}>{children}</section>;
+  return <section id={id} className={`mx-auto w-full max-w-7xl scroll-mt-28 px-4 py-12 sm:px-6 sm:py-16 lg:px-8 ${className}`}>{children}</section>;
 }
 
 function SectionHeader({ kicker, title, text, invert = false }: { kicker: string; title: string; text?: string; invert?: boolean }) {
@@ -85,16 +85,19 @@ function SectionHeader({ kicker, title, text, invert = false }: { kicker: string
 function PublicHeader() {
   return (
     <header className="sticky top-0 z-30 bg-[#1f1f1f] text-white shadow-xl shadow-black/10">
-      <nav className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-        <Link href="/" className="flex items-center gap-3 rounded-2xl focus-ring">
-          <span className="rounded-2xl bg-white p-1"><BrandLogo size={54} priority /></span>
-          <div><div className="text-lg font-black leading-tight sm:text-xl">{BRAND_NAME}</div><div className="text-xs font-bold text-white/60 sm:text-sm">{BRAND_SUBTITLE}</div></div>
+      <nav className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 px-4 py-3 sm:px-6 lg:flex lg:items-center lg:justify-between lg:px-8">
+        <Link href="/" className="flex min-w-0 items-center gap-3 rounded-2xl focus-ring">
+          <span className="shrink-0 rounded-2xl bg-white p-1"><BrandLogo size={54} priority /></span>
+          <div className="min-w-0"><div className="text-base font-black leading-tight sm:text-xl lg:text-2xl">{BRAND_NAME}</div></div>
         </Link>
-        <div className="grid grid-cols-2 gap-2 text-sm font-black sm:flex sm:items-center">
-          <a href="#models" className="hidden rounded-xl px-4 py-3 text-white/72 transition hover:bg-white/10 hover:text-white lg:inline-flex">แพ็กเกจ</a>
-          <a href="#system" className="hidden rounded-xl px-4 py-3 text-white/72 transition hover:bg-white/10 hover:text-white lg:inline-flex">ระบบหลังบ้าน</a>
-          <Link href="/franchise/apply" className="rounded-xl bg-[#f47b00] px-5 py-3 text-center text-white transition hover:bg-[#ff8c19] focus-ring">สมัครแฟรนไชส์</Link>
-          <Link href="/login" className="rounded-xl border border-white/20 bg-white px-5 py-3 text-center text-[#1f1f1f] transition hover:bg-[#fff1df] focus-ring">เข้าสู่ระบบ</Link>
+        <div className="flex shrink-0 flex-col items-stretch gap-1.5 lg:items-end">
+          <div className="grid grid-cols-2 gap-2 text-xs font-black sm:text-sm lg:flex lg:items-center">
+            <a href="#franchise-packages" className="hidden rounded-xl px-4 py-3 text-white/72 transition hover:bg-white/10 hover:text-white lg:inline-flex">แพ็กเกจ</a>
+            <a href="#back-office-system" className="hidden rounded-xl px-4 py-3 text-white/72 transition hover:bg-white/10 hover:text-white lg:inline-flex">ระบบหลังบ้าน</a>
+            <Link href="/franchise/apply" className="rounded-xl bg-[#f47b00] px-3 py-3 text-center text-white transition hover:bg-[#ff8c19] focus-ring sm:px-5">สมัครแฟรนไชส์</Link>
+            <Link href="/login" className="rounded-xl border border-white/20 bg-white px-3 py-3 text-center text-[#1f1f1f] transition hover:bg-[#fff1df] focus-ring sm:px-5">เข้าสู่ระบบ</Link>
+          </div>
+          <p className="max-w-[12rem] text-center text-[0.68rem] font-bold leading-5 text-white/68 sm:max-w-none sm:text-xs lg:text-right">{BRAND_SUBTITLE}</p>
         </div>
       </nav>
     </header>
@@ -103,7 +106,7 @@ function PublicHeader() {
 
 function HeroCatalog() {
   return (
-    <Section id="overview" className="py-8 sm:py-10 lg:py-12">
+    <Section id="business-overview" className="py-8 sm:py-10 lg:py-12">
       <div className="grid gap-5 lg:grid-cols-[290px_1fr]">
         <aside className="rounded-[1.75rem] border border-black/10 bg-white p-4 shadow-xl shadow-black/5">
           <div className="rounded-2xl bg-[#1f1f1f] px-5 py-4 text-white"><p className="text-sm font-black text-[#f6c400]">CATEGORY MENU</p><h2 className="mt-1 text-2xl font-black">เลือกดูข้อมูล</h2></div>
@@ -118,7 +121,7 @@ function HeroCatalog() {
               <div className="inline-flex w-fit rounded-full bg-[#1f1f1f] px-4 py-2 text-sm font-black text-[#f6c400]">Franchise Catalog Landing Page</div>
               <h1 className="mt-5 text-4xl font-black leading-[1.04] tracking-tight sm:text-6xl lg:text-7xl">แฟรนไชส์ข้าวเหนียวไก่ทอด เข้าใจง่ายในหน้าเดียว</h1>
               <p className="mt-5 max-w-2xl text-lg font-bold leading-9 text-white/88 sm:text-xl">รวมภาพธุรกิจ แพ็กเกจ ราคา พื้นที่ที่ต้องใช้ ความเหมาะสม และช่องทางสมัครสำหรับผู้สนใจแฟรนไชส์เหนียวไก่เยอะโคตร</p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row"><Link href="/franchise/apply" className={primaryButton}>สมัคร / สอบถามแฟรนไชส์</Link><a href="#models" className={secondaryButton}>ดูแพ็กเกจลงทุน</a></div>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row"><Link href="/franchise/apply" className={primaryButton}>สมัคร / สอบถามแฟรนไชส์</Link><a href="#franchise-packages" className={secondaryButton}>ดูแพ็กเกจลงทุน</a></div>
             </div>
             <div className="relative min-h-[24rem] bg-[#fff1df] p-5">
               <div className="absolute right-5 top-5 z-10 rounded-2xl bg-white px-5 py-3 text-right shadow-xl"><p className="text-sm font-black text-[#666666]">ราคาเริ่มต้น</p><p className="text-3xl font-black text-[#d71920]">55,000</p></div>
@@ -138,16 +141,16 @@ function CatalogCards() {
 
 function FranchiseModelsSection() {
   return (
-    <Section id="models" className="pt-0">
+    <Section id="franchise-packages" className="pt-0">
       <div className="rounded-[2.5rem] border border-[#eadfca] bg-white p-5 shadow-2xl shadow-black/8 sm:p-8 lg:p-10">
         <SectionHeader kicker="Packages" title="แพ็กเกจแฟรนไชส์แบบเปรียบเทียบง่าย" text="วางข้อมูลแบบ catalog เพื่อให้ผู้สนใจเห็นราคา พื้นที่ ทำเลที่เหมาะสม และจุดเด่นของแต่ละรูปแบบทันที" />
         <div className="grid gap-5 lg:grid-cols-2">
-          {franchiseModels.map((model) => (
+          {franchiseModels.map((model, index) => (
             <article key={model.title} className="flex flex-col overflow-hidden rounded-[2rem] border border-[#eadfca] bg-[#fff8ed] text-[#151515] shadow-xl shadow-black/8">
               <div className="grid gap-4 bg-[#1f1f1f] p-5 text-white sm:p-7 md:grid-cols-[1fr_auto] md:items-start"><div><span className="rounded-full bg-[#f6c400] px-4 py-2 text-sm font-black text-[#151515]">{model.badge}</span><h3 className="mt-5 text-3xl font-black leading-tight sm:text-4xl">{model.title}</h3></div><div className="rounded-2xl bg-white px-5 py-4 text-left md:text-right"><p className="text-sm font-black text-[#666666]">ราคา</p><p className="text-3xl font-black text-[#d71920]">{model.price}</p></div></div>
               <div className="flex h-72 items-center justify-center bg-white p-4 sm:h-80"><img src={model.imageSrc} alt={model.imageAlt} className="h-full w-full rounded-[1.5rem] object-contain" /></div>
               <div className="flex flex-1 flex-col p-5 sm:p-7">
-                <div id="space" className="grid gap-3">{[["พื้นที่แนะนำ", model.area], ["ลักษณะพื้นที่", model.location], ["เหมาะสำหรับ", model.suitableFor]].map(([label, value]) => <div key={label} className="rounded-2xl border border-[#eadfca] bg-white p-4"><p className="text-sm font-black text-[#f47b00]">{label}</p><p className="mt-1 font-bold leading-7 text-[#666666]">{value}</p></div>)}</div>
+                <div id={index === 0 ? "required-space" : undefined} className="grid scroll-mt-28 gap-3">{[["พื้นที่แนะนำ", model.area], ["ลักษณะพื้นที่", model.location], ["เหมาะสำหรับ", model.suitableFor]].map(([label, value]) => <div key={label} className="rounded-2xl border border-[#eadfca] bg-white p-4"><p className="text-sm font-black text-[#f47b00]">{label}</p><p className="mt-1 font-bold leading-7 text-[#666666]">{value}</p></div>)}</div>
                 <ul className="mt-5 grid gap-2">{model.highlights.map((highlight) => <li key={highlight} className="flex gap-3 rounded-2xl border border-[#eadfca] bg-[#fff1df] px-4 py-3 font-black text-[#151515]"><span className="text-[#d71920]">✓</span><span>{highlight}</span></li>)}</ul>
               </div>
             </article>
@@ -169,9 +172,9 @@ export default function LandingPage() {
 
       <FranchiseModelsSection />
 
-      <Section id="fit" className="pt-0"><div className="grid gap-5 lg:grid-cols-2"><div className="rounded-[2rem] bg-[#1f1f1f] p-6 text-white sm:p-8"><h2 className="text-3xl font-black">เหมาะกับใคร</h2><ul className="mt-6 grid gap-3">{fit.map((x) => <li key={x} className="rounded-2xl bg-white/10 p-4 text-lg font-black">✓ {x}</li>)}</ul></div><div className="rounded-[2rem] border border-[#eadfca] bg-white p-6 sm:p-8"><h2 className="text-3xl font-black">ไม่เหมาะกับใคร</h2><ul className="mt-6 grid gap-3">{notFit.map((x) => <li key={x} className="rounded-2xl bg-[#fff1df] p-4 text-lg font-black text-[#666666]">! {x}</li>)}</ul></div></div></Section>
+      <Section id="target-audience" className="pt-0"><div className="grid gap-5 lg:grid-cols-2"><div className="rounded-[2rem] bg-[#1f1f1f] p-6 text-white sm:p-8"><h2 className="text-3xl font-black">เหมาะกับใคร</h2><ul className="mt-6 grid gap-3">{fit.map((x) => <li key={x} className="rounded-2xl bg-white/10 p-4 text-lg font-black">✓ {x}</li>)}</ul></div><div className="rounded-[2rem] border border-[#eadfca] bg-white p-6 sm:p-8"><h2 className="text-3xl font-black">ไม่เหมาะกับใคร</h2><ul className="mt-6 grid gap-3">{notFit.map((x) => <li key={x} className="rounded-2xl bg-[#fff1df] p-4 text-lg font-black text-[#666666]">! {x}</li>)}</ul></div></div></Section>
 
-      <Section id="system" className="pt-0"><SectionHeader kicker="Back Office System" title="สิ่งที่ได้จากระบบแฟรนไชส์" text="ไม่ใช่แค่หน้าร้าน แต่รวมแนวทางทำงาน สูตร ระบบขาย และข้อมูลหลังบ้านสำหรับติดตามสาขา" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{benefits.map((item) => <div key={item} className="rounded-[1.75rem] border border-[#eadfca] bg-white p-6 shadow-xl shadow-black/5"><div className="mb-5 h-2 w-16 rounded-full bg-[#f47b00]" /><h3 className="text-2xl font-black">{item}</h3></div>)}</div></Section>
+      <Section id="back-office-system" className="pt-0"><SectionHeader kicker="Back Office System" title="สิ่งที่ได้จากระบบแฟรนไชส์" text="ไม่ใช่แค่หน้าร้าน แต่รวมแนวทางทำงาน สูตร ระบบขาย และข้อมูลหลังบ้านสำหรับติดตามสาขา" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{benefits.map((item) => <div key={item} className="rounded-[1.75rem] border border-[#eadfca] bg-white p-6 shadow-xl shadow-black/5"><div className="mb-5 h-2 w-16 rounded-full bg-[#f47b00]" /><h3 className="text-2xl font-black">{item}</h3></div>)}</div></Section>
 
       <Section className="pt-0"><div className="rounded-[2.5rem] bg-[#fff1df] p-6 sm:p-10"><SectionHeader kicker="How to start" title="เริ่มต้นอย่างเป็นขั้นตอน" text="วาง flow ให้ผู้สนใจเข้าใจง่าย ตั้งแต่การสมัครจนถึงการเปิดร้านจริง" /><div className="grid gap-4 lg:grid-cols-3">{steps.map((step, index) => <article key={step.title} className="rounded-[1.75rem] bg-white p-6 shadow-lg shadow-black/5"><div className="text-4xl font-black text-[#d71920]">0{index + 1}</div><h3 className="mt-4 text-2xl font-black">{step.title}</h3><p className="mt-3 font-bold leading-7 text-[#666666]">{step.text}</p></article>)}</div></div></Section>
 
