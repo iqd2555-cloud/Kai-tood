@@ -7,6 +7,7 @@ import { BRAND_NAME, BRAND_SUBTITLE } from "@/lib/brand";
 const categoryMenu = [
   { label: "ภาพรวมธุรกิจ", href: "#business-overview", detail: "ข้าวเหนียวไก่ทอดพร้อมขาย" },
   { label: "แพ็กเกจแฟรนไชส์", href: "#franchise-packages", detail: "55,000 / 99,000 บาท" },
+  { label: "หนังสือสูตรไก่ทอด", href: "#book-recipes", detail: "10 สูตร + ข้าวเหนียว + ต้นทุน" },
   { label: "พื้นที่ที่ต้องใช้", href: "#required-space", detail: "เริ่ม 2 × 3 เมตร" },
   { label: "เหมาะกับใคร", href: "#target-audience", detail: "ผู้เริ่มต้นและคนมีทำเล" },
   { label: "ระบบหลังบ้าน", href: "#back-office-system", detail: "ยอดขาย วัตถุดิบ สต็อก" },
@@ -48,6 +49,22 @@ const franchiseModels = [
     highlights: ["ทำงานคล่องตัวขึ้น", "จัดวางอุปกรณ์เป็นระบบ", "สร้างภาพจำหน้าร้านชัด"],
   },
 ];
+
+const recipeBookItems = [
+  "ไก่ทอดดั้งเดิม",
+  "ไก่ทอดพริก",
+  "หนังไก่ทอด",
+  "เครื่องในทอด",
+  "เอ็นไก่ทอด",
+  "ไก่เขย่ารสต้มยำ",
+  "ไก่เขย่ารสชีส",
+  "ไก่เขย่ารสวิงแซ่บ",
+  "ไก่เขย่ารสปาปริก้า",
+  "ไก่หยอง",
+];
+
+const recipeBookExtras = ["สูตรนึ่งข้าวเหนียว"];
+const recipeBookCosting = ["แนวทางคำนวณต้นทุน", "ตัวอย่างการคิดต้นทุนต่อห่อ", "แนวทางประเมินราคาขายและกำไรเบื้องต้น"];
 
 const proofCards = [
   { title: "ร้านจริง", text: "เริ่มจากร้านที่ขายอาหารจริงทุกวัน เห็นปัญหาและโอกาสจากหน้าร้านโดยตรง" },
@@ -138,6 +155,66 @@ function CatalogCards() {
   return <Section className="pt-0"><div className="grid gap-4 lg:grid-cols-3">{catalogCards.map((card) => <article key={card.title} className="group overflow-hidden rounded-[1.75rem] border border-[#eadfca] bg-white shadow-xl shadow-black/5"><div className="relative h-56 bg-[#fff1df] p-4"><img src={card.image} alt={card.title} className="h-full w-full rounded-[1.25rem] object-contain transition group-hover:scale-[1.03]" /><span className="absolute left-6 top-6 rounded-full bg-[#1f1f1f] px-4 py-2 text-sm font-black text-[#f6c400]">{card.tag}</span></div><div className="p-6"><h3 className="text-2xl font-black">{card.title}</h3><p className="mt-2 font-bold leading-7 text-[#666666]">{card.text}</p></div></article>)}</div></Section>;
 }
 
+function RecipeBookSection() {
+  return (
+    <Section id="book-recipes" className="pt-0">
+      <div className="overflow-hidden rounded-[2.5rem] border border-[#eadfca] bg-white shadow-2xl shadow-black/8">
+        <div className="grid gap-0 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="p-5 sm:p-8 lg:p-10">
+            <SectionHeader
+              kicker="Recipe Book"
+              title="หนังสือสูตรไก่ทอด 10 สูตร"
+              text="รวมสูตรไก่ทอดที่แม่ค้าทำขายจริงหน้าร้าน พร้อมสูตรนึ่งข้าวเหนียว และแนวทางคำนวณต้นทุนท้ายเล่ม"
+            />
+            <div className="grid gap-4 text-base font-bold leading-8 text-[#666666] sm:text-lg">
+              <p>หนังสือสูตรไก่ทอด 10 สูตรเล่มนี้ รวบรวมจากสูตรที่แม่ค้าใช้ทำขายจริงหน้าร้าน เหมาะสำหรับคนที่อยากเริ่มต้นขายข้าวเหนียวไก่ทอด ต้องการสูตรตั้งต้นที่ชัดเจน และอยากเข้าใจแนวทางการคิดต้นทุนก่อนเริ่มขายจริง</p>
+              <p>ภายในเล่มมีทั้งสูตรไก่ทอดดั้งเดิม ไก่ทอดพริก หนังไก่ทอด เครื่องในทอด เอ็นไก่ทอด ไก่เขย่า 4 เมนู และไก่หยอง พร้อมแถมฟรีสูตรนึ่งข้าวเหนียว และแนวทางคำนวณต้นทุนท้ายเล่ม เพื่อให้ผู้อ่านเห็นภาพการทำขายจริงมากขึ้น</p>
+            </div>
+
+            <div className="mt-7 rounded-[1.75rem] bg-[#fff8ed] p-4 sm:p-5">
+              <h3 className="text-2xl font-black text-[#151515]">รายการสูตรในเล่ม</h3>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {recipeBookItems.map((item, index) => (
+                  <div key={item} className="flex items-center gap-3 rounded-2xl border border-[#eadfca] bg-white p-3 shadow-sm shadow-black/5">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#f47b00] text-sm font-black text-white">{index + 1}</span>
+                    <span className="font-black text-[#151515]">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <div className="rounded-[1.5rem] border border-[#eadfca] bg-[#fff1df] p-5">
+                <p className="text-sm font-black uppercase tracking-[0.2em] text-[#d71920]">ของแถมฟรี</p>
+                <ul className="mt-3 grid gap-2">{recipeBookExtras.map((item) => <li key={item} className="font-black text-[#151515]">✓ {item}</li>)}</ul>
+              </div>
+              <div className="rounded-[1.5rem] border border-[#eadfca] bg-[#1f1f1f] p-5 text-white">
+                <p className="text-sm font-black uppercase tracking-[0.2em] text-[#f6c400]">ท้ายเล่ม</p>
+                <ul className="mt-3 grid gap-2">{recipeBookCosting.map((item) => <li key={item} className="font-black">✓ {item}</li>)}</ul>
+              </div>
+            </div>
+
+            <div className="mt-7 flex flex-col items-start gap-3">
+              <a href="#footer-contact" className={primaryButton}>สนใจหนังสือสูตรไก่ทอด</a>
+              <p className="font-bold leading-7 text-[#666666]">เหมาะสำหรับผู้เริ่มต้นที่อยากฝึกทำขาย ก่อนตัดสินใจลงทุนแฟรนไชส์</p>
+            </div>
+          </div>
+
+          <div className="bg-[#fff1df] p-5 sm:p-8 lg:p-10">
+            <div className="flex min-h-[26rem] h-full items-center justify-center rounded-[2rem] border-2 border-dashed border-[#eadfca] bg-white p-6 text-center shadow-inner shadow-black/5">
+              <div className="max-w-xs">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[1.5rem] bg-[#fff8ed] text-4xl shadow-lg shadow-black/5" aria-hidden="true">📘</div>
+                <h3 className="mt-5 text-2xl font-black text-[#151515]">พื้นที่สำหรับใส่รูปหนังสือสูตรไก่ทอด</h3>
+                <p className="mt-3 font-bold leading-7 text-[#666666]">จะเพิ่มรูปปกหนังสือสูตรไก่ทอดภายหลัง โดยกรอบนี้รองรับทั้งมือถือและเดสก์ท็อป</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
 function FranchiseModelsSection() {
   return (
     <Section id="franchise-packages" className="pt-0">
@@ -169,6 +246,8 @@ export default function LandingPage() {
 
       <Section id="proof" className="pt-0"><SectionHeader kicker="Business Proof" title="แบรนด์ที่เติบโตจากการขายจริง" text="เหนียวไก่เยอะโคตรเติบโตจากประสบการณ์งานราชการ 27 ปี ผสานกับการเริ่มต้นขายไก่ทอดด้วยเงินเพียง 4,000 บาท ยืนขายจริง แก้ปัญหาจริง เรียนรู้พฤติกรรมลูกค้าจริง แล้วค่อย ๆ เปลี่ยนประสบการณ์หน้าร้านให้กลายเป็นระบบแฟรนไชส์ที่ถ่ายทอดต่อได้" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{proofCards.map((item, index) => <article key={item.title} className="rounded-[1.75rem] border border-[#eadfca] bg-white p-5 shadow-lg shadow-black/5"><div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#eadfca] bg-[#fff1df] text-sm font-black text-[#d71920]">0{index + 1}</div><h3 className="mt-5 text-2xl font-black">{item.title}</h3><p className="mt-3 text-sm font-bold leading-7 text-[#666666]">{item.text}</p></article>)}</div></Section>
 
+      <RecipeBookSection />
+
       <FranchiseModelsSection />
 
       <Section id="target-audience" className="pt-0"><div className="grid gap-5 lg:grid-cols-2"><div className="rounded-[2rem] bg-[#1f1f1f] p-6 text-white sm:p-8"><h2 className="text-3xl font-black">เหมาะกับใคร</h2><ul className="mt-6 grid gap-3">{fit.map((x) => <li key={x} className="rounded-2xl bg-white/10 p-4 text-lg font-black">✓ {x}</li>)}</ul></div><div className="rounded-[2rem] border border-[#eadfca] bg-white p-6 sm:p-8"><h2 className="text-3xl font-black">ไม่เหมาะกับใคร</h2><ul className="mt-6 grid gap-3">{notFit.map((x) => <li key={x} className="rounded-2xl bg-[#fff1df] p-4 text-lg font-black text-[#666666]">! {x}</li>)}</ul></div></div></Section>
@@ -179,7 +258,7 @@ export default function LandingPage() {
 
       <Section className="pt-0"><div className="overflow-hidden rounded-[2.5rem] bg-[#1f1f1f] p-8 text-center text-white shadow-2xl shadow-black/20 sm:p-12"><h2 className="mx-auto max-w-4xl text-3xl font-black leading-tight sm:text-5xl">พร้อมคุยเรื่องทำเลและรูปแบบลงทุนของคุณหรือยัง?</h2><p className="mx-auto mt-4 max-w-2xl text-base font-bold leading-8 text-white/70 sm:text-lg">กรอกข้อมูลเบื้องต้น ทีมงานจะตรวจสอบทำเล งบลงทุน และความพร้อมก่อนติดต่อกลับ</p><Link href="/franchise/apply" className={`${primaryButton} mt-8`}>ลงทะเบียนผู้สนใจแฟรนไชส์</Link></div></Section>
 
-      <footer className="border-t border-[#eadfca] bg-white"><div className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_auto] lg:px-8"><div className="flex items-center gap-3"><BrandLogo size={52} /><div><div className="text-2xl font-black">{BRAND_NAME}</div><div className="mt-1 font-bold text-[#666666]">{BRAND_SUBTITLE}</div></div></div><div className="grid gap-2 text-sm font-black sm:grid-cols-2 lg:text-right">{contact.map((item) => <span key={item}>{item}</span>)}<Link href="/login" className="underline decoration-2 underline-offset-4">เข้าสู่ระบบ</Link></div></div></footer>
+      <footer id="footer-contact" className="border-t border-[#eadfca] bg-white"><div className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_auto] lg:px-8"><div className="flex items-center gap-3"><BrandLogo size={52} /><div><div className="text-2xl font-black">{BRAND_NAME}</div><div className="mt-1 font-bold text-[#666666]">{BRAND_SUBTITLE}</div></div></div><div className="grid gap-2 text-sm font-black sm:grid-cols-2 lg:text-right">{contact.map((item) => <span key={item}>{item}</span>)}<Link href="/login" className="underline decoration-2 underline-offset-4">เข้าสู่ระบบ</Link></div></div></footer>
     </main>
   );
 }
