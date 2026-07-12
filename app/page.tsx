@@ -201,12 +201,12 @@ function RecipeBookSection() {
           </div>
 
           <div className="bg-[#fff1df] p-5 sm:p-8 lg:p-10">
-            <div className="flex min-h-[26rem] h-full items-center justify-center rounded-[2rem] border-2 border-dashed border-[#eadfca] bg-white p-6 text-center shadow-inner shadow-black/5">
-              <div className="max-w-xs">
-                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[1.5rem] bg-[#fff8ed] text-4xl shadow-lg shadow-black/5" aria-hidden="true">📘</div>
-                <h3 className="mt-5 text-2xl font-black text-[#151515]">พื้นที่สำหรับใส่รูปหนังสือสูตรไก่ทอด</h3>
-                <p className="mt-3 font-bold leading-7 text-[#666666]">จะเพิ่มรูปปกหนังสือสูตรไก่ทอดภายหลัง โดยกรอบนี้รองรับทั้งมือถือและเดสก์ท็อป</p>
-              </div>
+            <div className="flex h-full min-h-[26rem] items-center justify-center rounded-[2rem] bg-white p-4 shadow-inner shadow-black/5 sm:p-6">
+              <img
+                src="/book.png"
+                alt="หนังสือสูตรไก่ทอด 10 สูตร"
+                className="h-full w-full rounded-3xl bg-white object-contain"
+              />
             </div>
           </div>
         </div>
