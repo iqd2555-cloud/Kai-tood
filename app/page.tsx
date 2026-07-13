@@ -62,6 +62,7 @@ const courseSections = [
     description: "เรียนแบบจับมือทำ 2 วันเต็มที่จังหวัดนครสวรรค์ เหมาะสำหรับคนที่ต้องการเรียนรู้จากประสบการณ์จริง เห็นขั้นตอนจริง ลงมือจริง และถามตอบได้แบบใกล้ชิด",
     bullets: ["สอนแบบจับมือทำ", "เรียนสด 2 วันที่จังหวัดนครสวรรค์", "ราคาคอร์ส 17,500 บาท"],
     price: "17,500 บาท",
+    mainImage: { src: "/Live_Training_Course.png", alt: "คอร์สสอนสด สูตรไก่ทอดเงินล้าน" },
     mainPlaceholder: "รูปคอร์สสอนสด",
     reviewPlaceholders: ["รีวิวการเรียนจริง 1", "รีวิวการเรียนจริง 2", "รีวิวการเรียนจริง 3"],
   },
@@ -288,7 +289,17 @@ function CourseSections() {
               </div>
 
               <div className="bg-[#fff1df] p-5 sm:p-8 lg:p-10">
-                <CoursePlaceholder label={course.mainPlaceholder} featured />
+                {course.mainImage ? (
+                  <div className="flex h-full min-h-[26rem] items-center justify-center rounded-[2rem] bg-white p-3 shadow-inner shadow-black/5 sm:min-h-[32rem] sm:p-5 lg:min-h-[34rem]">
+                    <img
+                      src={course.mainImage.src}
+                      alt={course.mainImage.alt}
+                      className="h-auto max-h-[34rem] w-full rounded-3xl object-contain shadow-2xl shadow-black/10"
+                    />
+                  </div>
+                ) : (
+                  <CoursePlaceholder label={course.mainPlaceholder} featured />
+                )}
                 <div className="mt-5 grid gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
                   {course.reviewPlaceholders.map((label) => (
                     <CoursePlaceholder key={label} label={label} />
