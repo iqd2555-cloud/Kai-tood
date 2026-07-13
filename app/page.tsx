@@ -154,8 +154,8 @@ function HeroCatalog() {
           <div className="grid min-h-[31rem] lg:grid-cols-[1.02fr_0.98fr]">
             <div className="flex flex-col justify-center p-6 text-white sm:p-10 lg:p-12">
               <div className="inline-flex w-fit rounded-full bg-[#1f1f1f] px-4 py-2 text-sm font-black text-[#f6c400]">Franchise Catalog Landing Page</div>
-              <h1 className="mt-5 text-4xl font-black leading-[1.04] tracking-tight sm:text-6xl lg:text-7xl">แฟรนไชส์ข้าวเหนียวไก่ทอด เข้าใจง่ายในหน้าเดียว</h1>
-              <p className="mt-5 max-w-2xl text-lg font-bold leading-9 text-white/88 sm:text-xl">รวมภาพรวมธุรกิจ แพ็กเกจ ราคา พื้นที่ที่ต้องใช้ ความเหมาะสม และช่องทางสมัคร สำหรับผู้สนใจแฟรนไชส์เหนียวไก่เยอะโคตร</p>
+              <h1 className="mt-5 text-4xl font-black leading-[1.04] tracking-tight sm:text-6xl lg:text-7xl">เริ่มต้นธุรกิจข้าวเหนียวไก่ทอด<br />จากระบบที่ผ่านการขายจริง</h1>
+              <p className="mt-5 max-w-2xl text-lg font-bold leading-9 text-white/88 sm:text-xl">รวมทุกทางเลือกสำหรับคนอยากเริ่มต้น ตั้งแต่หนังสือสูตร คอร์สออนไลน์ คอร์สสอนสด ไปจนถึงแพ็กเกจแฟรนไชส์ 55,000 และ 99,000 บาท</p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row"><Link href="/franchise/apply" className={primaryButton}>สมัคร / สอบถามแฟรนไชส์</Link><a href="#franchise-packages" className={secondaryButton}>ดูแพ็กเกจลงทุน</a></div>
             </div>
             <div className="relative min-h-[24rem] bg-[#fff1df] p-5">
