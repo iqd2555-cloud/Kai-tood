@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 import { CategoryMenuToggle } from "@/components/category-menu-toggle";
+import { CourseReviewCarousel } from "@/components/course-review-carousel";
 import { BRAND_NAME, BRAND_SUBTITLE } from "@/lib/brand";
 
 const categoryMenu = [
@@ -290,21 +291,17 @@ function CourseSections() {
 
               <div className="bg-[#fff1df] p-5 sm:p-8 lg:p-10">
                 {course.mainImage ? (
-                  <div className="flex h-full min-h-[26rem] items-center justify-center rounded-[2rem] bg-white p-3 shadow-inner shadow-black/5 sm:min-h-[32rem] sm:p-5 lg:min-h-[34rem]">
+                  <div className="w-full overflow-hidden rounded-[2rem] bg-white shadow-inner shadow-black/5">
                     <img
                       src={course.mainImage.src}
                       alt={course.mainImage.alt}
-                      className="h-auto max-h-[34rem] w-full rounded-3xl object-contain shadow-2xl shadow-black/10"
+                      className="block h-auto w-full rounded-[2rem] object-contain shadow-2xl shadow-black/10"
                     />
                   </div>
                 ) : (
                   <CoursePlaceholder label={course.mainPlaceholder} featured />
                 )}
-                <div className="mt-5 grid gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-                  {course.reviewPlaceholders.map((label) => (
-                    <CoursePlaceholder key={label} label={label} />
-                  ))}
-                </div>
+                <CourseReviewCarousel reviews={course.reviewPlaceholders} />
               </div>
             </div>
           </div>
