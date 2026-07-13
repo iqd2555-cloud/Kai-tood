@@ -8,6 +8,8 @@ const categoryMenu = [
   { label: "ภาพรวมธุรกิจ", href: "#business-overview", detail: "ข้าวเหนียวไก่ทอดพร้อมขาย" },
   { label: "แพ็กเกจแฟรนไชส์", href: "#franchise-packages", detail: "55,000 / 99,000 บาท" },
   { label: "หนังสือสูตรไก่ทอด", href: "#book-recipes", detail: "10 สูตร + ข้าวเหนียว + ต้นทุน" },
+  { label: "คอร์สสอนสด", href: "#live-course", detail: "คอร์สสอนสูตรไก่ทอดเงินล้าน" },
+  { label: "คอร์สออนไลน์", href: "#online-course", detail: "คอร์สสอนสูตรไก่ทอดเงินล้าน" },
   { label: "พื้นที่ที่ต้องใช้", href: "#required-space", detail: "เริ่ม 2 × 3 เมตร" },
   { label: "เหมาะกับใคร", href: "#target-audience", detail: "ผู้เริ่มต้นและคนมีทำเล" },
   { label: "ระบบหลังบ้าน", href: "#back-office-system", detail: "ยอดขาย วัตถุดิบ สต็อก" },
@@ -47,6 +49,31 @@ const franchiseModels = [
     location: "เหมาะกับพื้นที่หน้าถนน จุดขายประจำ ตลาด พื้นที่เช่า หรือจุดที่ต้องการให้ลูกค้ามองเห็นชัด",
     suitableFor: "ผู้ที่ต้องการพื้นที่ทำงานคล่องตัวขึ้น และต้องการภาพลักษณ์ร้านที่เด่นกว่า",
     highlights: ["ทำงานคล่องตัวขึ้น", "จัดวางอุปกรณ์เป็นระบบ", "สร้างภาพจำหน้าร้านชัด"],
+  },
+];
+
+
+const courseSections = [
+  {
+    id: "live-course",
+    kicker: "LIVE COURSE",
+    title: "คอร์สสอนสด สูตรไก่ทอดเงินล้าน",
+    subtitle: "คอร์สสอนสูตรไก่ทอดเงินล้าน",
+    description: "เรียนแบบจับมือทำ 2 วันเต็มที่จังหวัดนครสวรรค์ เหมาะสำหรับคนที่ต้องการเรียนรู้จากประสบการณ์จริง เห็นขั้นตอนจริง ลงมือจริง และถามตอบได้แบบใกล้ชิด",
+    bullets: ["สอนแบบจับมือทำ", "เรียนสด 2 วันที่จังหวัดนครสวรรค์", "ราคาคอร์ส 17,500 บาท"],
+    price: "17,500 บาท",
+    mainPlaceholder: "รูปคอร์สสอนสด",
+    reviewPlaceholders: ["รีวิวการเรียนจริง 1", "รีวิวการเรียนจริง 2", "รีวิวการเรียนจริง 3"],
+  },
+  {
+    id: "online-course",
+    kicker: "ONLINE COURSE",
+    title: "คอร์สออนไลน์ สูตรไก่ทอดเงินล้าน",
+    subtitle: "คอร์สสอนสูตรไก่ทอดเงินล้าน",
+    description: "เรียนในกลุ่มปิด Facebook รวม 10 สูตรที่แม่ค้าทำขายจริงหน้าร้าน พร้อมสูตรนึ่งข้าวเหนียว เรียนซ้ำได้ไม่จำกัด และเลือกเรียนเวลาไหนก็ได้ตามสะดวก",
+    bullets: ["เรียนในกลุ่มปิด Facebook", "สอน 10 สูตรที่แม่ค้าทำขายจริงหน้าร้าน", "สอนนึ่งข้าวเหนียว", "เรียนซ้ำได้ไม่จำกัด", "เรียนตอนไหนก็ได้"],
+    mainPlaceholder: "รูปคอร์สออนไลน์",
+    reviewPlaceholders: ["รีวิวคอร์สออนไลน์ 1", "รีวิวคอร์สออนไลน์ 2", "รีวิวคอร์สออนไลน์ 3"],
   },
 ];
 
@@ -111,6 +138,8 @@ function PublicHeader() {
         <div className="flex shrink-0 flex-col items-stretch gap-1.5 lg:items-end">
           <div className="grid grid-cols-2 gap-2 text-xs font-black sm:text-sm lg:flex lg:items-center">
             <a href="#franchise-packages" className="hidden rounded-xl px-4 py-3 text-white/72 transition hover:bg-white/10 hover:text-white lg:inline-flex">แพ็กเกจ</a>
+            <a href="#live-course" className="hidden rounded-xl px-4 py-3 text-white/72 transition hover:bg-white/10 hover:text-white lg:inline-flex">คอร์สสอนสด</a>
+            <a href="#online-course" className="hidden rounded-xl px-4 py-3 text-white/72 transition hover:bg-white/10 hover:text-white lg:inline-flex">คอร์สออนไลน์</a>
             <a href="#back-office-system" className="hidden rounded-xl px-4 py-3 text-white/72 transition hover:bg-white/10 hover:text-white lg:inline-flex">ระบบหลังบ้าน</a>
             <Link href="/franchise/apply" className="rounded-xl bg-[#f47b00] px-3 py-3 text-center text-white transition hover:bg-[#ff8c19] focus-ring sm:px-5">สมัครแฟรนไชส์</Link>
             <Link href="/login" className="rounded-xl border border-white/20 bg-white px-3 py-3 text-center text-[#1f1f1f] transition hover:bg-[#fff1df] focus-ring sm:px-5">เข้าสู่ระบบ</Link>
@@ -215,6 +244,65 @@ function RecipeBookSection() {
   );
 }
 
+
+function CoursePlaceholder({ label, featured = false }: { label: string; featured?: boolean }) {
+  return (
+    <div className={`flex items-center justify-center rounded-[1.75rem] border-2 border-dashed border-[#f47b00]/45 bg-white/70 p-5 text-center shadow-inner shadow-black/5 ${featured ? "min-h-[26rem] sm:min-h-[32rem] lg:min-h-[34rem]" : "min-h-40 sm:min-h-48"}`}>
+      <div>
+        <div className={`mx-auto mb-4 flex items-center justify-center rounded-2xl bg-[#1f1f1f] font-black text-[#f6c400] ${featured ? "h-16 w-16 text-2xl" : "h-12 w-12 text-lg"}`}>รูป</div>
+        <p className={`font-black text-[#151515] ${featured ? "text-2xl sm:text-3xl" : "text-lg"}`}>{label}</p>
+        <p className="mt-2 text-sm font-bold text-[#666666]">พื้นที่รอใส่รูปจริง</p>
+      </div>
+    </div>
+  );
+}
+
+function CourseSections() {
+  return (
+    <>
+      {courseSections.map((course) => (
+        <Section key={course.id} id={course.id} className="pt-0">
+          <div className="overflow-hidden rounded-[2.5rem] border border-[#eadfca] bg-white shadow-2xl shadow-black/8">
+            <div className="grid gap-0 lg:grid-cols-[1.15fr_0.85fr]">
+              <div className="p-5 sm:p-8 lg:p-10">
+                <SectionHeader kicker={course.kicker} title={course.title} text={course.description} />
+                <div className="rounded-[1.75rem] bg-[#fff8ed] p-5 sm:p-6">
+                  <p className="text-sm font-black uppercase tracking-[0.2em] text-[#d71920]">รายละเอียดคอร์ส</p>
+                  <h3 className="mt-3 text-2xl font-black text-[#151515]">{course.subtitle}</h3>
+                  <ul className="mt-5 grid gap-3">
+                    {course.bullets.map((item) => (
+                      <li key={item} className="flex gap-3 rounded-2xl border border-[#eadfca] bg-white px-4 py-3 font-black text-[#151515] shadow-sm shadow-black/5">
+                        <span className="text-[#d71920]">✓</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {course.price ? (
+                  <div className="mt-5 inline-flex flex-col rounded-2xl bg-[#1f1f1f] px-6 py-4 text-white shadow-xl shadow-black/10 sm:flex-row sm:items-end sm:gap-4">
+                    <span className="text-sm font-black uppercase tracking-[0.2em] text-[#f6c400]">ราคา</span>
+                    <span className="text-3xl font-black text-white">{course.price}</span>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="bg-[#fff1df] p-5 sm:p-8 lg:p-10">
+                <CoursePlaceholder label={course.mainPlaceholder} featured />
+                <div className="mt-5 grid gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                  {course.reviewPlaceholders.map((label) => (
+                    <CoursePlaceholder key={label} label={label} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Section>
+      ))}
+    </>
+  );
+}
+
 function FranchiseModelsSection() {
   return (
     <Section id="franchise-packages" className="pt-0">
@@ -247,6 +335,8 @@ export default function LandingPage() {
       <Section id="proof" className="pt-0"><SectionHeader kicker="Business Proof" title="แบรนด์ที่เติบโตจากการขายจริง" text="เหนียวไก่เยอะโคตรเติบโตจากประสบการณ์งานราชการ 27 ปี ผสานกับการเริ่มต้นขายไก่ทอดด้วยเงินเพียง 4,000 บาท ยืนขายจริง แก้ปัญหาจริง เรียนรู้พฤติกรรมลูกค้าจริง แล้วค่อย ๆ เปลี่ยนประสบการณ์หน้าร้านให้กลายเป็นระบบแฟรนไชส์ที่ถ่ายทอดต่อได้" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{proofCards.map((item, index) => <article key={item.title} className="rounded-[1.75rem] border border-[#eadfca] bg-white p-5 shadow-lg shadow-black/5"><div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#eadfca] bg-[#fff1df] text-sm font-black text-[#d71920]">0{index + 1}</div><h3 className="mt-5 text-2xl font-black">{item.title}</h3><p className="mt-3 text-sm font-bold leading-7 text-[#666666]">{item.text}</p></article>)}</div></Section>
 
       <RecipeBookSection />
+
+      <CourseSections />
 
       <FranchiseModelsSection />
 
