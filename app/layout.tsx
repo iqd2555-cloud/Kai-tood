@@ -33,7 +33,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="th">
-      <body className="font-kanit antialiased">
+      <body className="font-body antialiased">
         {children}
         <PwaRegistrar />
       </body>
