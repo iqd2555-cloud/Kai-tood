@@ -3,6 +3,7 @@ import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 import { CategoryMenuToggle } from "@/components/category-menu-toggle";
 import { CourseReviewCarousel } from "@/components/course-review-carousel";
+import { FounderStoryPreview } from "@/components/founder-story";
 import { BRAND_NAME, BRAND_SUBTITLE } from "@/lib/brand";
 
 const categoryMenu = [
@@ -335,6 +336,23 @@ function CourseSections() {
   );
 }
 
+function FranchiseOriginSection() {
+  return (
+    <Section id="franchise-origin" className="pt-0">
+      <article className="rounded-[2.5rem] border border-[#eadfca] bg-[#1f1f1f] p-6 text-white shadow-2xl shadow-black/15 sm:p-8 lg:p-10">
+        <p className="text-xs font-black uppercase tracking-[0.28em] text-[#f6c400]">Franchise Origin</p>
+        <h2 className="mt-3 max-w-4xl text-3xl font-black leading-tight tracking-tight sm:text-5xl">แฟรนไชส์นี้ไม่ได้เริ่มจากการออกแบบแพ็กเกจ แต่เริ่มจากร้านที่ขายจริง</h2>
+        <div className="mt-6 grid gap-4 text-base font-bold leading-8 text-white/72 sm:text-lg">
+          <p>เหนียวไก่เยอะโคตรเริ่มต้นจากเงินทุนเพียง 4,000 บาท และพัฒนาจากการขายหน้าร้านจริงต่อเนื่องเป็นเวลา 5 ปี</p>
+          <p>ผู้ก่อตั้งนำประสบการณ์จากการทำงานราชการด้านการวางแผนและบริหารระบบตลอด 27 ปี มาปรับใช้กับธุรกิจร้านอาหาร เพื่อให้ร้านสามารถแบ่งหน้าที่ ควบคุมต้นทุน พัฒนาพนักงาน และดำเนินงานได้อย่างเป็นระบบ</p>
+          <p>ระบบแฟรนไชส์จึงไม่ได้สร้างขึ้นจากการคาดเดา แต่พัฒนามาจากปัญหาและประสบการณ์จริงของร้าน</p>
+        </div>
+        <Link href="/founder-story" className="mt-6 inline-flex font-black text-[#f6c400] underline decoration-2 underline-offset-8 focus-ring">อ่านเรื่องราวของผู้ก่อตั้ง</Link>
+      </article>
+    </Section>
+  );
+}
+
 function FranchiseModelsSection() {
   return (
     <Section id="franchise-packages" className="pt-0">
@@ -363,12 +381,14 @@ export default function LandingPage() {
       <PublicHeader />
       <HeroCatalog />
       <BusinessOverviewSection />
+      <FounderStoryPreview />
       <SystemHighlightsSection />
 
       <RecipeBookSection />
 
       <CourseSections />
 
+      <FranchiseOriginSection />
       <FranchiseModelsSection />
 
       <Section id="target-audience" className="pt-0"><div className="grid gap-5 lg:grid-cols-2"><div className="rounded-[2rem] bg-[#1f1f1f] p-6 text-white sm:p-8"><h2 className="text-3xl font-black">แฟรนไชส์นี้เหมาะกับใคร</h2><p className="mt-4 font-bold leading-8 text-white/70">เหมาะกับคนที่อยากเริ่มต้นธุรกิจอาหาร มีทำเลหรือกำลังมองหาทำเล มีงบลงทุนพร้อม และต้องการทำตามระบบที่ผ่านการใช้งานจริงจากหน้าร้าน</p><ul className="mt-6 grid gap-3">{fit.map((x) => <li key={x} className="rounded-2xl bg-white/10 p-4 text-lg font-black">✓ {x}</li>)}</ul></div><div className="rounded-[2rem] border border-[#eadfca] bg-white p-6 sm:p-8"><h2 className="text-3xl font-black">ไม่เหมาะกับใคร</h2><p className="mt-4 font-bold leading-8 text-[#666666]">แฟรนไชส์นี้ไม่เหมาะกับคนที่ต้องการซื้อแค่ป้ายหรือสูตร แต่ไม่พร้อมดูแลร้าน ไม่พร้อมทำตามระบบ หรือคิดว่าซื้อแฟรนไชส์แล้วจะสำเร็จเองโดยไม่ลงมือทำ</p><ul className="mt-6 grid gap-3">{notFit.map((x) => <li key={x} className="rounded-2xl bg-[#fff1df] p-4 text-lg font-black text-[#666666]">! {x}</li>)}</ul></div></div></Section>
