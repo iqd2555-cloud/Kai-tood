@@ -6,14 +6,14 @@ import { CourseReviewCarousel } from "@/components/course-review-carousel";
 import { BRAND_NAME, BRAND_SUBTITLE } from "@/lib/brand";
 
 const categoryMenu = [
-  { label: "ภาพรวมธุรกิจ", href: "#business-overview", detail: "ข้าวเหนียวไก่ทอดพร้อมขาย" },
+  { label: "ภาพรวมธุรกิจ", href: "#business-overview", detail: "เริ่มจากร้านขายจริง" },
+  { label: "หนังสือสูตรไก่ทอด", href: "#book-recipes", detail: "10 สูตร + ข้าวเหนียว" },
+  { label: "คอร์สสอนสด", href: "#live-course", detail: "จับมือทำ 2 วัน" },
+  { label: "คอร์สออนไลน์", href: "#online-course", detail: "เรียนซ้ำได้ไม่จำกัด" },
   { label: "แพ็กเกจแฟรนไชส์", href: "#franchise-packages", detail: "55,000 / 99,000 บาท" },
-  { label: "หนังสือสูตรไก่ทอด", href: "#book-recipes", detail: "10 สูตร + ข้าวเหนียว + ต้นทุน" },
-  { label: "คอร์สสอนสด", href: "#live-course", detail: "คอร์สสอนสูตรไก่ทอดเงินล้าน" },
-  { label: "คอร์สออนไลน์", href: "#online-course", detail: "คอร์สสอนสูตรไก่ทอดเงินล้าน" },
-  { label: "พื้นที่ที่ต้องใช้", href: "#required-space", detail: "เริ่ม 2 × 3 เมตร" },
-  { label: "เหมาะกับใคร", href: "#target-audience", detail: "ผู้เริ่มต้นและคนมีทำเล" },
-  { label: "ระบบหลังบ้าน", href: "#back-office-system", detail: "ยอดขาย วัตถุดิบ สต็อก" },
+  { label: "เหมาะกับใคร", href: "#target-audience", detail: "เช็กความพร้อม" },
+  { label: "ระบบหลังบ้าน", href: "#back-office-system", detail: "ยอดขาย วัตถุดิบ รายงาน" },
+  { label: "สมัครแฟรนไชส์", href: "#apply-franchise", detail: "กรอกข้อมูลเบื้องต้น" },
 ];
 
 const stats = [
@@ -22,10 +22,11 @@ const stats = [
   { value: "2×3 ม.", label: "พื้นที่ขั้นต่ำ", detail: "เริ่มขายได้จริง" },
 ];
 
-const catalogCards = [
-  { title: "แพ็กเกจเริ่มต้น", text: "สำหรับพื้นที่เล็ก คุมงบง่าย เหมาะกับคนเริ่มขายจริง", image: "/new-kiosk.png", tag: "Counter" },
-  { title: "หน้าร้านเด่น", text: "ซุ้มขนาดใหญ่ขึ้น เห็นชัด เหมาะกับทำเลถนนหรือตลาด", image: "/stand-alone.png", tag: "Kiosk" },
-  { title: "แบรนด์ร้านจริง", text: "ภาพจำข้าวเหนียวไก่ทอดพร้อมระบบทำงานหลังร้าน", image: "/fronshop.jpg", tag: "Brand" },
+const systemHighlights = [
+  { title: "ร้านจริง", text: "เริ่มจากร้านข้าวเหนียวไก่ทอดที่ขายจริงทุกวัน" },
+  { title: "สูตรจริง", text: "สูตรที่แม่ค้าใช้ทำขายจริงหน้าร้าน" },
+  { title: "ระบบจริง", text: "มีแนวทางการขาย การจัดร้าน วัตถุดิบ และต้นทุน" },
+  { title: "ระบบหลังบ้าน", text: "มีระบบช่วยติดตามยอดขาย วัตถุดิบ รายงาน และข้อมูลแฟรนไชส์" },
 ];
 
 const franchiseModels = [
@@ -46,9 +47,9 @@ const franchiseModels = [
     price: "99,000 บาท",
     imageSrc: "/stand-alone.png",
     imageAlt: "แฟรนไชส์รูปแบบซุ้ม 99,000 บาท",
-    area: "พื้นที่อย่างน้อย 3 × 4 เมตร",
-    location: "เหมาะกับพื้นที่หน้าถนน จุดขายประจำ ตลาด พื้นที่เช่า หรือจุดที่ต้องการให้ลูกค้ามองเห็นชัด",
-    suitableFor: "ผู้ที่ต้องการพื้นที่ทำงานคล่องตัวขึ้น และต้องการภาพลักษณ์ร้านที่เด่นกว่า",
+    area: "พื้นที่ประมาณ 3 × 3 เมตร",
+    location: "เหมาะกับคนที่ต้องการหน้าร้านชัดเจน ใช้พื้นที่ประมาณ 3 × 3 เมตร ทำงานคล่องตัวขึ้น",
+    suitableFor: "ผู้ที่ต้องการหน้าร้านชัดเจนและพื้นที่ทำงานคล่องตัวขึ้น",
     highlights: ["ทำงานคล่องตัวขึ้น", "จัดวางอุปกรณ์เป็นระบบ", "สร้างภาพจำหน้าร้านชัด"],
   },
 ];
@@ -61,7 +62,7 @@ const courseSections = [
     title: "คอร์สสอนสด สูตรไก่ทอดเงินล้าน",
     subtitle: "คอร์สสอนสูตรไก่ทอดเงินล้าน",
     description: "เรียนแบบจับมือทำ 2 วันเต็มที่จังหวัดนครสวรรค์ เหมาะสำหรับคนที่ต้องการเรียนรู้จากประสบการณ์จริง เห็นขั้นตอนจริง ลงมือจริง และถามตอบได้แบบใกล้ชิด",
-    bullets: ["สอนแบบจับมือทำ", "เรียนสด 2 วันที่จังหวัดนครสวรรค์", "ราคาคอร์ส 17,500 บาท"],
+    bullets: ["สอนแบบจับมือทำ", "เรียนสด 2 วัน", "เรียนที่จังหวัดนครสวรรค์", "ราคา 17,500 บาท"],
     price: "17,500 บาท",
     mainImage: { src: "/Live_Training_Course.png", alt: "คอร์สสอนสด สูตรไก่ทอดเงินล้าน" },
     mainPlaceholder: "รูปคอร์สสอนสด",
@@ -95,21 +96,8 @@ const recipeBookItems = [
 const recipeBookExtras = ["สูตรนึ่งข้าวเหนียว"];
 const recipeBookCosting = ["แนวทางคำนวณต้นทุน", "ตัวอย่างการคิดต้นทุนต่อห่อ", "แนวทางประเมินราคาขายและกำไรเบื้องต้น"];
 
-const proofCards = [
-  { title: "ร้านจริง", text: "เริ่มจากร้านที่ขายอาหารจริงทุกวัน เห็นปัญหาและโอกาสจากหน้าร้านโดยตรง" },
-  { title: "ลูกค้าจริง", text: "เข้าใจพฤติกรรมลูกค้าหน้างาน เมนูหลัก ช่วงเวลาขาย และการจัดการคิว" },
-  { title: "ระบบจริง", text: "มีระบบหลังบ้านสำหรับยอดขาย วัตถุดิบ คงเหลือ และรายการสั่งของของแต่ละสาขา" },
-  { title: "ทีมงานดูแลจริง", text: "ประเมินผู้สมัคร ทำเล งบลงทุน และความพร้อมก่อนเริ่มเปิดร้านอย่างเป็นขั้นตอน" },
-];
-
-const fit = ["อยากเริ่มธุรกิจอาหารที่จับต้องได้", "มีทำเลหรือกำลังหาทำเลจริง", "พร้อมลงมือดูแลร้านและทีมงาน", "ต้องการระบบช่วยคุมต้นทุนและวัตถุดิบ"];
-const notFit = ["ต้องการลงทุนแล้วรอรับกำไรทันที", "ไม่พร้อมทำตามมาตรฐานร้าน", "ไม่มีเวลาติดตามงานหน้าร้าน", "มองแฟรนไชส์เป็นแค่ชุดอุปกรณ์ราคาถูก"];
-const benefits = ["สูตรไก่หมักพร้อมทอด", "ระบบการขายหน้าร้าน", "การคำนวณต้นทุน", "ระบบสั่งวัตถุดิบ", "ระบบหลังบ้าน", "การดูแลหลังเปิดร้าน"];
-const steps = [
-  { title: "คุยความพร้อม", text: "กรอกข้อมูลผู้สนใจ ทีมงานตรวจงบลงทุน พื้นที่ และเป้าหมายการขาย" },
-  { title: "ประเมินทำเล", text: "ดูรูปแบบพื้นที่ให้เหมาะกับเคาน์เตอร์หรือซุ้ม พร้อมแนะนำจุดที่ควรปรับ" },
-  { title: "เปิดร้านเป็นระบบ", text: "เริ่มขายด้วยสูตร มาตรฐานการทำงาน และระบบหลังบ้านเดิมของแบรนด์" },
-];
+const fit = ["อยากเริ่มขายข้าวเหนียวไก่ทอด", "มีทำเลหรือกำลังหาทำเล", "มีงบลงทุนพร้อม", "พร้อมทำตามระบบ", "ต้องการธุรกิจอาหารที่จับต้องได้"];
+const notFit = ["ต้องการซื้อแค่ป้ายหรือสูตร", "ไม่พร้อมดูแลร้าน", "ไม่พร้อมทำตามระบบ", "คิดว่าซื้อแฟรนไชส์แล้วจะสำเร็จเองโดยไม่ลงมือทำ"];
 const contact = ["โทร 089-272-2789", "Id Line: kaikoy", "TikTok: เหนียวไก่เยอะโคตร"];
 
 const primaryButton = "inline-flex min-h-14 items-center justify-center rounded-xl bg-[#d71920] px-7 py-4 text-base font-black text-white shadow-xl shadow-[#d71920]/25 transition hover:-translate-y-0.5 hover:bg-[#b9151b] focus-ring";
@@ -139,10 +127,10 @@ function PublicHeader() {
         </Link>
         <div className="flex shrink-0 flex-col items-stretch gap-1.5 lg:items-end">
           <div className="grid grid-cols-2 gap-2 text-xs font-black sm:text-sm lg:flex lg:items-center">
+            <a href="#business-overview" className="hidden rounded-xl px-4 py-3 text-white/72 transition hover:bg-white/10 hover:text-white lg:inline-flex">ภาพรวมธุรกิจ</a>
+            <a href="#book-recipes" className="hidden rounded-xl px-4 py-3 text-white/72 transition hover:bg-white/10 hover:text-white lg:inline-flex">หนังสือสูตร</a>
+            <a href="#live-course" className="hidden rounded-xl px-4 py-3 text-white/72 transition hover:bg-white/10 hover:text-white lg:inline-flex">คอร์สสด</a>
             <a href="#franchise-packages" className="hidden rounded-xl px-4 py-3 text-white/72 transition hover:bg-white/10 hover:text-white lg:inline-flex">แพ็กเกจ</a>
-            <a href="#live-course" className="hidden rounded-xl px-4 py-3 text-white/72 transition hover:bg-white/10 hover:text-white lg:inline-flex">คอร์สสอนสด</a>
-            <a href="#online-course" className="hidden rounded-xl px-4 py-3 text-white/72 transition hover:bg-white/10 hover:text-white lg:inline-flex">คอร์สออนไลน์</a>
-            <a href="#back-office-system" className="hidden rounded-xl px-4 py-3 text-white/72 transition hover:bg-white/10 hover:text-white lg:inline-flex">ระบบหลังบ้าน</a>
             <Link href="/franchise/apply" className="rounded-xl bg-[#f47b00] px-3 py-3 text-center text-white transition hover:bg-[#ff8c19] focus-ring sm:px-5">สมัครแฟรนไชส์</Link>
             <Link href="/login" className="rounded-xl border border-white/20 bg-white px-3 py-3 text-center text-[#1f1f1f] transition hover:bg-[#fff1df] focus-ring sm:px-5">เข้าสู่ระบบ</Link>
           </div>
@@ -155,7 +143,7 @@ function PublicHeader() {
 
 function HeroCatalog() {
   return (
-    <Section id="business-overview" className="py-8 sm:py-10 lg:py-12">
+    <Section className="py-8 sm:py-10 lg:py-12">
       <div className="grid gap-5 lg:grid-cols-[290px_1fr]">
         <aside className="rounded-[1.75rem] border border-black/10 bg-white p-4 shadow-xl shadow-black/5">
           <div className="rounded-2xl bg-[#1f1f1f] px-5 py-4 text-white"><p className="text-sm font-black text-[#f6c400]">CATEGORY MENU</p><h2 className="mt-1 text-2xl font-black">เลือกดูข้อมูล</h2></div>
@@ -167,7 +155,7 @@ function HeroCatalog() {
             <div className="flex flex-col justify-center p-6 text-white sm:p-10 lg:p-12">
               <div className="inline-flex w-fit rounded-full bg-[#1f1f1f] px-4 py-2 text-sm font-black text-[#f6c400]">Franchise Catalog Landing Page</div>
               <h1 className="mt-5 text-4xl font-black leading-[1.04] tracking-tight sm:text-6xl lg:text-7xl">แฟรนไชส์ข้าวเหนียวไก่ทอด เข้าใจง่ายในหน้าเดียว</h1>
-              <p className="mt-5 max-w-2xl text-lg font-bold leading-9 text-white/88 sm:text-xl">รวมภาพธุรกิจ แพ็กเกจ ราคา พื้นที่ที่ต้องใช้ ความเหมาะสม และช่องทางสมัครสำหรับผู้สนใจแฟรนไชส์เหนียวไก่เยอะโคตร</p>
+              <p className="mt-5 max-w-2xl text-lg font-bold leading-9 text-white/88 sm:text-xl">รวมภาพรวมธุรกิจ แพ็กเกจ ราคา พื้นที่ที่ต้องใช้ ความเหมาะสม และช่องทางสมัคร สำหรับผู้สนใจแฟรนไชส์เหนียวไก่เยอะโคตร</p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row"><Link href="/franchise/apply" className={primaryButton}>สมัคร / สอบถามแฟรนไชส์</Link><a href="#franchise-packages" className={secondaryButton}>ดูแพ็กเกจลงทุน</a></div>
             </div>
             <div className="relative min-h-[24rem] bg-[#fff1df] p-5">
@@ -182,8 +170,44 @@ function HeroCatalog() {
   );
 }
 
-function CatalogCards() {
-  return <Section className="pt-0"><div className="grid gap-4 lg:grid-cols-3">{catalogCards.map((card) => <article key={card.title} className="group overflow-hidden rounded-[1.75rem] border border-[#eadfca] bg-white shadow-xl shadow-black/5"><div className="relative h-56 bg-[#fff1df] p-4"><img src={card.image} alt={card.title} className="h-full w-full rounded-[1.25rem] object-contain transition group-hover:scale-[1.03]" /><span className="absolute left-6 top-6 rounded-full bg-[#1f1f1f] px-4 py-2 text-sm font-black text-[#f6c400]">{card.tag}</span></div><div className="p-6"><h3 className="text-2xl font-black">{card.title}</h3><p className="mt-2 font-bold leading-7 text-[#666666]">{card.text}</p></div></article>)}</div></Section>;
+function BusinessOverviewSection() {
+  return (
+    <Section id="business-overview" className="pt-0">
+      <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+        <article className="rounded-[2rem] border border-[#eadfca] bg-white p-6 shadow-xl shadow-black/5 sm:p-8">
+          <SectionHeader
+            kicker="Business Overview"
+            title="ธุรกิจที่เริ่มจากการขายจริง"
+            text="เหนียวไก่เยอะโคตรเติบโตจากการขายจริงหน้าร้าน ผ่านการทดลองเมนู ราคา การจัดร้าน การทำงานของพนักงาน และพฤติกรรมลูกค้าจริง ก่อนพัฒนาเป็นระบบแฟรนไชส์สำหรับคนที่อยากเริ่มต้นธุรกิจอาหารแบบมีแนวทางชัดเจน"
+          />
+        </article>
+        <article className="rounded-[2rem] bg-[#1f1f1f] p-6 text-white shadow-xl shadow-black/10 sm:p-8">
+          <SectionHeader
+            kicker="Real Experience"
+            title="แบรนด์ที่เติบโตจากการขายจริง"
+            text="เหนียวไก่เยอะโคตรไม่ได้เริ่มจากการสร้างภาพให้ดูดี แต่เริ่มจากประสบการณ์งานราชการ 27 ปี ผสานกับการเริ่มขายไก่ทอดด้วยเงินเพียง 4,000 บาท ยืนขายจริง แก้ปัญหาจริง เรียนรู้ลูกค้าจริง แล้วค่อย ๆ เปลี่ยนประสบการณ์หน้าร้านให้กลายเป็นระบบแฟรนไชส์ที่ถ่ายทอดต่อได้"
+            invert
+          />
+        </article>
+      </div>
+    </Section>
+  );
+}
+
+function SystemHighlightsSection() {
+  return (
+    <Section className="pt-0">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {systemHighlights.map((item, index) => (
+          <article key={item.title} className="rounded-[1.75rem] border border-[#eadfca] bg-white p-5 shadow-lg shadow-black/5">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#eadfca] bg-[#fff1df] text-sm font-black text-[#d71920]">0{index + 1}</div>
+            <h3 className="mt-5 text-2xl font-black">{item.title}</h3>
+            <p className="mt-3 text-sm font-bold leading-7 text-[#666666]">{item.text}</p>
+          </article>
+        ))}
+      </div>
+    </Section>
+  );
 }
 
 function RecipeBookSection() {
@@ -198,8 +222,7 @@ function RecipeBookSection() {
               text="รวมสูตรไก่ทอดที่แม่ค้าทำขายจริงหน้าร้าน พร้อมสูตรนึ่งข้าวเหนียว และแนวทางคำนวณต้นทุนท้ายเล่ม"
             />
             <div className="grid gap-4 text-base font-bold leading-8 text-[#666666] sm:text-lg">
-              <p>หนังสือสูตรไก่ทอด 10 สูตรเล่มนี้ รวบรวมจากสูตรที่แม่ค้าใช้ทำขายจริงหน้าร้าน เหมาะสำหรับคนที่อยากเริ่มต้นขายข้าวเหนียวไก่ทอด ต้องการสูตรตั้งต้นที่ชัดเจน และอยากเข้าใจแนวทางการคิดต้นทุนก่อนเริ่มขายจริง</p>
-              <p>ภายในเล่มมีทั้งสูตรไก่ทอดดั้งเดิม ไก่ทอดพริก หนังไก่ทอด เครื่องในทอด เอ็นไก่ทอด ไก่เขย่า 4 เมนู และไก่หยอง พร้อมแถมฟรีสูตรนึ่งข้าวเหนียว และแนวทางคำนวณต้นทุนท้ายเล่ม เพื่อให้ผู้อ่านเห็นภาพการทำขายจริงมากขึ้น</p>
+              <p>รวมสูตรไก่ทอดที่แม่ค้าใช้ทำขายจริงหน้าร้าน เหมาะสำหรับคนที่อยากเริ่มต้นเรียนรู้ก่อนลงทุน มีสูตรไก่ทอดดั้งเดิม ไก่ทอดพริก หนังไก่ เครื่องใน เอ็นไก่ ไก่เขย่า 4 เมนู และไก่หยอง พร้อมแถมฟรีสูตรนึ่งข้าวเหนียว และแนวทางคำนวณต้นทุนท้ายเล่ม</p>
             </div>
 
             <div className="mt-7 rounded-[1.75rem] bg-[#fff8ed] p-4 sm:p-5">
@@ -295,7 +318,7 @@ function CourseSections() {
                     <img
                       src={course.mainImage.src}
                       alt={course.mainImage.alt}
-                      className="block h-auto w-full rounded-[2rem] object-contain shadow-2xl shadow-black/10"
+                      className="block min-h-[26rem] w-full rounded-[2rem] object-cover shadow-2xl shadow-black/10 sm:min-h-[32rem]"
                     />
                   </div>
                 ) : (
@@ -338,9 +361,8 @@ export default function LandingPage() {
     <main className="min-h-dvh bg-[#fff8ed] text-[#151515]">
       <PublicHeader />
       <HeroCatalog />
-      <CatalogCards />
-
-      <Section id="proof" className="pt-0"><SectionHeader kicker="Business Proof" title="แบรนด์ที่เติบโตจากการขายจริง" text="เหนียวไก่เยอะโคตรเติบโตจากประสบการณ์งานราชการ 27 ปี ผสานกับการเริ่มต้นขายไก่ทอดด้วยเงินเพียง 4,000 บาท ยืนขายจริง แก้ปัญหาจริง เรียนรู้พฤติกรรมลูกค้าจริง แล้วค่อย ๆ เปลี่ยนประสบการณ์หน้าร้านให้กลายเป็นระบบแฟรนไชส์ที่ถ่ายทอดต่อได้" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{proofCards.map((item, index) => <article key={item.title} className="rounded-[1.75rem] border border-[#eadfca] bg-white p-5 shadow-lg shadow-black/5"><div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#eadfca] bg-[#fff1df] text-sm font-black text-[#d71920]">0{index + 1}</div><h3 className="mt-5 text-2xl font-black">{item.title}</h3><p className="mt-3 text-sm font-bold leading-7 text-[#666666]">{item.text}</p></article>)}</div></Section>
+      <BusinessOverviewSection />
+      <SystemHighlightsSection />
 
       <RecipeBookSection />
 
@@ -348,13 +370,11 @@ export default function LandingPage() {
 
       <FranchiseModelsSection />
 
-      <Section id="target-audience" className="pt-0"><div className="grid gap-5 lg:grid-cols-2"><div className="rounded-[2rem] bg-[#1f1f1f] p-6 text-white sm:p-8"><h2 className="text-3xl font-black">เหมาะกับใคร</h2><ul className="mt-6 grid gap-3">{fit.map((x) => <li key={x} className="rounded-2xl bg-white/10 p-4 text-lg font-black">✓ {x}</li>)}</ul></div><div className="rounded-[2rem] border border-[#eadfca] bg-white p-6 sm:p-8"><h2 className="text-3xl font-black">ไม่เหมาะกับใคร</h2><ul className="mt-6 grid gap-3">{notFit.map((x) => <li key={x} className="rounded-2xl bg-[#fff1df] p-4 text-lg font-black text-[#666666]">! {x}</li>)}</ul></div></div></Section>
+      <Section id="target-audience" className="pt-0"><div className="grid gap-5 lg:grid-cols-2"><div className="rounded-[2rem] bg-[#1f1f1f] p-6 text-white sm:p-8"><h2 className="text-3xl font-black">แฟรนไชส์นี้เหมาะกับใคร</h2><p className="mt-4 font-bold leading-8 text-white/70">เหมาะกับคนที่อยากเริ่มต้นธุรกิจอาหาร มีทำเลหรือกำลังมองหาทำเล มีงบลงทุนพร้อม และต้องการทำตามระบบที่ผ่านการใช้งานจริงจากหน้าร้าน</p><ul className="mt-6 grid gap-3">{fit.map((x) => <li key={x} className="rounded-2xl bg-white/10 p-4 text-lg font-black">✓ {x}</li>)}</ul></div><div className="rounded-[2rem] border border-[#eadfca] bg-white p-6 sm:p-8"><h2 className="text-3xl font-black">ไม่เหมาะกับใคร</h2><p className="mt-4 font-bold leading-8 text-[#666666]">แฟรนไชส์นี้ไม่เหมาะกับคนที่ต้องการซื้อแค่ป้ายหรือสูตร แต่ไม่พร้อมดูแลร้าน ไม่พร้อมทำตามระบบ หรือคิดว่าซื้อแฟรนไชส์แล้วจะสำเร็จเองโดยไม่ลงมือทำ</p><ul className="mt-6 grid gap-3">{notFit.map((x) => <li key={x} className="rounded-2xl bg-[#fff1df] p-4 text-lg font-black text-[#666666]">! {x}</li>)}</ul></div></div></Section>
 
-      <Section id="back-office-system" className="pt-0"><SectionHeader kicker="Back Office System" title="สิ่งที่ได้จากระบบแฟรนไชส์" text="ไม่ใช่แค่หน้าร้าน แต่รวมแนวทางทำงาน สูตร ระบบขาย และข้อมูลหลังบ้านสำหรับติดตามสาขา" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{benefits.map((item) => <div key={item} className="rounded-[1.75rem] border border-[#eadfca] bg-white p-6 shadow-xl shadow-black/5"><div className="mb-5 h-2 w-16 rounded-full bg-[#f47b00]" /><h3 className="text-2xl font-black">{item}</h3></div>)}</div></Section>
+      <Section id="back-office-system" className="pt-0"><div className="rounded-[2.5rem] border border-[#eadfca] bg-white p-6 shadow-2xl shadow-black/8 sm:p-10"><SectionHeader kicker="Back Office System" title="ระบบหลังบ้านที่ช่วยให้ร้านเดินเป็นระบบ" text="ระบบหลังบ้านถูกออกแบบมาเพื่อช่วยให้เจ้าของร้านติดตามข้อมูลสำคัญ เช่น ยอดขาย วัตถุดิบ โรงหมักไก่ Cash Flow รายงาน และรายชื่อผู้สนใจแฟรนไชส์ เพื่อให้บริหารร้านด้วยข้อมูลมากกว่าความจำ" /></div></Section>
 
-      <Section className="pt-0"><div className="rounded-[2.5rem] bg-[#fff1df] p-6 sm:p-10"><SectionHeader kicker="How to start" title="เริ่มต้นอย่างเป็นขั้นตอน" text="วาง flow ให้ผู้สนใจเข้าใจง่าย ตั้งแต่การสมัครจนถึงการเปิดร้านจริง" /><div className="grid gap-4 lg:grid-cols-3">{steps.map((step, index) => <article key={step.title} className="rounded-[1.75rem] bg-white p-6 shadow-lg shadow-black/5"><div className="text-4xl font-black text-[#d71920]">0{index + 1}</div><h3 className="mt-4 text-2xl font-black">{step.title}</h3><p className="mt-3 font-bold leading-7 text-[#666666]">{step.text}</p></article>)}</div></div></Section>
-
-      <Section className="pt-0"><div className="overflow-hidden rounded-[2.5rem] bg-[#1f1f1f] p-8 text-center text-white shadow-2xl shadow-black/20 sm:p-12"><h2 className="mx-auto max-w-4xl text-3xl font-black leading-tight sm:text-5xl">พร้อมคุยเรื่องทำเลและรูปแบบลงทุนของคุณหรือยัง?</h2><p className="mx-auto mt-4 max-w-2xl text-base font-bold leading-8 text-white/70 sm:text-lg">กรอกข้อมูลเบื้องต้น ทีมงานจะตรวจสอบทำเล งบลงทุน และความพร้อมก่อนติดต่อกลับ</p><Link href="/franchise/apply" className={`${primaryButton} mt-8`}>ลงทะเบียนผู้สนใจแฟรนไชส์</Link></div></Section>
+      <Section id="apply-franchise" className="pt-0"><div className="overflow-hidden rounded-[2.5rem] bg-[#1f1f1f] p-8 text-center text-white shadow-2xl shadow-black/20 sm:p-12"><h2 className="mx-auto max-w-4xl text-3xl font-black leading-tight sm:text-5xl">ก่อนสมัครแฟรนไชส์</h2><p className="mx-auto mt-4 max-w-3xl text-base font-bold leading-8 text-white/70 sm:text-lg">ก่อนสมัคร แนะนำให้ประเมินตัวเองเรื่องงบลงทุน ทำเล ความพร้อมในการดูแลร้าน และความพร้อมในการทำตามระบบ หากพร้อมเริ่มต้น สามารถกรอกข้อมูลสมัครแฟรนไชส์เพื่อให้ทีมงานตรวจสอบเบื้องต้นได้</p><Link href="/franchise/apply" className={`${primaryButton} mt-8`}>สมัครแฟรนไชส์</Link></div></Section>
 
       <footer id="footer-contact" className="border-t border-[#eadfca] bg-white"><div className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_auto] lg:px-8"><div className="flex items-center gap-3"><BrandLogo size={52} /><div><div className="text-2xl font-black">{BRAND_NAME}</div><div className="mt-1 font-bold text-[#666666]">{BRAND_SUBTITLE}</div></div></div><div className="grid gap-2 text-sm font-black sm:grid-cols-2 lg:text-right">{contact.map((item) => <span key={item}>{item}</span>)}<Link href="/login" className="underline decoration-2 underline-offset-4">เข้าสู่ระบบ</Link></div></div></footer>
     </main>
