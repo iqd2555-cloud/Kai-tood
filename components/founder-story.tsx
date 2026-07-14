@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 
+const governmentServiceGalleryPlaceholders = ["พื้นที่รูปย่อย 1", "พื้นที่รูปย่อย 2", "พื้นที่รูปย่อย 3", "พื้นที่รูปย่อย 4"];
+
 export const founderPhotos = {
   firstShop: {
     src: "/first-shop.png",
@@ -135,6 +137,26 @@ export function FounderStoryPreview() {
   );
 }
 
+function FounderThumbnailGallery({ placeholders }: { placeholders: string[] }) {
+  return (
+    <div className="mt-5 rounded-[1.75rem] border border-[#eadfca] bg-white p-3 shadow-xl shadow-black/5 sm:p-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {placeholders.map((placeholder, index) => (
+          <figure key={placeholder} className="overflow-hidden rounded-[1.5rem] border border-[#eadfca] bg-white p-2 shadow-lg shadow-black/10">
+            <div className="flex aspect-[4/3] items-center justify-center rounded-[1.25rem] bg-[#fff8ed] p-3 text-center">
+              <div>
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-[#1f1f1f] text-sm font-black text-[#f6c400]">รูป</div>
+                <p className="mt-3 text-sm font-black leading-5 text-[#151515] sm:text-base">{placeholder}</p>
+              </div>
+            </div>
+            <figcaption className="px-1 pt-2 text-center text-xs font-bold leading-5 text-[#666666]">รอใส่รูปจริง {index + 1}</figcaption>
+          </figure>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function FounderStorySection({ section, index }: { section: (typeof founderSections)[number]; index: number }) {
   return (
     <section className="scroll-mt-28 rounded-[2rem] border border-[#eadfca] bg-white p-5 shadow-xl shadow-black/5 sm:p-8">
@@ -149,6 +171,7 @@ export function FounderStorySection({ section, index }: { section: (typeof found
             {index === 2 ? <>{/* TODO: Replace with the real photo of the founder during government service */}</> : null}
             {index === 3 ? <>{/* TODO: Replace with the real photo of the founder after resignation */}</> : null}
             <FounderPhotoCard photo={section.photo} />
+            {index === 2 ? <FounderThumbnailGallery placeholders={governmentServiceGalleryPlaceholders} /> : null}
           </div>
         ) : null}
       </div>
