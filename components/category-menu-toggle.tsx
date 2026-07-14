@@ -6,7 +6,6 @@ type CategoryMenuItem = {
   label: string;
   href: string;
   detail: string;
-  cta: string;
 };
 
 export function CategoryMenuToggle({ items }: { items: CategoryMenuItem[] }) {
@@ -40,14 +39,14 @@ export function CategoryMenuToggle({ items }: { items: CategoryMenuItem[] }) {
             className="group rounded-2xl border border-[#eadfca] bg-[#fff8ed] p-4 transition hover:-translate-y-0.5 hover:border-[#f47b00] hover:bg-[#fff1df] hover:shadow-lg hover:shadow-[#f47b00]/10 focus-ring"
             onClick={() => setIsCategoryMenuOpen(false)}
           >
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
+            <div className="flex flex-col gap-1">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="font-black text-[#151515]">{item.label}</span>
-                <p className="mt-1 text-sm font-bold text-[#666666]">{item.detail}</p>
+                <span className="cta-pulse inline-flex min-h-9 shrink-0 items-center justify-center rounded-full bg-[#f47b00] px-3.5 py-1.5 text-sm font-black text-white shadow-lg shadow-[#f47b00]/25 transition group-hover:translate-x-0.5 group-hover:bg-[#d71920] sm:text-[0.8rem]">
+                  คลิกตรงนี้ →
+                </span>
               </div>
-              <span className="cta-pulse inline-flex min-h-10 shrink-0 items-center justify-center rounded-full bg-[#f47b00] px-4 py-2 text-sm font-black text-white shadow-lg shadow-[#f47b00]/25 transition group-hover:translate-x-1 group-hover:bg-[#d71920] sm:text-[0.8rem]">
-                {item.cta}
-              </span>
+              <p className="text-sm font-bold text-[#666666]">{item.detail}</p>
             </div>
           </a>
         ))}
