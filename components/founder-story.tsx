@@ -3,8 +3,8 @@ import Link from "next/link";
 
 export const founderPhotos = {
   firstShop: {
-    src: "",
-    alt: "ร้านไก่ทอดร้านแรกของผู้ก่อตั้ง",
+    src: "/first-shop.png",
+    alt: "ร้านแรกที่เริ่มต้นธุรกิจเหนียวไก่เยอะโคตร",
     caption: "ร้านแรกที่เริ่มจากเงินทุน 4,000 บาท และการลงมือขายด้วยตัวเอง",
     placeholder: "พื้นที่รูป: ร้านแรกที่เริ่มต้นธุรกิจ",
   },
@@ -129,8 +129,7 @@ export function FounderStoryPreview() {
           <div className="mt-6 grid gap-4 text-base font-bold leading-8 text-[#666666] sm:text-lg">{storyParagraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}</div>
           <Link href="/founder-story" className="mt-7 inline-flex min-h-14 items-center justify-center rounded-xl bg-[#d71920] px-7 py-4 text-base font-black text-white shadow-xl shadow-[#d71920]/25 transition hover:-translate-y-0.5 hover:bg-[#b9151b] focus-ring">อ่านเรื่องราวของผู้ก่อตั้ง</Link>
         </article>
-        {/* TODO: Replace with the real photo of the first fried chicken shop */}
-        <FounderPhotoCard photo={{ ...founderPhotos.firstShop, alt: "ผู้ก่อตั้งกับร้านไก่ทอดร้านแรกที่เริ่มต้นจากเงินทุน 4,000 บาท" }} priority />
+        <FounderPhotoCard photo={founderPhotos.firstShop} priority />
       </div>
     </section>
   );
@@ -147,7 +146,6 @@ export function FounderStorySection({ section, index }: { section: (typeof found
         </article>
         {section.photo ? (
           <div>
-            {index === 0 ? <>{/* TODO: Replace with the real photo of the first fried chicken shop */}</> : null}
             {index === 2 ? <>{/* TODO: Replace with the real photo of the founder during government service */}</> : null}
             {index === 3 ? <>{/* TODO: Replace with the real photo of the founder after resignation */}</> : null}
             <FounderPhotoCard photo={section.photo} />
