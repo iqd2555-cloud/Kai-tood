@@ -125,14 +125,18 @@ const founderSections = [
   },
 ];
 
-export function FounderPhotoCard({ photo, priority = false, altOverride }: { photo: FounderPhoto; priority?: boolean; altOverride?: string }) {
+export function FounderPhotoCard({ photo, priority = false, altOverride, fullBleed = false }: { photo: FounderPhoto; priority?: boolean; altOverride?: string; fullBleed?: boolean }) {
   return (
-    <figure className="overflow-hidden rounded-[2rem] border border-[#eadfca] bg-white p-3 shadow-xl shadow-black/8">
-      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[1.5rem] bg-[#fff1df] sm:aspect-[3/2]">
+    <figure className={`overflow-hidden rounded-[2rem] border border-[#eadfca] bg-white shadow-xl shadow-black/8 ${fullBleed ? "p-2 sm:p-3" : "p-3"}`}>
+      <div className={fullBleed ? "w-full overflow-hidden rounded-[1.5rem] bg-white" : "relative aspect-[4/3] w-full overflow-hidden rounded-[1.5rem] bg-[#fff1df] sm:aspect-[3/2]"}>
         {photo.src ? (
-          <Image src={photo.src} alt={altOverride ?? photo.alt} fill sizes="(min-width: 1024px) 42vw, 100vw" priority={priority} className="object-contain" />
+          fullBleed ? (
+            <Image src={photo.src} alt={altOverride ?? photo.alt} width={1122} height={1402} sizes="(min-width: 1024px) 42vw, 100vw" priority={priority} className="block h-auto w-full object-contain" />
+          ) : (
+            <Image src={photo.src} alt={altOverride ?? photo.alt} fill sizes="(min-width: 1024px) 42vw, 100vw" priority={priority} className="object-contain" />
+          )
         ) : (
-          <div className="flex h-full w-full items-center justify-center p-6 text-center">
+          <div className="flex h-full min-h-[20rem] w-full items-center justify-center p-6 text-center">
             <div>
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#1f1f1f] text-2xl font-black text-[#f6c400]">รูป</div>
               <p className="mt-4 text-xl font-black text-[#151515]">{photo.placeholder}</p>
@@ -165,16 +169,17 @@ export function FounderStoryPreview() {
 function FounderThumbnailGallery() {
   return (
     <div className="mt-5 rounded-[1.75rem] border border-[#eadfca] bg-white p-3 shadow-xl shadow-black/5 sm:p-4">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         {governmentServiceGalleryItems.map((item) => (
           <figure key={item.placeholder} className="overflow-hidden rounded-[1.5rem] border border-[#eadfca] bg-white p-2 shadow-lg shadow-black/10">
-            <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-[1.25rem] bg-[#fff8ed] p-3 text-center">
+            <div className="relative flex min-h-[16rem] items-center justify-center overflow-hidden rounded-[1.25rem] bg-[#fff8ed] p-3 text-center sm:min-h-[22rem]">
               {item.src ? (
-                <Image src={item.src} alt={item.alt} fill sizes="(min-width: 768px) 22vw, 50vw" className="object-contain" />
+                <Image src={item.src} alt={item.alt} fill sizes="(min-width: 640px) 42vw, 46vw" className="object-contain" />
               ) : (
                 <div>
                   <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-[#1f1f1f] text-sm font-black text-[#f6c400]">รูป</div>
                   <p className="mt-3 text-sm font-black leading-5 text-[#151515] sm:text-base">{item.placeholder}</p>
+                  <p className="mt-1 text-xs font-bold leading-5 text-[#666666]">รอใส่รูปจริง</p>
                 </div>
               )}
             </div>
@@ -197,7 +202,7 @@ export function FounderStorySection({ section, index }: { section: (typeof found
         </article>
         {section.photo ? (
           <div>
-            <FounderPhotoCard photo={section.photo} />
+            <FounderPhotoCard photo={section.photo} fullBleed={index === 2} />
             {index === 2 ? <FounderThumbnailGallery /> : null}
           </div>
         ) : null}
