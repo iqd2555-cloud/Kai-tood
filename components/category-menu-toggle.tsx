@@ -6,6 +6,7 @@ type CategoryMenuItem = {
   label: string;
   href: string;
   detail: string;
+  cta: string;
 };
 
 export function CategoryMenuToggle({ items }: { items: CategoryMenuItem[] }) {
@@ -30,20 +31,24 @@ export function CategoryMenuToggle({ items }: { items: CategoryMenuItem[] }) {
 
       <div
         id="category-menu-list"
-        className={`grid overflow-hidden transition-all duration-300 ease-out ${isCategoryMenuOpen ? "mt-3 max-h-[32rem] gap-2 opacity-100" : "max-h-0 gap-0 opacity-0"}`}
+        className={`grid overflow-hidden transition-all duration-300 ease-out ${isCategoryMenuOpen ? "mt-3 max-h-[48rem] gap-2 opacity-100" : "max-h-0 gap-0 opacity-0"}`}
       >
         {items.map((item) => (
           <a
             key={item.href}
             href={item.href}
-            className="group rounded-2xl border border-[#eadfca] bg-[#fff8ed] p-4 transition hover:border-[#f47b00] hover:bg-[#fff1df] focus-ring"
+            className="group rounded-2xl border border-[#eadfca] bg-[#fff8ed] p-4 transition hover:-translate-y-0.5 hover:border-[#f47b00] hover:bg-[#fff1df] hover:shadow-lg hover:shadow-[#f47b00]/10 focus-ring"
             onClick={() => setIsCategoryMenuOpen(false)}
           >
-            <div className="flex items-center justify-between gap-3">
-              <span className="font-black text-[#151515]">{item.label}</span>
-              <span className="text-[#f47b00] transition group-hover:translate-x-1">→</span>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <span className="font-black text-[#151515]">{item.label}</span>
+                <p className="mt-1 text-sm font-bold text-[#666666]">{item.detail}</p>
+              </div>
+              <span className="cta-pulse inline-flex min-h-10 shrink-0 items-center justify-center rounded-full bg-[#f47b00] px-4 py-2 text-sm font-black text-white shadow-lg shadow-[#f47b00]/25 transition group-hover:translate-x-1 group-hover:bg-[#d71920] sm:text-[0.8rem]">
+                {item.cta}
+              </span>
             </div>
-            <p className="mt-1 text-sm font-bold text-[#666666]">{item.detail}</p>
           </a>
         ))}
       </div>
