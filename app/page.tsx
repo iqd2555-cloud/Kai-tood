@@ -1,4 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
+import Image from "next/image";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 import { CategoryMenuToggle } from "@/components/category-menu-toggle";
@@ -68,6 +69,11 @@ const courseSections = [
     mainImage: { src: "/Live_Training_Course.png", alt: "คอร์สสอนสด สูตรไก่ทอดเงินล้าน" },
     mainPlaceholder: "รูปคอร์สสอนสด",
     reviewPlaceholders: ["รีวิวการเรียนจริง 1", "รีวิวการเรียนจริง 2", "รีวิวการเรียนจริง 3"],
+    reviewImages: [
+      { src: "/review-Live-course.png", alt: "รีวิวผู้เรียนคอร์สสอนสด เหนียวไก่เยอะโคตร รูปที่ 1" },
+      { src: "/review-Live-course2.png", alt: "รีวิวผู้เรียนคอร์สสอนสด เหนียวไก่เยอะโคตร รูปที่ 2" },
+      { src: "/review-Live-course3.png", alt: "รีวิวผู้เรียนคอร์สสอนสด เหนียวไก่เยอะโคตร รูปที่ 3" },
+    ],
   },
   {
     id: "online-course",
@@ -284,6 +290,33 @@ function CoursePlaceholder({ label, featured = false }: { label: string; feature
   );
 }
 
+function LiveCourseReviewGallery({ images }: { images: { src: string; alt: string }[] }) {
+  return (
+    <div className="mt-5 rounded-[1.75rem] border border-[#eadfca] bg-white p-4 shadow-xl shadow-black/5 sm:p-5">
+      <div className="mb-5">
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-[#d71920]">Student Reviews</p>
+        <h3 className="mt-1 text-2xl font-black text-[#151515]">รีวิวจากผู้เรียนคอร์สสอนสด</h3>
+        <p className="mt-2 text-sm font-bold leading-7 text-[#666666] sm:text-base">เสียงจากผู้เรียนที่เข้ามาเรียนรู้ ลงมือทำ และนำความรู้ไปใช้จริง</p>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {images.map((image) => (
+          <article key={image.src} className="overflow-hidden rounded-[1.5rem] bg-white p-2 shadow-lg shadow-black/10">
+            <div className="relative flex min-h-[22rem] items-center justify-center rounded-[1.25rem] bg-[#fff8ed] sm:min-h-[28rem] lg:min-h-[20rem]">
+              <Image
+                src={image.src}
+                alt={image.alt}
+                fill
+                sizes="(min-width: 1024px) 28vw, (min-width: 768px) 42vw, 92vw"
+                className="rounded-[1.25rem] object-contain"
+              />
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CourseSections() {
   return (
     <>
@@ -326,7 +359,7 @@ function CourseSections() {
                 ) : (
                   <CoursePlaceholder label={course.mainPlaceholder} featured />
                 )}
-                <CourseReviewCarousel reviews={course.reviewPlaceholders} />
+                {course.reviewImages ? <LiveCourseReviewGallery images={course.reviewImages} /> : <CourseReviewCarousel reviews={course.reviewPlaceholders} />}
               </div>
             </div>
           </div>
