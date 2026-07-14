@@ -8,14 +8,14 @@ import { FounderStoryPreview } from "@/components/founder-story";
 import { BRAND_NAME, BRAND_SUBTITLE } from "@/lib/brand";
 
 const categoryMenu = [
-  { label: "ภาพรวมธุรกิจ", href: "#business-overview", detail: "เริ่มจากร้านขายจริง" },
-  { label: "หนังสือสูตรไก่ทอด", href: "#book-recipes", detail: "10 สูตร + ข้าวเหนียว" },
-  { label: "คอร์สสอนสด", href: "#live-course", detail: "จับมือทำ 2 วัน" },
-  { label: "คอร์สออนไลน์", href: "#online-course", detail: "เรียนซ้ำได้ไม่จำกัด" },
-  { label: "แพ็กเกจแฟรนไชส์", href: "#franchise-packages", detail: "55,000 / 99,000 บาท" },
-  { label: "เหมาะกับใคร", href: "#target-audience", detail: "เช็กความพร้อม" },
-  { label: "ระบบหลังบ้าน", href: "#back-office-system", detail: "ยอดขาย วัตถุดิบ รายงาน" },
-  { label: "สมัครแฟรนไชส์", href: "#apply-franchise", detail: "กรอกข้อมูลเบื้องต้น" },
+  { label: "ภาพรวมธุรกิจ", href: "#business-overview", detail: "เริ่มจากร้านขายจริง", cta: "คลิกเพื่อดูภาพรวมธุรกิจ →" },
+  { label: "หนังสือสูตรไก่ทอด", href: "#book-recipes", detail: "10 สูตร + ข้าวเหนียว", cta: "คลิกเพื่อดูหนังสือสูตรไก่ทอด →" },
+  { label: "คอร์สสอนสด", href: "#live-course", detail: "จับมือทำ 2 วัน", cta: "คลิกเพื่อดูคอร์สสอนสด →" },
+  { label: "คอร์สออนไลน์", href: "#online-course", detail: "เรียนซ้ำได้ไม่จำกัด", cta: "คลิกเพื่อดูคอร์สออนไลน์ →" },
+  { label: "แพ็กเกจแฟรนไชส์", href: "#franchise-packages", detail: "55,000 / 99,000 บาท", cta: "คลิกเพื่อดูแพ็กเกจแฟรนไชส์ →" },
+  { label: "เหมาะกับใคร", href: "#target-audience", detail: "เช็กความพร้อม", cta: "คลิกเพื่อดูว่าเหมาะกับใคร →" },
+  { label: "ระบบหลังบ้าน", href: "#back-office-system", detail: "ยอดขาย วัตถุดิบ รายงาน", cta: "คลิกเพื่อดูระบบหลังบ้าน →" },
+  { label: "สมัครแฟรนไชส์", href: "#apply-franchise", detail: "กรอกข้อมูลเบื้องต้น", cta: "คลิกเพื่อสมัครแฟรนไชส์ →" },
 ];
 
 const stats = [
