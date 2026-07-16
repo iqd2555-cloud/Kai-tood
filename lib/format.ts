@@ -13,7 +13,7 @@ export const ingredientKgFormatter = new Intl.NumberFormat("th-TH", {
   maximumFractionDigits: 1,
 });
 
-const THAI_TIME_ZONE = "Asia/Bangkok";
+export const THAI_TIME_ZONE = "Asia/Bangkok";
 
 function thaiDateParts(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -41,6 +41,11 @@ export function formatThaiDate(date: string | Date) {
 
 export function todayISO() {
   const parts = thaiDateParts();
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+export function thaiDateISO(date: Date | string = new Date()) {
+  const parts = thaiDateParts(typeof date === "string" ? new Date(date) : date);
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 

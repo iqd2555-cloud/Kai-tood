@@ -70,6 +70,8 @@ type InsightReportRow = {
   order_palm_sugar: number | string | null;
   order_other_items: { name?: string; amount?: number | string }[] | null;
   requested_items: string | null;
+  status: string | null;
+  submitted_at: string | null;
   updated_at: string | null;
   created_at: string | null;
 };
@@ -260,13 +262,20 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
 
   const insightReportsQuery = supabase
     .from("daily_reports")
-    .select("id,report_date,branch_id,cash_sales,transfer_sales,total_sales,opening_original_chicken,opening_spicy_chicken,opening_ground_chicken,opening_drumstick,opening_offal,opening_chicken_skin,opening_sticky_rice,received_original_chicken,received_spicy_chicken,received_ground_chicken,received_drumstick,received_offal,received_chicken_skin,received_chicken,received_sticky_rice,used_bl,used_bb,used_chopped_chicken,used_drumstick,used_offal,used_chicken_skin,used_sticky_rice,remaining_chicken,remaining_original_chicken,remaining_spicy_chicken,remaining_ground_chicken,remaining_drumstick,remaining_offal,remaining_chicken_skin,remaining_sticky_rice,opening_oil,received_oil,remaining_oil,order_original_chicken,order_spicy_chicken,order_offal,order_chopped_chicken,order_drumstick,order_chicken_skin,order_sticky_rice,order_oil,order_palm_sugar,order_other_items,requested_items,updated_at,created_at")
+    .select("id,report_date,branch_id,cash_sales,transfer_sales,total_sales,opening_original_chicken,opening_spicy_chicken,opening_ground_chicken,opening_drumstick,opening_offal,opening_chicken_skin,opening_sticky_rice,received_original_chicken,received_spicy_chicken,received_ground_chicken,received_drumstick,received_offal,received_chicken_skin,received_chicken,received_sticky_rice,used_bl,used_bb,used_chopped_chicken,used_drumstick,used_offal,used_chicken_skin,used_sticky_rice,remaining_chicken,remaining_original_chicken,remaining_spicy_chicken,remaining_ground_chicken,remaining_drumstick,remaining_offal,remaining_chicken_skin,remaining_sticky_rice,opening_oil,received_oil,remaining_oil,order_original_chicken,order_spicy_chicken,order_offal,order_chopped_chicken,order_drumstick,order_chicken_skin,order_sticky_rice,order_oil,order_palm_sugar,order_other_items,requested_items,status,submitted_at,updated_at,created_at")
     .eq("report_date", insightDate)
     .order("updated_at", { ascending: false })
     .order("created_at", { ascending: false });
 
   if (activeInsightBranchIds.length > 0) insightReportsQuery.in("branch_id", activeInsightBranchIds);
   const { data: insightReports, error: insightReportsError } = await insightReportsQuery.returns<InsightReportRow[]>();
+  if (insightReportsError) {
+    console.error("owner_dashboard_reports_load_failed", {
+      selectedDate: insightDate,
+      activeBranchIds: activeInsightBranchIds,
+      error: insightReportsError,
+    });
+  }
 
   const reportCountsByBranch = (insightReports ?? []).reduce<Map<string, number>>((acc, report) => {
     acc.set(report.branch_id, (acc.get(report.branch_id) ?? 0) + 1);
