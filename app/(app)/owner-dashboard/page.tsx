@@ -8,7 +8,28 @@ import { calculateOverallDashboardSummary, normalizeDashboardReports } from "@/l
 import { isReportableBranch } from "@/lib/branches";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
-type ProfitRow = Record<string, string | number | null>;
+type ProfitRow = Record<string, string | number | null | undefined>;
+
+type ProfitRollupRow = {
+  report_date: string;
+  branch_id: string;
+  branch_name: string | null;
+  branch_code: string | null;
+  total_sales: number | string | null;
+  used_bl: number | string | null;
+  used_bb: number | string | null;
+  used_chicken_skin: number | string | null;
+  used_chopped_chicken?: number | string | null;
+  used_drumstick?: number | string | null;
+  used_oil: number | string | null;
+  used_sticky_rice: number | string | null;
+};
+
+type ProfitChickenReportRow = {
+  report_date: string;
+  branch_id: string;
+  received_chicken: number | string | null;
+};
 type MetricKey = "totalSales" | "chickenCost" | "otherExpenses";
 type BranchNoteRow = {
   report_date: string;
@@ -138,11 +159,35 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
   // Owner totals/charts must come directly from branch daily-report rollups, keyed by
   // branch_id + report_date. Do not rely on user/profile assignment views, because
   // staff may legitimately submit a report on behalf of another branch.
+  const verifiedRollupColumns = "report_date,branch_id,branch_name,branch_code,total_sales,used_bl,used_bb,used_chicken_skin,used_chopped_chicken,used_drumstick,used_oil,used_sticky_rice";
   const { data, error } = await supabase
     .from("daily_report_rollups")
-    .select("report_date,branch_id,branch_name,branch_code,total_sales,received_chicken,used_bl,used_bb,used_chicken_skin,used_chopped_chicken,used_drumstick,used_oil,used_sticky_rice")
-    .returns<ProfitRow[]>();
-  if (error) return <div className="rounded-2xl bg-red-50 p-4 font-bold text-red-900">โหลดข้อมูล daily_report_rollups ไม่สำเร็จ: {error.message}</div>;
+    .select(verifiedRollupColumns)
+    .returns<ProfitRollupRow[]>();
+  if (error) {
+    console.error("Failed to load daily_report_rollups", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      columns: verifiedRollupColumns,
+    });
+    return <div className="rounded-2xl bg-red-50 p-4 font-bold text-red-900">โหลดข้อมูล daily_report_rollups ไม่สำเร็จ: {error.message}</div>;
+  }
+
+  const { data: chickenReports, error: chickenReportsError } = await supabase
+    .from("daily_reports")
+    .select("report_date,branch_id,received_chicken")
+    .returns<ProfitChickenReportRow[]>();
+  if (chickenReportsError) {
+    console.error("Failed to load daily_reports received_chicken", {
+      code: chickenReportsError.code,
+      message: chickenReportsError.message,
+      details: chickenReportsError.details,
+      hint: chickenReportsError.hint,
+    });
+    return <div className="rounded-2xl bg-red-50 p-4 font-bold text-red-900">โหลดข้อมูลไก่รับเข้าจาก daily_reports ไม่สำเร็จ: {chickenReportsError.message}</div>;
+  }
 
   const { data: rawBranchNotes, error: branchNotesError } = await supabase
     .from("daily_reports")
@@ -170,12 +215,18 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
     });
   }
 
+  const chickenReceivedByBranchDate = new Map<string, number>();
+  for (const report of chickenReports ?? []) {
+    const key = `${report.report_date}::${report.branch_id}`;
+    chickenReceivedByBranchDate.set(key, (chickenReceivedByBranchDate.get(key) ?? 0) + toNumber(report.received_chicken));
+  }
+
   const rows = (data ?? [])
     .filter((row) => isReportableBranch({ name: pickBranchName(row), code: typeof row.branch_code === "string" ? row.branch_code : null }))
     .map((row) => {
     const totalSales = pickNumber(row, ["total_sales", "sales_total", "total_revenue", "revenue"]);
     const chickenCostRaw = pickNumber(row, ["chicken_cost", "cost_chicken", "total_chicken_cost"]);
-    const chickenKg = pickNumber(row, ["chicken_kg", "total_chicken_kg", "raw_chicken_kg", "received_chicken"]);
+    const chickenKg = chickenReceivedByBranchDate.get(`${row.report_date}::${row.branch_id}`) ?? 0;
     const chickenCost = chickenCostRaw > 0 ? chickenCostRaw : chickenKg * CHICKEN_COST_PER_KG;
     const otherExpenses = pickNumber(row, ["other_expenses", "expense_other", "operating_expenses"]);
 
