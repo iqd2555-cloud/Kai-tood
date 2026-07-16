@@ -19,6 +19,9 @@ type ReportsPageProps = {
   searchParams?: Promise<SearchParams>;
 };
 
+type ReportProfile = { email: string | null; full_name: string | null };
+type OwnerDailyReport = DailyReport & { profiles?: ReportProfile | null; created_at?: string | null };
+
 type NumericReportField = keyof Pick<
   DailyReport,
   | "opening_original_chicken"
@@ -73,23 +76,33 @@ function isIsoDate(value: string | undefined) {
   return Boolean(value?.match(/^\d{4}-\d{2}-\d{2}$/));
 }
 
-function sumReports(reports: DailyReport[], field: NumericReportField) {
+function recorderLabel(report: OwnerDailyReport) {
+  return report.profiles?.full_name?.trim() || report.profiles?.email?.trim() || report.submitted_by || "ไม่ระบุผู้บันทึก";
+}
+
+function recordedAtLabel(report: OwnerDailyReport) {
+  const value = report.updated_at || report.created_at;
+  if (!value) return "ไม่พบเวลาบันทึก";
+  return new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Bangkok" }).format(new Date(value));
+}
+
+function sumReports(reports: OwnerDailyReport[], field: NumericReportField) {
   return reports.reduce((sum, report) => sum + Number(report[field] ?? 0), 0);
 }
 
-function sumIngredientSummaryField(reports: DailyReport[], field: "chickenUsedByStockKg" | "stickyRiceUsedByStockKg" | "oilUsedByStockKg" | "chickenReceivedKg" | "stickyRiceReceivedKg" | "oilReceivedKg") {
+function sumIngredientSummaryField(reports: OwnerDailyReport[], field: "chickenUsedByStockKg" | "stickyRiceUsedByStockKg" | "oilUsedByStockKg" | "chickenReceivedKg" | "stickyRiceReceivedKg" | "oilReceivedKg") {
   return reports.reduce((sum, report) => sum + calculateBranchIngredientSummary(report)[field], 0);
 }
 
-function sumChickenUsedByStock(reports: DailyReport[]) {
+function sumChickenUsedByStock(reports: OwnerDailyReport[]) {
   return sumIngredientSummaryField(reports, "chickenUsedByStockKg");
 }
 
-function sumChickenOrder(reports: DailyReport[]) {
+function sumChickenOrder(reports: OwnerDailyReport[]) {
   return sumReports(reports, "order_original_chicken") + sumReports(reports, "order_spicy_chicken") + sumReports(reports, "order_offal") + sumReports(reports, "order_chopped_chicken") + sumReports(reports, "order_drumstick") + sumReports(reports, "order_chicken_skin");
 }
 
-function latestReportsByBranch(reports: DailyReport[]) {
+function latestReportsByBranch(reports: OwnerDailyReport[]) {
   const latest = new Map<string, DailyReport>();
   for (const report of reports) {
     if (!latest.has(report.branch_id)) latest.set(report.branch_id, report);
@@ -97,15 +110,15 @@ function latestReportsByBranch(reports: DailyReport[]) {
   return Array.from(latest.values());
 }
 
-function sumLatestRemaining(reports: DailyReport[], field: NumericReportField) {
+function sumLatestRemaining(reports: OwnerDailyReport[], field: NumericReportField) {
   return latestReportsByBranch(reports).reduce((sum, report) => sum + Number(report[field] ?? 0), 0);
 }
 
-function sumLatestRemainingChicken(reports: DailyReport[]) {
+function sumLatestRemainingChicken(reports: OwnerDailyReport[]) {
   return latestReportsByBranch(reports).reduce((sum, report) => sum + calculateBranchIngredientSummary(report).chickenRemainingKg, 0);
 }
 
-function InventoryFlowSummary({ title, reports }: { title: string; reports: DailyReport[] }) {
+function InventoryFlowSummary({ title, reports }: { title: string; reports: OwnerDailyReport[] }) {
   const rows = [
     { label: "ไก่", received: sumIngredientSummaryField(reports, "chickenReceivedKg"), used: sumChickenUsedByStock(reports), remaining: sumLatestRemainingChicken(reports), order: sumChickenOrder(reports), unit: "กิโลกรัม" },
     { label: "ข้าวเหนียว", received: sumIngredientSummaryField(reports, "stickyRiceReceivedKg"), used: sumIngredientSummaryField(reports, "stickyRiceUsedByStockKg"), remaining: sumLatestRemaining(reports, "remaining_sticky_rice"), order: sumReports(reports, "order_sticky_rice"), unit: "กิโลกรัม" },
@@ -144,7 +157,7 @@ function RemainingInventoryGrid({
   reports,
 }: {
   title: string;
-  reports: DailyReport[];
+  reports: OwnerDailyReport[];
 }) {
   return (
     <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
@@ -175,7 +188,7 @@ function QuantityGrid({
 }: {
   title: string;
   items: readonly { label: string; name: NumericReportField; unit: string }[];
-  reports: DailyReport[];
+  reports: OwnerDailyReport[];
 }) {
   return (
     <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
@@ -199,7 +212,7 @@ function UsedByStockQuantityGrid({
   reports,
 }: {
   title: string;
-  reports: DailyReport[];
+  reports: OwnerDailyReport[];
 }) {
   return (
     <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
@@ -226,7 +239,7 @@ function UsedByStockQuantityGrid({
   );
 }
 
-function InventoryComparisonTable({ title, reports }: { title: string; reports: DailyReport[] }) {
+function InventoryComparisonTable({ title, reports }: { title: string; reports: OwnerDailyReport[] }) {
   return (
     <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
       <h2 className="text-2xl font-black">{title}</h2>
@@ -281,7 +294,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const activeBranchIds = branches.map((branch) => branch.id);
   const selectedBranchId = branches.some((branch) => branch.id === params.branch_id) ? params.branch_id : branches[0]?.id;
 
-  const reportSelect = "*, branches(name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold)";
+  const reportSelect = "*, branches(name, code, low_chicken_threshold, low_sticky_rice_threshold, low_oil_threshold), profiles:submitted_by(email, full_name)";
 
   const { data: allReportsData } = await supabase
     .from("daily_reports")
@@ -290,7 +303,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     .lte("report_date", to)
     .in("branch_id", activeBranchIds.length > 0 ? activeBranchIds : ["00000000-0000-0000-0000-000000000000"])
     .order("report_date", { ascending: false })
-    .returns<DailyReport[]>();
+    .returns<OwnerDailyReport[]>();
   const allReports = allReportsData ?? [];
 
   const branchReportsQuery = supabase
@@ -303,7 +316,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
 
   if (selectedBranchId) branchReportsQuery.eq("branch_id", selectedBranchId);
 
-  const { data: branchReportsData } = await branchReportsQuery.returns<DailyReport[]>();
+  const { data: branchReportsData } = await branchReportsQuery.returns<OwnerDailyReport[]>();
   const branchReports = branchReportsData ?? [];
 
   if (process.env.NODE_ENV === "development") {
@@ -428,6 +441,28 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       <QuantityGrid title={`รายการสั่งวัตถุดิบเพิ่มของ${selectedBranch?.name ?? "สาขา"}`} items={ORDER_REQUEST_ITEMS} reports={branchReports} />
       <InventoryFlowSummary title={`ระบบรายงานวัตถุดิบของ${selectedBranch?.name ?? "สาขา"}`} reports={branchReports} />
       <InventoryComparisonTable title={`คงเหลือคำนวณวันนี้และส่วนต่างของ${selectedBranch?.name ?? "สาขา"}`} reports={branchReports} />
+
+      <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
+        <h2 className="text-2xl font-black">ข้อมูลผู้บันทึกรายงาน</h2>
+        {branchReports.length === 0 ? (
+          <p className="mt-4 rounded-2xl bg-black/[0.04] p-4 text-sm font-bold text-black/60">ยังไม่มีรายงานในช่วงวันที่นี้</p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {branchReports.map((report) => (
+              <article key={report.id} className="rounded-2xl bg-black/[0.04] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-black/50">{formatThaiDate(report.report_date)} · {report.branches?.name ?? report.branch_name ?? selectedBranch?.name ?? "ไม่ระบุสาขา"}</p>
+                    <h3 className="text-lg font-black">บันทึกโดย: {recorderLabel(report)}</h3>
+                    <p className="mt-1 text-xs font-bold text-black/50">report id: {report.id} · branch_id: {report.branch_id}</p>
+                  </div>
+                  <div className="rounded-xl bg-white px-3 py-2 text-sm font-black text-black/70">{recordedAtLabel(report)}</div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
         <h2 className="text-2xl font-black">หมายเหตุจากสาขา</h2>
