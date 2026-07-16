@@ -25,7 +25,6 @@ export type DashboardReport = Record<string, unknown> & {
   total_sales?: DashboardNumber;
   updated_at?: string | null;
   created_at?: string | null;
-  submitted_at?: string | null;
 };
 export type DashboardBranch = { id: string; name?: string | null; code?: string | null; is_active?: boolean | null };
 
@@ -210,7 +209,7 @@ export function calculateOverallDashboardSummary(branchSummaries: BranchDashboar
 }
 
 function latestTimestamp(report: DashboardReport) {
-  return String(report.submitted_at || report.updated_at || report.created_at || "");
+  return String(report.updated_at || report.created_at || "");
 }
 
 export function normalizeDashboardReports(reports: DashboardReport[], branches: DashboardBranch[], reportDate: string): BranchDashboardSummary[] {

@@ -75,7 +75,6 @@ export type DailyReport = {
   requested_items: string;
   note: string;
   submitted_by: string | null;
-  submitted_at?: string | null;
   updated_at: string;
   branches?: Pick<Branch, "name" | "code" | "low_chicken_threshold" | "low_sticky_rice_threshold" | "low_oil_threshold"> | null;
 };

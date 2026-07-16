@@ -135,7 +135,6 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
 
   const totalReceivedChicken = payload.received_original_chicken + payload.received_spicy_chicken + payload.received_ground_chicken + payload.received_drumstick + payload.received_offal + payload.received_chicken_skin;
 
-  const submittedAt = new Date().toISOString();
   const { data: savedReport, error } = await supabase.from("daily_reports").upsert(
     {
       ...payload,
@@ -145,8 +144,7 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
       requested_items: allRequestedItems,
       order_other_items: otherItems.success ? otherItems.data.filter((item) => item.name.trim() && item.amount > 0) : [],
       submitted_by: profile.id,
-      submitted_at: submittedAt,
-      updated_at: submittedAt,
+      updated_at: new Date().toISOString(),
     },
     { onConflict: "branch_id,report_date" },
   ).select("id, report_date, branch_id, total_sales, branch_name").single();

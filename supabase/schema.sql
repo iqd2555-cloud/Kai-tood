@@ -81,7 +81,6 @@ create table public.daily_reports (
   requested_items text not null default '',
   note text not null default '',
   submitted_by uuid references public.profiles(id),
-  submitted_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (branch_id, report_date)
