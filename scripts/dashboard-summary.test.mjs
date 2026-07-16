@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { calculateBranchDashboardSummary, calculateOverallDashboardSummary, normalizeDashboardReports, toNumberSafe } from "../lib/dashboard/inventory-summary.ts";
+import { thaiDateISO } from "../lib/format.ts";
 
 const date = "2026-06-24";
 const branch1 = { id: "b1", name: "สาขาที่ 1 ร.ร.นวมินทร์", code: "B1", is_active: true };
@@ -51,6 +52,15 @@ const normalized = normalizeDashboardReports([report1, report2, latestReport1], 
 assert.equal(normalized.length, 3, "inactive branch must not be included");
 assert.equal(normalized.find((item) => item.branchId === "b1")?.totalSales, 5000, "duplicate branch/date must use latest updated_at");
 assert.equal(normalized.find((item) => item.branchId === "b3")?.status, "no_report");
+assert.equal(normalized.find((item) => item.branchId === "b2")?.hasReport, true, "owner dashboard must match submitted reports by branch_id");
+
+const sameNameOtherBranch = { id: "b5", name: "สาขาที่ 2 โลตัสป้อม 1", code: "B5", is_active: true };
+const normalizedDuplicateName = normalizeDashboardReports([report2], [branch2, sameNameOtherBranch], date);
+assert.equal(normalizedDuplicateName.find((item) => item.branchId === "b2")?.hasReport, true, "matching branch_id report is submitted");
+assert.equal(normalizedDuplicateName.find((item) => item.branchId === "b5")?.hasReport, false, "same branch name with different branch_id must not be treated as submitted");
+
+assert.equal(thaiDateISO("2026-07-12T17:00:00.000Z"), "2026-07-13", "00:00 Bangkok must be Thai calendar date, not UTC date");
+assert.equal(thaiDateISO("2026-07-13T17:59:59.000Z"), "2026-07-14", "00:59 Bangkok next day must not stay on UTC date");
 
 const overall = calculateOverallDashboardSummary([summary1, summary2, noReport], date);
 assert.equal(overall.totalSales, 12009);

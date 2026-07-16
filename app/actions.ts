@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getCurrentProfile } from "@/lib/auth";
 import { addDaysISO } from "@/lib/cash-flow";
 import { CASH_FLOW_ENTRIES_TABLE } from "@/lib/cash-flow-constants";
+import { todayISO } from "@/lib/format";
 import { ORDER_REQUEST_ITEMS } from "@/lib/report-items";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
@@ -129,6 +130,7 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
 
   const totalReceivedChicken = payload.received_original_chicken + payload.received_spicy_chicken + payload.received_ground_chicken + payload.received_drumstick + payload.received_offal + payload.received_chicken_skin;
 
+  const submittedAt = new Date().toISOString();
   const { data: savedReport, error } = await supabase.from("daily_reports").upsert(
     {
       ...payload,
@@ -138,12 +140,24 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
       requested_items: allRequestedItems,
       order_other_items: otherItems.success ? otherItems.data.filter((item) => item.name.trim() && item.amount > 0) : [],
       submitted_by: profile.id,
-      updated_at: new Date().toISOString(),
+      status: "submitted",
+      submitted_at: submittedAt,
+      updated_at: submittedAt,
     },
     { onConflict: "branch_id,report_date" },
   ).select("id, report_date, branch_id, total_sales, branch_name").single();
 
-  if (error) return { ok: false, message: error.message };
+  if (error) {
+    console.error("saveDailyReport_failed", {
+      email: profile.email,
+      userId: profile.id,
+      profileBranchId: profile.branch_id,
+      reportBranchId: payload.branch_id,
+      reportDate: payload.report_date,
+      error,
+    });
+    return { ok: false, message: error.message };
+  }
 
   if (savedReport?.id) {
     const cashFlowResult = await syncSalesReportToCashFlow(savedReport.id, supabase, profile.id);
@@ -155,6 +169,7 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
   revalidatePath("/history");
   revalidatePath("/orders");
   revalidatePath("/reports");
+  revalidatePath("/owner-dashboard");
   revalidatePath("/cash-flow");
   return { ok: true, message: "บันทึกข้อมูลเรียบร้อย" };
 }
@@ -571,7 +586,7 @@ export async function syncSalesToCashFlow(formData?: FormData) {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์" };
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   const selectedDateRaw = String(formData?.get("selected_date") ?? formData?.get("to") ?? today);
   const selectedDate = isISODate(selectedDateRaw) ? selectedDateRaw : today;
   const range = String(formData?.get("sync_range") ?? "today");
