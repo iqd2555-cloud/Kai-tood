@@ -135,8 +135,14 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
   const today = todayISO();
   const insightDate = /^\d{4}-\d{2}-\d{2}$/.test(resolvedSearchParams.date ?? "") ? resolvedSearchParams.date! : today;
 
-  const { data, error } = await supabase.from("owner_profit_dashboard").select("*").returns<ProfitRow[]>();
-  if (error) return <div className="rounded-2xl bg-red-50 p-4 font-bold text-red-900">โหลดข้อมูล owner_profit_dashboard ไม่สำเร็จ: {error.message}</div>;
+  // Owner totals/charts must come directly from branch daily-report rollups, keyed by
+  // branch_id + report_date. Do not rely on user/profile assignment views, because
+  // staff may legitimately submit a report on behalf of another branch.
+  const { data, error } = await supabase
+    .from("daily_report_rollups")
+    .select("report_date,branch_id,branch_name,branch_code,total_sales,received_chicken,used_bl,used_bb,used_chicken_skin,used_chopped_chicken,used_drumstick,used_oil,used_sticky_rice")
+    .returns<ProfitRow[]>();
+  if (error) return <div className="rounded-2xl bg-red-50 p-4 font-bold text-red-900">โหลดข้อมูล daily_report_rollups ไม่สำเร็จ: {error.message}</div>;
 
   const { data: rawBranchNotes, error: branchNotesError } = await supabase
     .from("daily_reports")
@@ -169,7 +175,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
     .map((row) => {
     const totalSales = pickNumber(row, ["total_sales", "sales_total", "total_revenue", "revenue"]);
     const chickenCostRaw = pickNumber(row, ["chicken_cost", "cost_chicken", "total_chicken_cost"]);
-    const chickenKg = pickNumber(row, ["chicken_kg", "total_chicken_kg", "raw_chicken_kg"]);
+    const chickenKg = pickNumber(row, ["chicken_kg", "total_chicken_kg", "raw_chicken_kg", "received_chicken"]);
     const chickenCost = chickenCostRaw > 0 ? chickenCostRaw : chickenKg * CHICKEN_COST_PER_KG;
     const otherExpenses = pickNumber(row, ["other_expenses", "expense_other", "operating_expenses"]);
 
