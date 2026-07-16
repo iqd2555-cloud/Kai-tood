@@ -25,7 +25,6 @@ export type DashboardReport = Record<string, unknown> & {
   total_sales?: DashboardNumber;
   updated_at?: string | null;
   created_at?: string | null;
-  status?: string | null;
   submitted_at?: string | null;
 };
 export type DashboardBranch = { id: string; name?: string | null; code?: string | null; is_active?: boolean | null };

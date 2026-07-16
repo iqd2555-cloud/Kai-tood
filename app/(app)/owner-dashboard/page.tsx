@@ -70,7 +70,6 @@ type InsightReportRow = {
   order_palm_sugar: number | string | null;
   order_other_items: { name?: string; amount?: number | string }[] | null;
   requested_items: string | null;
-  status: string | null;
   submitted_at: string | null;
   updated_at: string | null;
   created_at: string | null;
@@ -262,7 +261,7 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
 
   const insightReportsQuery = supabase
     .from("daily_reports")
-    .select("id,report_date,branch_id,cash_sales,transfer_sales,total_sales,opening_original_chicken,opening_spicy_chicken,opening_ground_chicken,opening_drumstick,opening_offal,opening_chicken_skin,opening_sticky_rice,received_original_chicken,received_spicy_chicken,received_ground_chicken,received_drumstick,received_offal,received_chicken_skin,received_chicken,received_sticky_rice,used_bl,used_bb,used_chopped_chicken,used_drumstick,used_offal,used_chicken_skin,used_sticky_rice,remaining_chicken,remaining_original_chicken,remaining_spicy_chicken,remaining_ground_chicken,remaining_drumstick,remaining_offal,remaining_chicken_skin,remaining_sticky_rice,opening_oil,received_oil,remaining_oil,order_original_chicken,order_spicy_chicken,order_offal,order_chopped_chicken,order_drumstick,order_chicken_skin,order_sticky_rice,order_oil,order_palm_sugar,order_other_items,requested_items,status,submitted_at,updated_at,created_at")
+    .select("id,report_date,branch_id,cash_sales,transfer_sales,total_sales,opening_original_chicken,opening_spicy_chicken,opening_ground_chicken,opening_drumstick,opening_offal,opening_chicken_skin,opening_sticky_rice,received_original_chicken,received_spicy_chicken,received_ground_chicken,received_drumstick,received_offal,received_chicken_skin,received_chicken,received_sticky_rice,used_bl,used_bb,used_chopped_chicken,used_drumstick,used_offal,used_chicken_skin,used_sticky_rice,remaining_chicken,remaining_original_chicken,remaining_spicy_chicken,remaining_ground_chicken,remaining_drumstick,remaining_offal,remaining_chicken_skin,remaining_sticky_rice,opening_oil,received_oil,remaining_oil,order_original_chicken,order_spicy_chicken,order_offal,order_chopped_chicken,order_drumstick,order_chicken_skin,order_sticky_rice,order_oil,order_palm_sugar,order_other_items,requested_items,submitted_at,updated_at,created_at")
     .eq("report_date", insightDate)
     .order("updated_at", { ascending: false })
     .order("created_at", { ascending: false });
@@ -277,21 +276,27 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
     });
   }
 
-  const reportCountsByBranch = (insightReports ?? []).reduce<Map<string, number>>((acc, report) => {
+  const reportsLoadedSuccessfully = !insightBranchesError && !insightReportsError;
+  const loadedInsightReports = reportsLoadedSuccessfully ? (insightReports ?? []) : [];
+  const loadedInsightBranches = reportsLoadedSuccessfully ? (insightBranches ?? []) : [];
+
+  const reportCountsByBranch = loadedInsightReports.reduce<Map<string, number>>((acc, report) => {
     acc.set(report.branch_id, (acc.get(report.branch_id) ?? 0) + 1);
     return acc;
   }, new Map());
   const duplicateReportBranches = new Set([...reportCountsByBranch.entries()].filter(([, count]) => count > 1).map(([branchId]) => branchId));
-  const branchDashboardSummaries = normalizeDashboardReports(insightReports ?? [], insightBranches ?? [], insightDate);
-  const reportsByBranch = (insightReports ?? []).reduce<Map<string, InsightReportRow>>((acc, report) => {
+  const branchDashboardSummaries = reportsLoadedSuccessfully ? normalizeDashboardReports(loadedInsightReports, loadedInsightBranches, insightDate) : [];
+  const reportsByBranch = loadedInsightReports.reduce<Map<string, InsightReportRow>>((acc, report) => {
     const current = acc.get(report.branch_id);
     const reportTime = String(report.updated_at || report.created_at || "");
     const currentTime = String(current?.updated_at || current?.created_at || "");
     if (!current || reportTime > currentTime) acc.set(report.branch_id, report);
     return acc;
   }, new Map());
-  const overallSummary = calculateOverallDashboardSummary(branchDashboardSummaries, insightDate);
-  const insightBranchCards = overallSummary.branchSummaries.map((summary) => {
+  const overallSummary = reportsLoadedSuccessfully
+    ? calculateOverallDashboardSummary(branchDashboardSummaries, insightDate)
+    : null;
+  const insightBranchCards = (overallSummary?.branchSummaries ?? []).map((summary) => {
     const report = reportsByBranch.get(summary.branchId);
     const base = {
       branchId: summary.branchId,
@@ -308,20 +313,23 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
     };
     return { ...base, insight: calculateBranchDailyInsight(base) };
   });
-  const insightTotals = {
-    totalSales: overallSummary.totalSales,
-    chickenReceivedKg: overallSummary.chickenReceivedKg,
-    chickenUsedKg: overallSummary.chickenUsedByStockKg,
-    chickenRemainingKg: overallSummary.chickenRemainingKg,
-    stickyRiceUsedKg: overallSummary.stickyRiceUsedByStockKg,
-    salesPerChickenKg: overallSummary.salesPerChickenKg,
-  };
+  const insightTotals = overallSummary
+    ? {
+        totalSales: overallSummary.totalSales,
+        chickenReceivedKg: overallSummary.chickenReceivedKg,
+        chickenUsedKg: overallSummary.chickenUsedByStockKg,
+        chickenRemainingKg: overallSummary.chickenRemainingKg,
+        stickyRiceUsedKg: overallSummary.stickyRiceUsedByStockKg,
+        salesPerChickenKg: overallSummary.salesPerChickenKg,
+      }
+    : null;
 
   if (process.env.NODE_ENV === "development") {
     console.log("ingredient summary debug", {
       selectedDate: insightDate,
       branchSummaries: branchDashboardSummaries,
       overallSummary,
+      reportsLoadedSuccessfully,
     });
   }
   const abnormalBranches = insightBranchCards.filter((item) => item.insight.status === "check");
@@ -382,10 +390,10 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
         </div>
 
         {(insightBranchesError || insightReportsError) ? (
-          <div className="mt-4 rounded-2xl bg-yellow-50 p-3 text-sm font-bold text-yellow-900">ยังโหลดข้อมูลสรุปรายงานอัจฉริยะได้ไม่ครบ แต่หน้า Dashboard ยังใช้งานได้: {insightBranchesError?.message || insightReportsError?.message}</div>
+          <div className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-bold text-red-900" role="alert">โหลดรายงานประจำวันไม่สำเร็จ: {insightBranchesError?.message || insightReportsError?.message} — ระบบจะไม่คำนวณยอดรวมและไม่แจ้งว่าสาขาใดไม่ส่งรายงานจนกว่าจะโหลดข้อมูลสำเร็จ</div>
         ) : null}
 
-        <article className="mt-4 rounded-3xl bg-[#111111] p-4 text-white">
+        {reportsLoadedSuccessfully && insightTotals ? <article className="mt-4 rounded-3xl bg-[#111111] p-4 text-white">
           <p className="text-sm font-bold text-white/70">รายงานประจำวันที่ {formatThaiDate(insightDate)}</p>
           <h3 className="mt-1 text-lg font-black">ภาพรวมทุกสาขา</h3>
           <div className="mt-3 grid grid-cols-2 gap-2 text-sm md:grid-cols-3">
@@ -405,9 +413,9 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
             issues={alertIssues}
           />
           {duplicateReportBranches.size > 0 ? <p className="mt-3 rounded-2xl bg-orange-50 p-3 text-sm font-bold text-orange-900">พบรายงานซ้ำในวันเดียวกัน: {insightBranchCards.filter((item) => duplicateReportBranches.has(item.branchId)).map((item) => item.branchName).join(", ")} — ใช้รายการล่าสุดในการคำนวณ</p> : null}
-        </article>
+        </article> : null}
 
-        <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {reportsLoadedSuccessfully ? <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
           {insightBranchCards.map((item) => {
             const branchIssueStatus: InsightAlertStatus = item.insight.status === "check" ? getIssueStatus(item.insight.abnormalFlags) : item.insight.status === "missing" ? "missing" : "normal";
             const badgeClass = branchIssueStatus === "normal" ? "border-[#86EFAC] bg-[#DFF5E3] text-[#166534]" : branchIssueStatus === "missing" ? "border-[#D1D5DB] bg-[#F3F4F6] text-[#333333]" : branchIssueStatus === "warning" ? "border-[#E0A800] bg-[#FFD54A] text-[#111111]" : "border-[#D9363E] bg-[#FF4D4F] text-white";
@@ -431,12 +439,12 @@ export default async function OwnerDashboardPage({ searchParams }: { searchParam
               </article>
             );
           })}
-        </div>
+        </div> : null}
 
-        <article className="mt-4 rounded-3xl border border-black/10 bg-[#FFF7D6] p-4">
+        {reportsLoadedSuccessfully ? <article className="mt-4 rounded-3xl border border-black/10 bg-[#FFF7D6] p-4">
           <h3 className="text-base font-black">สิ่งที่ต้องทำพรุ่งนี้</h3>
           {tomorrowTasks.length > 0 ? <ul className="mt-2 list-disc space-y-1 pl-5 text-sm font-bold">{tomorrowTasks.map((task, index) => <li key={`${task}-${index}`}>{task}</li>)}</ul> : <p className="mt-2 text-sm font-bold text-black/60">ยังไม่มีรายการที่ต้องเตรียมสำหรับพรุ่งนี้</p>}
-        </article>
+        </article> : null}
       </section>
 
       <section className="rounded-3xl bg-white p-4 shadow-sm">

@@ -81,7 +81,6 @@ create table public.daily_reports (
   requested_items text not null default '',
   note text not null default '',
   submitted_by uuid references public.profiles(id),
-  status text not null default 'submitted' check (status in ('draft', 'submitted', 'completed', 'pending')),
   submitted_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -92,7 +91,6 @@ create index daily_reports_report_date_idx on public.daily_reports(report_date d
 create index daily_reports_branch_date_idx on public.daily_reports(branch_id, report_date desc);
 create index daily_reports_submitted_by_date_idx on public.daily_reports(submitted_by, report_date desc);
 create index daily_reports_updated_at_idx on public.daily_reports(updated_at desc);
-create index daily_reports_status_date_branch_idx on public.daily_reports(status, report_date desc, branch_id);
 
 alter table public.branches enable row level security;
 alter table public.profiles enable row level security;

@@ -112,11 +112,16 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
     return { ok: false, message: "ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์" };
   }
 
-  const { data: branchData } = await supabase
+  const { data: branchData, error: branchError } = await supabase
     .from("branches")
     .select("name")
     .eq("id", payload.branch_id)
     .maybeSingle();
+
+  if (branchError) {
+    console.error("saveDailyReport_branch_load_failed", { branchId: payload.branch_id, error: branchError });
+    return { ok: false, message: branchError.message };
+  }
 
   const canonicalBranchName = branchData?.name ?? payload.branch_name;
 
@@ -140,7 +145,6 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
       requested_items: allRequestedItems,
       order_other_items: otherItems.success ? otherItems.data.filter((item) => item.name.trim() && item.amount > 0) : [],
       submitted_by: profile.id,
-      status: "submitted",
       submitted_at: submittedAt,
       updated_at: submittedAt,
     },
