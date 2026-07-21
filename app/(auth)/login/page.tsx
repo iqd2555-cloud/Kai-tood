@@ -23,8 +23,8 @@ export default async function LoginPage({
 
   return (
     <main className="app-shell flex min-h-dvh items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md rounded-[2rem] border border-black/10 bg-white p-6 shadow-2xl">
-        <div className="mb-8 rounded-[1.5rem] bg-[#111111] p-6 text-center text-white">
+      <div className="w-full max-w-md glass-card rounded-[2rem] p-6">
+        <div className="mb-8 glass-dark rounded-[1.5rem] p-6 text-center text-white">
           <div className="flex justify-center">
             <BrandLogo size={88} priority className="shadow-lg shadow-[#E60012]/20" />
           </div>
