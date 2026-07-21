@@ -80,7 +80,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-[2rem] bg-[#111111] p-5 text-white shadow-xl">
+      <section className="glass-dark rounded-[2rem] p-5 text-white">
         <div className="flex items-center gap-4">
           <BrandLogo size={64} priority className="rounded-2xl shadow-lg shadow-[#E60012]/20" />
           <div className="min-w-0">
@@ -89,7 +89,7 @@ export default async function DashboardPage() {
             <p className="text-sm font-bold text-white/80">{BRAND_SUBTITLE}</p>
           </div>
         </div>
-        <div className="mt-5 rounded-2xl bg-white/10 p-4">
+        <div className="mt-5 glass-button rounded-2xl p-4">
           <h2 className="text-2xl font-black">{isOwner(profile) ? "ทุกสาขา" : profile.branch?.name}</h2>
           <p className="mt-2 text-white/70">ข้อมูลอัปเดตทันทีเมื่อพนักงานบันทึกยอดขาย วัตถุดิบ และรายการสั่งของ</p>
           <div className="mt-4"><DashboardRealtime /></div>
@@ -103,7 +103,7 @@ export default async function DashboardPage() {
         <StatCard label="ยอดขาย 7 วัน" value={moneyFormatter.format(weekSales)} tone="dark" />
       </section>
 
-      <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
+      <section className="glass-card rounded-[1.75rem] p-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-sm font-bold text-black/50">สรุปวัตถุดิบย้อนหลัง</p>
@@ -123,11 +123,11 @@ export default async function DashboardPage() {
       </section>
 
       {lowStockReports.length > 0 && (
-        <section className="rounded-[1.75rem] border border-red-200 bg-red-50 p-5 shadow-sm">
+        <section className="rounded-[1.75rem] border border-red-200/70 bg-red-50/80 p-5 shadow-sm backdrop-blur-md">
           <h2 className="text-2xl font-black text-red-900">แจ้งเตือนวัตถุดิบใกล้หมด</h2>
           <div className="mt-3 space-y-2">
             {lowStockReports.map((report) => (
-              <div key={report.id} className="rounded-2xl bg-white p-3 font-bold text-red-900">
+              <div key={report.id} className="glass-card rounded-2xl p-3 font-bold text-red-900">
                 {report.branches?.name}: ไก่รวม {numberFormatter.format(getRemainingChickenTotal(report))}, ข้าวเหนียว {numberFormatter.format(report.remaining_sticky_rice)}, น้ำมัน {numberFormatter.format(report.remaining_oil)}
               </div>
             ))}
@@ -139,7 +139,7 @@ export default async function DashboardPage() {
         {branches.map((branch) => {
           const report = reports.find((item) => item.branch_id === branch.id);
           return (
-            <article key={branch.id} className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
+            <article key={branch.id} className="glass-card rounded-[1.75rem] p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-2xl font-black">{branch.name}</h2>
