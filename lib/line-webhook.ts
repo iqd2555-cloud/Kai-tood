@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { createSupabaseAdminClient } from "./supabase-admin.ts";
+import { createSupabaseAdminClient, getSupabaseAdminClientDiagnostics } from "./supabase-admin.ts";
 
 type LineMessage = {
   id?: string;
@@ -31,6 +31,7 @@ type ProcessDeps = {
   channelAccessToken: string;
   fetchFn?: typeof fetch;
   logger?: LineWebhookLogger;
+  supabaseDiagnostics?: { missing: string[]; invalid: string[] };
 };
 
 const LINE_REPLY_API_URL = "https://api.line.me/v2/bot/message/reply";
@@ -151,8 +152,11 @@ export async function processLineWebhookPayload(payload: LineWebhookPayload, dep
   const logger = deps.logger ?? console;
 
   if (!deps.supabase) {
+    const diagnostics = deps.supabaseDiagnostics ?? getSupabaseAdminClientDiagnostics();
     logger.error("LINE webhook cannot process events because Supabase admin client is unavailable", {
       stage: "supabase_client",
+      missing: diagnostics.missing,
+      invalid: diagnostics.invalid,
     });
     return { ok: false, status: 500, code: "database_unavailable" as const };
   }
@@ -228,11 +232,16 @@ export async function handleLineWebhookRequest(request: Request, deps: HandleDep
     return { ok: false, status: 500, code: "missing_config" };
   }
 
+  const createSupabase = deps.createSupabase ?? createSupabaseAdminClient;
+  const supabase = createSupabase();
+  const supabaseDiagnostics = supabase ? { missing: [], invalid: [] } : getSupabaseAdminClientDiagnostics();
+
   logger.info("LINE webhook signature accepted; processing events", { stage: "process_events", eventCount: events.length });
   return processLineWebhookPayload(
     { events },
     {
-      supabase: (deps.createSupabase ?? createSupabaseAdminClient)(),
+      supabase,
+      supabaseDiagnostics,
       channelAccessToken,
       fetchFn: deps.fetchFn,
       logger,

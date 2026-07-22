@@ -1,20 +1,19 @@
 import { createClient } from "@supabase/supabase-js";
-import { getSupabasePublicEnv } from "./supabase-env.ts";
-
-function clean(value: string | undefined) {
-  return value?.trim() ?? "";
-}
+import { getSupabaseAdminEnv, getSupabaseAdminEnvDiagnostics } from "./supabase-env.ts";
 
 export function createSupabaseAdminClient() {
-  const supabaseEnv = getSupabasePublicEnv();
-  const serviceRoleKey = clean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const supabaseEnv = getSupabaseAdminEnv();
 
-  if (!supabaseEnv || !serviceRoleKey) return null;
+  if (!supabaseEnv) return null;
 
-  return createClient(supabaseEnv.url, serviceRoleKey, {
+  return createClient(supabaseEnv.url, supabaseEnv.serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
   });
+}
+
+export function getSupabaseAdminClientDiagnostics() {
+  return getSupabaseAdminEnvDiagnostics();
 }
