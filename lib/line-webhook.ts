@@ -22,13 +22,15 @@ type LineWebhookPayload = {
   events?: LineEvent[];
 };
 
+type LineWebhookLogger = Pick<Console, "info" | "warn" | "error">;
+
 type SupabaseClient = ReturnType<typeof createSupabaseAdminClient>;
 
 type ProcessDeps = {
   supabase: SupabaseClient;
   channelAccessToken: string;
   fetchFn?: typeof fetch;
-  logger?: Pick<Console, "info" | "warn" | "error">;
+  logger?: LineWebhookLogger;
 };
 
 const LINE_REPLY_API_URL = "https://api.line.me/v2/bot/message/reply";
@@ -39,6 +41,12 @@ export type LineWebhookResult = {
   ok: boolean;
   status: number;
   code: "ok" | "missing_config" | "invalid_signature" | "invalid_json" | "database_unavailable" | "processing_error";
+};
+
+type HandleDeps = {
+  logger?: LineWebhookLogger;
+  createSupabase?: typeof createSupabaseAdminClient;
+  fetchFn?: typeof fetch;
 };
 
 function clean(value: string | undefined) {
@@ -56,8 +64,8 @@ export function verifyLineSignature(rawBody: string, signature: string | null, c
   if (!signature || !channelSecret) return false;
 
   const expected = createHmac("sha256", channelSecret).update(rawBody).digest("base64");
-  const actualBuffer = Buffer.from(signature);
-  const expectedBuffer = Buffer.from(expected);
+  const actualBuffer = Buffer.from(signature, "base64");
+  const expectedBuffer = Buffer.from(expected, "base64");
 
   if (actualBuffer.length !== expectedBuffer.length) return false;
 
@@ -142,7 +150,12 @@ export async function processLineWebhookPayload(payload: LineWebhookPayload, dep
   const fetchFn = deps.fetchFn ?? fetch;
   const logger = deps.logger ?? console;
 
-  if (!deps.supabase) return { ok: false, status: 500, code: "database_unavailable" as const };
+  if (!deps.supabase) {
+    logger.error("LINE webhook cannot process events because Supabase admin client is unavailable", {
+      stage: "supabase_client",
+    });
+    return { ok: false, status: 500, code: "database_unavailable" as const };
+  }
 
   for (const event of payload.events ?? []) {
     if (event.type !== "message" || !safeMessageId(event)) continue;
@@ -173,15 +186,16 @@ export async function processLineWebhookPayload(payload: LineWebhookPayload, dep
     }
   }
 
-  logger.info("LINE webhook processed", { eventCount: payload.events?.length ?? 0 });
+  logger.info("LINE webhook processed", { stage: "complete", eventCount: payload.events?.length ?? 0 });
   return { ok: true, status: 200, code: "ok" as const };
 }
 
-export async function handleLineWebhookRequest(request: Request): Promise<LineWebhookResult> {
+export async function handleLineWebhookRequest(request: Request, deps: HandleDeps = {}): Promise<LineWebhookResult> {
+  const logger = deps.logger ?? console;
   const { channelSecret, channelAccessToken } = getLineWebhookConfig();
 
-  if (!channelSecret || !channelAccessToken) {
-    console.error("LINE webhook configuration is missing");
+  if (!channelSecret) {
+    logger.error("LINE webhook configuration is missing", { stage: "config", missing: ["LINE_CHANNEL_SECRET"] });
     return { ok: false, status: 500, code: "missing_config" };
   }
 
@@ -189,7 +203,7 @@ export async function handleLineWebhookRequest(request: Request): Promise<LineWe
   const signature = request.headers.get("x-line-signature");
 
   if (!verifyLineSignature(rawBody, signature, channelSecret)) {
-    console.warn("LINE webhook rejected invalid signature");
+    logger.warn("LINE webhook rejected invalid signature", { stage: "signature" });
     return { ok: false, status: 401, code: "invalid_signature" };
   }
 
@@ -197,12 +211,31 @@ export async function handleLineWebhookRequest(request: Request): Promise<LineWe
   try {
     payload = JSON.parse(rawBody) as LineWebhookPayload;
   } catch {
-    console.warn("LINE webhook rejected invalid JSON body");
+    logger.warn("LINE webhook rejected invalid JSON body", { stage: "parse_json" });
     return { ok: false, status: 400, code: "invalid_json" };
   }
 
-  return processLineWebhookPayload(payload, {
-    supabase: createSupabaseAdminClient(),
-    channelAccessToken,
-  });
+  const events = Array.isArray(payload.events) ? payload.events : [];
+  if (events.length === 0) {
+    logger.info("LINE webhook verify request accepted", { stage: "verify_empty_events", eventCount: 0 });
+    return { ok: true, status: 200, code: "ok" };
+  }
+
+  const missingConfig = [];
+  if (!channelAccessToken) missingConfig.push("LINE_CHANNEL_ACCESS_TOKEN");
+  if (missingConfig.length > 0) {
+    logger.error("LINE webhook configuration is missing for event processing", { stage: "config", missing: missingConfig });
+    return { ok: false, status: 500, code: "missing_config" };
+  }
+
+  logger.info("LINE webhook signature accepted; processing events", { stage: "process_events", eventCount: events.length });
+  return processLineWebhookPayload(
+    { events },
+    {
+      supabase: (deps.createSupabase ?? createSupabaseAdminClient)(),
+      channelAccessToken,
+      fetchFn: deps.fetchFn,
+      logger,
+    },
+  );
 }
