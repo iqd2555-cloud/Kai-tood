@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import {
+  handleLineWebhookRequest,
   processLineWebhookPayload,
   verifyLineSignature,
 } from "../lib/line-webhook.ts";
@@ -39,6 +40,31 @@ function createSupabaseMock({ insertError = null, uploadError = null } = {}) {
   };
 }
 
+
+function createSignedRequest(body, secret, signature = sign(body, secret)) {
+  return new Request("https://kai-tood.test/api/line/webhook", {
+    method: "POST",
+    headers: { "x-line-signature": signature, "content-type": "application/json" },
+    body,
+  });
+}
+
+function withEnv(env, fn) {
+  const previous = {};
+  for (const key of Object.keys(env)) {
+    previous[key] = process.env[key];
+    if (env[key] === undefined) delete process.env[key];
+    else process.env[key] = env[key];
+  }
+
+  return Promise.resolve(fn()).finally(() => {
+    for (const key of Object.keys(env)) {
+      if (previous[key] === undefined) delete process.env[key];
+      else process.env[key] = previous[key];
+    }
+  });
+}
+
 function createFetchMock() {
   const calls = [];
   const fetchFn = async (url, init = {}) => {
@@ -63,6 +89,65 @@ const body = JSON.stringify({ events: [] });
 assert.equal(verifyLineSignature(body, sign(body, secret), secret), true, "valid signature passes");
 assert.equal(verifyLineSignature(body, "invalid", secret), false, "invalid signature fails");
 assert.equal(verifyLineSignature(body, null, secret), false, "missing signature fails");
+
+{
+  const logs = [];
+  const createSupabase = () => {
+    throw new Error("Verify must not create Supabase client");
+  };
+  const result = await withEnv(
+    { LINE_CHANNEL_SECRET: secret, LINE_CHANNEL_ACCESS_TOKEN: undefined, SUPABASE_SERVICE_ROLE_KEY: undefined },
+    () =>
+      handleLineWebhookRequest(createSignedRequest(body, secret), {
+        createSupabase,
+        logger: { ...console, info: (...args) => logs.push(args) },
+      }),
+  );
+
+  assert.equal(result.ok, true, "LINE Verify with empty events succeeds");
+  assert.equal(result.status, 200, "LINE Verify returns HTTP 200");
+  assert.equal(result.code, "ok");
+  assert.equal(JSON.stringify(logs).includes("verify_empty_events"), true, "Verify stage is logged");
+}
+
+{
+  const result = await withEnv({ LINE_CHANNEL_SECRET: secret, LINE_CHANNEL_ACCESS_TOKEN: undefined }, () =>
+    handleLineWebhookRequest(createSignedRequest(body, secret, "wrong-signature"), { logger: console }),
+  );
+
+  assert.equal(result.ok, false, "invalid signature fails");
+  assert.equal(result.status, 401, "invalid signature returns HTTP 401");
+  assert.equal(result.code, "invalid_signature");
+}
+
+{
+  const supabase = createSupabaseMock();
+  const fetchFn = createFetchMock();
+  const imageBody = JSON.stringify({
+    events: [
+      {
+        type: "message",
+        replyToken: "reply-token-route",
+        timestamp: 1784678400000,
+        source: { userId: "line-user-route" },
+        message: { id: "image-message-route", type: "image" },
+      },
+    ],
+  });
+  const result = await withEnv({ LINE_CHANNEL_SECRET: secret, LINE_CHANNEL_ACCESS_TOKEN: "channel-token" }, () =>
+    handleLineWebhookRequest(createSignedRequest(imageBody, secret), {
+      createSupabase: () => supabase,
+      fetchFn,
+      logger: console,
+    }),
+  );
+
+  assert.equal(result.ok, true, "valid image payload succeeds through request handler");
+  assert.equal(result.status, 200);
+  assert.equal(supabase.insertedRows.length, 1, "valid image payload enters bill receipt persistence");
+  assert.equal(supabase.uploadedFiles.length, 1, "valid image payload downloads and uploads the image");
+  assert.equal(fetchFn.calls.length, 2, "valid image payload calls content and reply APIs");
+}
 
 {
   const supabase = createSupabaseMock();
