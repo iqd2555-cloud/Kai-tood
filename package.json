@@ -17,7 +17,8 @@
     "test:marination-summary": "node --experimental-strip-types scripts/marination-summary.test.mjs",
     "test:thai-address": "node --experimental-strip-types scripts/thai-address-audit.test.mjs",
     "test:owner-report-branch-visibility": "node --experimental-strip-types scripts/owner-report-branch-visibility.test.mjs",
-    "test:line-webhook": "node --experimental-strip-types scripts/line-webhook.test.mjs"
+    "test:line-webhook": "node --experimental-strip-types scripts/line-webhook.test.mjs",
+    "test:line-bill-receipts-migration": "node scripts/line-bill-receipts-migration.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
