@@ -5,6 +5,7 @@ import {
   processLineWebhookPayload,
   verifyLineSignature,
 } from "../lib/line-webhook.ts";
+import { createSupabaseAdminClient, getSupabaseAdminClientDiagnostics } from "../lib/supabase-admin.ts";
 
 function sign(body, secret) {
   return createHmac("sha256", secret).update(body).digest("base64");
@@ -89,6 +90,67 @@ const body = JSON.stringify({ events: [] });
 assert.equal(verifyLineSignature(body, sign(body, secret), secret), true, "valid signature passes");
 assert.equal(verifyLineSignature(body, "invalid", secret), false, "invalid signature fails");
 assert.equal(verifyLineSignature(body, null, secret), false, "missing signature fails");
+
+{
+  const result = await withEnv(
+    {
+      NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined,
+      SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+    },
+    () => {
+      const client = createSupabaseAdminClient();
+      const diagnostics = getSupabaseAdminClientDiagnostics();
+      assert.notEqual(client, null, "admin client is created without requiring anon key");
+      assert.deepEqual(diagnostics, { missing: [], invalid: [] });
+    },
+  );
+  await result;
+}
+
+{
+  await withEnv(
+    { NEXT_PUBLIC_SUPABASE_URL: undefined, SUPABASE_SERVICE_ROLE_KEY: undefined },
+    () => {
+      const diagnostics = getSupabaseAdminClientDiagnostics();
+      assert.deepEqual(diagnostics.missing.sort(), ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"].sort());
+      assert.deepEqual(diagnostics.invalid, []);
+    },
+  );
+}
+
+{
+  const textBody = JSON.stringify({
+    events: [
+      {
+        type: "message",
+        replyToken: "reply-token-missing-db",
+        source: { userId: "line-user-missing-db" },
+        message: { id: "text-message-missing-db", type: "text" },
+      },
+    ],
+  });
+  const errors = [];
+  const result = await withEnv(
+    {
+      LINE_CHANNEL_SECRET: secret,
+      LINE_CHANNEL_ACCESS_TOKEN: "channel-token",
+      NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined,
+      SUPABASE_SERVICE_ROLE_KEY: undefined,
+    },
+    () =>
+      handleLineWebhookRequest(createSignedRequest(textBody, secret), {
+        logger: { ...console, error: (...args) => errors.push(args) },
+      }),
+  );
+
+  assert.equal(result.ok, false, "missing service role key fails event processing");
+  assert.equal(result.code, "database_unavailable");
+  assert.equal(JSON.stringify(errors).includes("SUPABASE_SERVICE_ROLE_KEY"), true, "missing service role key name is logged");
+  assert.equal(JSON.stringify(errors).includes("channel-token"), false, "channel access token is not leaked in logs");
+}
+
 
 {
   const logs = [];
