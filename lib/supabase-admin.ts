@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { getSupabasePublicEnv } from "@/lib/supabase-env";
+import { getSupabasePublicEnv } from "./supabase-env.ts";
 
 function clean(value: string | undefined) {
   return value?.trim() ?? "";
