@@ -39,6 +39,30 @@ const LINE_REPLY_API_URL = "https://api.line.me/v2/bot/message/reply";
 const LINE_CONTENT_API_BASE_URL = "https://api-data.line.me/v2/bot/message";
 const BILL_IMAGE_BUCKET = "line-bill-receipts";
 const RECEIPT_CONFIDENCE_THRESHOLD = 0.9;
+const MAX_INCOMPLETE_RECEIPT_CONFIDENCE = RECEIPT_CONFIDENCE_THRESHOLD - 0.01;
+const THAILAND_TIME_ZONE = "Asia/Bangkok";
+const RECEIPT_CATEGORY_CODE_BY_LABEL: Record<string, string> = {
+  "ค่าเช่าที่": "rent_payment",
+  "อินเทอร์เน็ต": "internet_payment",
+  "ไก่สด": "chicken_purchase",
+  "ข้าวเหนียว": "ingredient_purchase",
+  "เครื่องปรุง": "seasoning_cost",
+  "ค่าแรง": "labor_cost",
+  "น้ำแข็ง": "ice_cost",
+  "ขนส่ง": "transport",
+  "อื่นๆ": "misc_expense",
+};
+const RECEIPT_CATEGORY_LABEL_BY_CODE: Record<string, string> = {
+  rent_payment: "จ่ายค่าเช่าที่",
+  internet_payment: "จ่ายค่าอินเทอร์เน็ต",
+  chicken_purchase: "ซื้อไก่สด",
+  ingredient_purchase: "ซื้อวัตถุดิบ/ข้าวเหนียว",
+  seasoning_cost: "ค่าเครื่องปรุง",
+  labor_cost: "ค่าแรง",
+  ice_cost: "ค่าน้ำแข็ง",
+  transport: "ค่าขนส่ง",
+  misc_expense: "ค่าใช้จ่ายจิปาถะ",
+};
 
 type ReceiptAnalysis = {
   merchant: string;
@@ -93,15 +117,49 @@ function safeMessageId(event: LineEvent) {
   return event.message?.id?.trim() ?? "";
 }
 
-function receiptCategory(value: unknown) {
-  const text = String(value ?? "").trim();
-  const allowed = ["ค่าเช่าที่", "อินเทอร์เน็ต", "ไก่สด", "ข้าวเหนียว", "เครื่องปรุง", "ค่าแรง", "น้ำแข็ง", "ขนส่ง", "อื่นๆ"];
-  return allowed.includes(text) ? text : "อื่นๆ";
+function dateOnlyInTimeZone(value: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const part = (type: "year" | "month" | "day") => parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
-function validDate(value: unknown, fallback: string) {
-  const text = String(value ?? "");
-  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : fallback;
+function thailandDate(value: string | number | undefined) {
+  const date = new Date(value ?? Date.now());
+  return Number.isNaN(date.getTime())
+    ? dateOnlyInTimeZone(new Date(), THAILAND_TIME_ZONE)
+    : dateOnlyInTimeZone(date, THAILAND_TIME_ZONE);
+}
+
+function receiptCategory(value: unknown) {
+  const text = String(value ?? "").trim();
+  if (text in RECEIPT_CATEGORY_CODE_BY_LABEL) return { code: RECEIPT_CATEGORY_CODE_BY_LABEL[text], recognized: true };
+  if (text in RECEIPT_CATEGORY_LABEL_BY_CODE) return { code: text, recognized: true };
+  return { code: "misc_expense", recognized: false };
+}
+
+function isActualISODate(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+}
+
+function canAutoSaveReceipt(analysis: ReceiptAnalysis) {
+  return analysis.amount > 0
+    && analysis.confidence >= RECEIPT_CONFIDENCE_THRESHOLD
+    && isActualISODate(analysis.transactionDate)
+    && analysis.merchant !== "ไม่ทราบชื่อร้าน"
+    && analysis.paymentMethod !== "ไม่ระบุ"
+    && analysis.category in RECEIPT_CATEGORY_LABEL_BY_CODE;
+}
+
+function receiptCategoryLabel(code: string) {
+  return RECEIPT_CATEGORY_LABEL_BY_CODE[code] ?? RECEIPT_CATEGORY_LABEL_BY_CODE.misc_expense;
 }
 
 export async function analyzeReceiptImage(
@@ -118,17 +176,37 @@ export async function analyzeReceiptImage(
     body: JSON.stringify({
       model: clean(process.env.OPENAI_RECEIPT_MODEL) || "gpt-4.1-mini",
       temperature: 0,
-      response_format: { type: "json_object" },
+      max_completion_tokens: 300,
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "receipt_extraction",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              merchant: { type: "string" },
+              transactionDate: { type: "string", description: "วันที่บนบิลรูปแบบ YYYY-MM-DD" },
+              amount: { type: "number", description: "ยอดชำระสุทธิ" },
+              paymentMethod: { type: "string" },
+              category: { type: "string", enum: Object.keys(RECEIPT_CATEGORY_CODE_BY_LABEL) },
+              confidence: { type: "number", minimum: 0, maximum: 1 },
+            },
+            required: ["merchant", "transactionDate", "amount", "paymentMethod", "category", "confidence"],
+            additionalProperties: false,
+          },
+        },
+      },
       messages: [{
         role: "user",
         content: [
           {
             type: "text",
-            text: `อ่านบิลค่าใช้จ่ายภาษาไทย ตอบ JSON เท่านั้น: merchant, transactionDate (YYYY-MM-DD), amount (ยอดชำระสุทธิ), paymentMethod, category, confidence (0-1). category ต้องเป็นหนึ่งใน ค่าเช่าที่, อินเทอร์เน็ต, ไก่สด, ข้าวเหนียว, เครื่องปรุง, ค่าแรง, น้ำแข็ง, ขนส่ง, อื่นๆ หากไม่เห็นวันที่ให้ใช้ ${eventAt.slice(0, 10)} และลด confidence`,
+            text: `อ่านบิลค่าใช้จ่ายภาษาไทย แยก merchant, transactionDate, amount, paymentMethod, category และ confidence. หากไม่เห็นวันที่ให้ใช้ ${thailandDate(eventAt)} และตั้ง confidence ต่ำกว่า ${RECEIPT_CONFIDENCE_THRESHOLD}`,
           },
           {
             type: "image_url",
-            image_url: { url: `data:${image.contentType};base64,${image.data.toString("base64")}` },
+            image_url: { url: `data:${image.contentType};base64,${image.data.toString("base64")}`, detail: "high" },
           },
         ],
       }],
@@ -136,17 +214,38 @@ export async function analyzeReceiptImage(
   });
 
   if (!response.ok) throw new Error(`Receipt OCR failed with status ${response.status}`);
-  const body = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-  const parsed = JSON.parse(body.choices?.[0]?.message?.content ?? "{}") as Record<string, unknown>;
+  const body = await response.json() as {
+    choices?: Array<{ finish_reason?: string; message?: { content?: string; refusal?: string | null } }>;
+  };
+  const choice = body.choices?.[0];
+  if (choice?.finish_reason !== "stop" || choice.message?.refusal) {
+    throw new Error(`Receipt OCR returned an incomplete response: ${choice?.finish_reason ?? "missing"}`);
+  }
+  const parsed = JSON.parse(choice.message?.content ?? "{}") as Record<string, unknown>;
   const amount = Number(parsed.amount);
-  const confidence = Math.max(0, Math.min(1, Number(parsed.confidence) || 0));
+  const reportedConfidence = Math.max(0, Math.min(1, Number(parsed.confidence) || 0));
+  const merchant = String(parsed.merchant ?? "").trim();
+  const paymentMethod = String(parsed.paymentMethod ?? "").trim();
+  const transactionDate = String(parsed.transactionDate ?? "").trim();
+  const category = receiptCategory(parsed.category);
+  const hasCompleteFields = Boolean(
+    merchant
+    && paymentMethod
+    && Number.isFinite(amount)
+    && amount > 0
+    && isActualISODate(transactionDate)
+    && category.recognized,
+  );
+  const confidence = hasCompleteFields
+    ? reportedConfidence
+    : Math.min(reportedConfidence, MAX_INCOMPLETE_RECEIPT_CONFIDENCE);
 
   return {
-    merchant: String(parsed.merchant ?? "").trim() || "ไม่ทราบชื่อร้าน",
-    transactionDate: validDate(parsed.transactionDate, eventAt.slice(0, 10)),
+    merchant: merchant || "ไม่ทราบชื่อร้าน",
+    transactionDate: isActualISODate(transactionDate) ? transactionDate : thailandDate(eventAt),
     amount: Number.isFinite(amount) && amount > 0 ? amount : 0,
-    paymentMethod: String(parsed.paymentMethod ?? "").trim() || "ไม่ระบุ",
-    category: receiptCategory(parsed.category),
+    paymentMethod: paymentMethod || "ไม่ระบุ",
+    category: category.code,
     confidence,
   };
 }
@@ -193,8 +292,8 @@ async function insertBillReceiptEvent(
   analysis?: ReceiptAnalysis,
   cashFlowEntryId?: string | null,
 ) {
-  const processed = Boolean(analysis && analysis.amount > 0 && analysis.confidence >= RECEIPT_CONFIDENCE_THRESHOLD);
-  const { error } = await supabase.from("line_bill_receipts").insert({
+  const processed = Boolean(analysis && canAutoSaveReceipt(analysis));
+  const receiptPayload = {
     message_id: safeMessageId(event),
     line_user_id: event.source?.userId ?? null,
     message_type: event.message?.type ?? "unknown",
@@ -205,10 +304,20 @@ async function insertBillReceiptEvent(
     confidence: analysis?.confidence ?? null,
     cash_flow_entry_id: cashFlowEntryId ?? null,
     processing_error: analysis && !processed ? "ข้อมูลจากภาพไม่ชัดเจนหรือไม่พบยอดชำระ" : null,
-  });
+  };
+  const { error } = await supabase.from("line_bill_receipts").insert(receiptPayload);
 
   if (error) {
-    if (error.code === "23505") return { inserted: false };
+    if (error.code === "23505") {
+      if (analysis) {
+        const { error: updateError } = await supabase
+          .from("line_bill_receipts")
+          .update(receiptPayload)
+          .eq("message_id", safeMessageId(event));
+        if (updateError) throw new Error(`Failed to update existing LINE bill receipt event: ${updateError.code ?? "unknown"}`);
+      }
+      return { inserted: false };
+    }
     throw new Error(`Failed to insert LINE bill receipt event: ${error.code ?? "unknown"}`);
   }
 
@@ -221,7 +330,7 @@ async function insertCashFlowExpense(
   imageStoragePath: string,
   analysis: ReceiptAnalysis,
 ) {
-  if (analysis.amount <= 0 || analysis.confidence < RECEIPT_CONFIDENCE_THRESHOLD) return null;
+  if (!canAutoSaveReceipt(analysis)) return null;
 
   const { data, error } = await supabase.from("cash_flow_entries").insert({
     transaction_date: analysis.transactionDate,
@@ -234,6 +343,8 @@ async function insertCashFlowExpense(
     source: "other",
     source_ref_id: `line:${safeMessageId(event)}`,
     attachment_url: imageStoragePath,
+    document_type: "receipt",
+    has_attachment: true,
     note: `บันทึกอัตโนมัติจาก LINE OA (ความมั่นใจ ${Math.round(analysis.confidence * 100)}%)`,
   }).select("id").maybeSingle();
 
@@ -252,9 +363,14 @@ async function insertCashFlowExpense(
   return (data as { id?: string } | null)?.id ?? null;
 }
 
-async function uploadBillImage(supabase: NonNullable<SupabaseClient>, messageId: string, image: { contentType: string; data: Buffer }) {
+async function uploadBillImage(
+  supabase: NonNullable<SupabaseClient>,
+  messageId: string,
+  image: { contentType: string; data: Buffer },
+  eventAt: string,
+) {
   const extension = image.contentType.includes("png") ? "png" : image.contentType.includes("webp") ? "webp" : "jpg";
-  const path = `line/${new Date().toISOString().slice(0, 10)}/${messageId}.${extension}`;
+  const path = `line/${thailandDate(eventAt)}/${messageId}.${extension}`;
   const { error } = await supabase.storage.from(BILL_IMAGE_BUCKET).upload(path, image.data, {
     contentType: image.contentType,
     // LINE may retry the same webhook after a partial failure. Reusing the deterministic path is safe.
@@ -286,17 +402,18 @@ export async function processLineWebhookPayload(payload: LineWebhookPayload, dep
     try {
       if (event.message?.type === "image") {
         const image = await downloadLineImage(safeMessageId(event), deps.channelAccessToken, fetchFn);
-        const imageStoragePath = await uploadBillImage(deps.supabase, safeMessageId(event), image);
-        const analysis = await (deps.analyzeReceipt ?? analyzeReceiptImage)(image, eventDate(event.timestamp), fetchFn);
+        const eventAt = eventDate(event.timestamp);
+        const imageStoragePath = await uploadBillImage(deps.supabase, safeMessageId(event), image, eventAt);
+        const analysis = await (deps.analyzeReceipt ?? analyzeReceiptImage)(image, eventAt, fetchFn);
         const cashFlowEntryId = await insertCashFlowExpense(deps.supabase, event, imageStoragePath, analysis);
         const { inserted } = await insertBillReceiptEvent(deps.supabase, event, imageStoragePath, analysis, cashFlowEntryId);
 
         if (inserted) {
-          const saved = analysis.amount > 0 && analysis.confidence >= RECEIPT_CONFIDENCE_THRESHOLD;
+          const saved = canAutoSaveReceipt(analysis);
           await replyToLine(
             event.replyToken,
             saved
-              ? `บันทึกค่าใช้จ่ายแล้ว\n${analysis.merchant}\n${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nหมวด ${analysis.category}`
+              ? `บันทึกค่าใช้จ่ายแล้ว\n${analysis.merchant}\n${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nหมวด ${receiptCategoryLabel(analysis.category)}`
               : "ได้รับรูปบิลแล้ว แต่ข้อมูลไม่ชัดเจน จึงยังไม่บันทึกยอดและเก็บไว้รอตรวจสอบ",
             deps.channelAccessToken,
             fetchFn,
