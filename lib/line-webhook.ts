@@ -59,12 +59,11 @@ const RECEIPT_CATEGORY_CODE_BY_LABEL: Record<string, string> = {
 const INCOME_CATEGORY_CODE_BY_LABEL: Record<string, string> = {
   "ขายไก่หมัก": "marinated_chicken_sales",
   "ขายไก่สด": "fresh_chicken_sales",
-  "ขายหนังสือสูตร": "recipe_book_sales",
-  "ขายคอร์สออนไลน์": "online_course_sales",
-  "ขายคอร์สสอนสด": "live_course_sales",
+  "ขายหนังสือ": "recipe_book_sales",
+  "ขายคอร์ส": "course_sales",
   "ยอดขายหน้าร้าน": "sales_revenue",
-  "รายได้แฟรนไชส์": "franchise_income",
-  "รายรับอื่น": "other_income",
+  "ขายแฟรนไชส์": "franchise_income",
+  "รับเงินอื่น ๆ": "other_income",
 };
 const INCOME_CATEGORY_LABEL_BY_CODE = Object.fromEntries(
   Object.entries(INCOME_CATEGORY_CODE_BY_LABEL).map(([label, code]) => [code, label]),

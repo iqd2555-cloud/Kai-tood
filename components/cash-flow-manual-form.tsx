@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CASH_FLOW_DOCUMENT_TYPE_LABEL, CASH_FLOW_SOURCE_LABEL, CASH_FLOW_STATUS_LABEL, CASH_FLOW_TYPE_LABEL, type CashFlowEntry, type CashFlowStatus, type CashFlowType } from "@/lib/cash-flow";
 import { formatThaiDate, numberFormatter } from "@/lib/format";
 import { createSupabaseBrowserClient } from "@/lib/supabase-client";
+import { mergeRequiredCashFlowIncomeCategories } from "@/lib/cash-flow-income-categories";
 import type { Branch } from "@/lib/types";
 
 type Category = { id: string; name: string; type?: string; code?: string | null; is_active?: boolean };
@@ -14,10 +15,9 @@ const incomeCategoryOrder = new Map([
   ["marinated_chicken_sales", 20],
   ["fresh_chicken_sales", 30],
   ["recipe_book_sales", 40],
-  ["online_course_sales", 50],
-  ["live_course_sales", 60],
-  ["franchise_income", 70],
-  ["other_income", 80],
+  ["course_sales", 50],
+  ["franchise_income", 60],
+  ["other_income", 70],
 ]);
 
 function categorySortValue(category: Category) {
@@ -49,12 +49,12 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
   const [category, setCategory] = useState("");
   const [attachmentUrl, setAttachmentUrl] = useState("");
   const [hasAttachment, setHasAttachment] = useState(false);
-  const [liveCategories, setLiveCategories] = useState<Category[]>(categories);
+  const [liveCategories, setLiveCategories] = useState<Category[]>(() => mergeRequiredCashFlowIncomeCategories(categories) as Category[]);
   const [localEntries, setLocalEntries] = useState<CashFlowEntry[]>(entries);
   const [deletingId, setDeletingId] = useState("");
   const [deleteError, setDeleteError] = useState("");
 
-  useEffect(() => { setLiveCategories(categories); }, [categories]);
+  useEffect(() => { setLiveCategories(mergeRequiredCashFlowIncomeCategories(categories) as Category[]); }, [categories]);
   useEffect(() => { setLocalEntries(entries); }, [entries]);
   useEffect(() => {
     let isMounted = true;
@@ -65,7 +65,7 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
       const { data, error } = await client.from("cash_flow_categories").select("id,name,type,code,is_active").eq("is_active", true).order("name");
       if (!isMounted) return;
       if (error) return console.error("Cash Flow categories load error:", error);
-      setLiveCategories(data ?? []);
+      setLiveCategories(mergeRequiredCashFlowIncomeCategories(data ?? []) as Category[]);
     }
     void loadCategories();
     const channel = client.channel("cash-flow-categories-dropdown").on("postgres_changes", { event: "*", schema: "public", table: "cash_flow_categories" }, () => { void loadCategories(); }).subscribe();

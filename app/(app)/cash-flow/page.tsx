@@ -6,6 +6,7 @@ import { StatCard } from "@/components/stat-card";
 import { getCurrentProfile } from "@/lib/auth";
 import { addDaysISO, calculateCashFlowSummary, CASH_FLOW_STATUS_LABEL, isPendingStatus, type CashFlowEntry } from "@/lib/cash-flow";
 import { CASH_FLOW_ENTRIES_TABLE } from "@/lib/cash-flow-constants";
+import { mergeRequiredCashFlowIncomeCategories } from "@/lib/cash-flow-income-categories";
 import { formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib/format";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { Branch } from "@/lib/types";
@@ -158,7 +159,7 @@ export default async function CashFlowPage({ searchParams }: PageProps) {
       });
 
       loadState.branches = (branches as Branch[] | null) ?? [];
-      loadState.categories = categories ?? [];
+      loadState.categories = mergeRequiredCashFlowIncomeCategories(categories ?? []);
       loadState.entries = (data ?? []).map((entry) => ({
         ...entry,
         id: entry.id,
