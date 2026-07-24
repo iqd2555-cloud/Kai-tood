@@ -51,8 +51,8 @@ export async function saveMarinationMovement(input: SaveMovementInput) {
   }
 
   let finalNote = note;
-  const needsBalanceCheck = movementType === "used" || (movementType === "adjustment" && !movementId);
-  if (needsBalanceCheck) {
+  const needsLedgerRead = movementType === "received" || movementType === "used" || (movementType === "adjustment" && !movementId);
+  if (needsLedgerRead) {
     const [{ data: previousMovements, error: readError }, { data: resetRows, error: resetError }] = await Promise.all([
       supabase
         .from("marination_stock_movements")
@@ -83,6 +83,16 @@ export async function saveMarinationMovement(input: SaveMovementInput) {
     const balanceMovements = (previousMovements ?? []).filter((movement) => movement.id !== movementId);
     const activeResetDate = resetRows?.[0]?.reset_date ?? null;
     const currentSystemBalance = calculateMarinationSystemBalance(balanceMovements, activeResetDate);
+    const dayIsClosed = !movementId && (movementType === "received" || movementType === "used") && balanceMovements.some(
+      (movement) => movement.movement_date === input.movementDate && movement.movement_type === "adjustment",
+    );
+
+    if (dayIsClosed) {
+      return {
+        ok: false,
+        message: "วันนี้มีการปรับยอดปิดจริงแล้ว จึงเพิ่มรายการรับเข้าหรือใช้หมักภายหลังไม่ได้ กรุณาให้ Owner ยกเลิกรายการปรับยอดเดิม บันทึกรายการที่ตกหล่น แล้วปรับยอดปิดใหม่",
+      };
+    }
 
     if (movementType === "used" && input.quantityKg > currentSystemBalance + 0.000001) {
       const available = currentSystemBalance.toLocaleString("th-TH", { maximumFractionDigits: 2 });
