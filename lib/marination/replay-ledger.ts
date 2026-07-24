@@ -106,7 +106,7 @@ export function replayMarinationLedgerForDate(movements: RawMarinationLedgerMove
       balance = quantityKg;
       signedEffect = balance - balanceBefore;
       balanceAfter = balance;
-      reason = "ปรับยอดแบบตั้งยอดใหม่ ผลต่อสต๊อกคือ target ลบยอดก่อนหน้า";
+      reason = "รายการปรับยอดล่าสุดของวันเป็นยอดปิดจริง ผลต่อสต๊อกคือยอดเป้าหมายลบยอดก่อนปรับ";
     } else if (normalizedKind === "unknown") {
       warnings.push(`พบ movement_type ที่ไม่รู้จัก: ${movement.movementType || "(ว่าง)"} ในรายการ ${movement.id || "ไม่มี id"}`);
       reason = "movement_type ไม่รู้จัก จึงไม่นำมาคิด";
@@ -161,6 +161,10 @@ export function replayMarinationLedger(movements: RawMarinationLedgerMovement[],
 }
 
 export function sortMarinationLedgerMovements<T extends RawMarinationLedgerMovement | MarinationLedgerMovement>(movements: T[]) {
+  // A same-day adjustment is an authoritative closing snapshot. Replay all
+  // ordinary movements first, then apply the latest effective set_balance as
+  // the final balance for that business date. This guarantees that entering a
+  // target of 50 kg closes at 50 kg and carries 50 kg into the next day.
   return movements.slice().sort((a, b) =>
     getMovementDate(a).localeCompare(getMovementDate(b)) ||
     getMovementKindSortOrder(a) - getMovementKindSortOrder(b) ||
@@ -244,10 +248,10 @@ function getCreatedAt(movement: RawMarinationLedgerMovement | MarinationLedgerMo
 function getMovementKindSortOrder(movement: RawMarinationLedgerMovement | MarinationLedgerMovement) {
   const movementType = "movementType" in movement && movement.movementType !== undefined ? movement.movementType : "movement_type" in movement ? movement.movement_type : "";
   const kind = normalizeMovementKind(movementType);
-  if (kind === "set_balance") return 0;
-  if (kind === "use") return 1;
-  if (kind === "receive") return 2;
-  if (kind === "stock_check") return 3;
-  return 4;
+  // Receive/use/check records are replayed in entry order. The effective
+  // set_balance is deliberately last so it becomes the authoritative daily
+  // closing snapshot; superseded same-day adjustments remain ignored.
+  if (kind === "set_balance") return 1;
+  return 0;
 }
 function getId(movement: RawMarinationLedgerMovement | MarinationLedgerMovement) { return String(movement.id ?? ""); }
