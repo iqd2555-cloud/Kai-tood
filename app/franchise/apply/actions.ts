@@ -42,13 +42,20 @@ export async function submitFranchiseLead(_prevState: ApplyFormState, formData: 
     province: parsed.data.province,
     district: parsed.data.district,
     has_capital: parsed.data.working_capital || null,
-    budget_range: parsed.data.budget_range || null,
+    budget_range: parsed.data.budget_range,
     preferred_model: null,
     available_area: parsed.data.has_location || null,
     location_type: parsed.data.location_type || null,
     experience: parsed.data.business_experience || null,
+    has_location: parsed.data.has_location,
+    working_capital: parsed.data.working_capital,
+    available_time_per_day: parsed.data.available_time_per_day,
+    business_experience: parsed.data.business_experience,
+    expected_daily_income: parsed.data.expected_daily_income,
+    understanding_confirmed: true,
     note: null,
     status: "new",
+    source: "website",
   };
 
   const { error } = await supabase.from("franchise_leads").insert(lead);
