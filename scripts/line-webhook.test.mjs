@@ -163,6 +163,35 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
 }
 
 {
+  const fetchFn = async () => Response.json({
+    choices: [{
+      finish_reason: "stop",
+      message: {
+        content: JSON.stringify({
+          merchant: "บริษัท เควีเอส เฟรชโปรดักส์ จำกัด",
+          transactionDate: "2026-07-24",
+          amount: 6300,
+          paymentMethod: "",
+          category: "ค่าเช่าที่",
+          confidence: 0.95,
+        }),
+      },
+    }],
+  });
+  const analysis = await withEnv(
+    { OPENAI_API_KEY: "test-openai-key" },
+    () => analyzeReceiptImage(
+      { contentType: "image/jpeg", data: Buffer.from("fake-kvs-invoice") },
+      "2026-07-24T15:41:00.000Z",
+      fetchFn,
+    ),
+  );
+
+  assert.equal(analysis.category, "chicken_purchase", "KVS chicken invoices cannot be classified as rent");
+  assert.equal(analysis.paymentMethod, "ไม่ระบุ");
+}
+
+{
   const result = await withEnv(
     {
       NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
