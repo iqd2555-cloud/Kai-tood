@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-const LINE_URL = "https://line.me/R/ti/p/@kaikov";
+const LINE_URL = "https://line.me/R/ti/p/@kaikoy";
 
 type Props = {
   fullName: string;
