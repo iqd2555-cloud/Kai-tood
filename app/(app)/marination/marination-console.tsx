@@ -217,7 +217,8 @@ export function MarinationConsole({ parts, initialMovements, selectedDate, canVi
             <input className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-lg font-bold shadow-sm" type="number" inputMode="decimal" min={isDirectAdjustmentEdit ? undefined : "0"} step="0.01" name="quantity_kg" value={formState.quantity_kg} onChange={(event) => updateForm("quantity_kg", event.target.value)} placeholder={isAdjustment && !isEditing ? "เช่น ต้องการให้คงเหลือเป็น 50 ให้กรอก 50" : "เช่น 30"} required />
             {isAdjustment && !isEditing && (
               <p className="mt-2 rounded-2xl bg-yellow-100 px-3 py-2 text-sm font-black text-yellow-900">
-                ระบบจะตั้งค่ายอดคงเหลือตามระบบให้เท่ากับจำนวนที่กรอก ไม่ใช่บวกเพิ่มจากยอดเดิม
+                ระบบจะตั้งยอดปิดจริงของวันนี้ให้เท่ากับจำนวนที่กรอก ไม่ใช่บวกเพิ่มจากยอดเดิม
+                <span className="mt-1 block text-yellow-950">หลังปิดยอดแล้ว ระบบจะไม่รับรายการรับเข้า/ใช้หมักเพิ่มเติมของวันนี้ หากมีรายการตกหล่นต้องยกเลิกยอดปิดเดิม บันทึกรายการให้ครบ แล้วปรับยอดใหม่</span>
                 <span className="mt-1 block text-yellow-950">ยอดคงเหลือปัจจุบันของวันที่เลือก: {kg(selectedPartSystemBalance)}</span>
               </p>
             )}
