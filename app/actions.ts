@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getCurrentProfile } from "@/lib/auth";
 import { addDaysISO } from "@/lib/cash-flow";
 import { CASH_FLOW_ENTRIES_TABLE } from "@/lib/cash-flow-constants";
+import { REQUIRED_CASH_FLOW_INCOME_CODES } from "@/lib/cash-flow-income-categories";
 import { todayISO } from "@/lib/format";
 import { ORDER_REQUEST_ITEMS } from "@/lib/report-items";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -405,8 +406,9 @@ export async function saveCashFlowEntry(_: unknown, formData: FormData) {
     .eq("type", payload.type)
     .eq("is_active", true)
     .maybeSingle();
-  if (categoryError) return { ok: false, message: categoryError.message };
-  if (!selectedCategory?.code) return { ok: false, message: "หมวดหมู่ไม่ตรงกับประเภทรายการ รับ/จ่าย" };
+  const isRequiredIncomeCategory = payload.type === "income" && REQUIRED_CASH_FLOW_INCOME_CODES.has(payload.category);
+  if (categoryError && !isRequiredIncomeCategory) return { ok: false, message: categoryError.message };
+  if (!selectedCategory?.code && !isRequiredIncomeCategory) return { ok: false, message: "หมวดหมู่ไม่ตรงกับประเภทรายการ รับ/จ่าย" };
 
   const entryPayload = {
     transaction_date: payload.transaction_date,
