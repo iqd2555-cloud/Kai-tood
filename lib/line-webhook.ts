@@ -35,6 +35,7 @@ type ProcessDeps = {
   supabaseDiagnostics?: { missing: string[]; invalid: string[] };
   analyzeReceipt?: typeof analyzeReceiptImage;
   analyzeTextExpense?: typeof analyzeCashFlowText;
+  analyzeTextIncome?: typeof analyzeCashFlowIncomeText;
 };
 
 const LINE_REPLY_API_URL = "https://api.line.me/v2/bot/message/reply";
@@ -55,6 +56,20 @@ const RECEIPT_CATEGORY_CODE_BY_LABEL: Record<string, string> = {
   "ขนส่ง": "transport",
   "อื่นๆ": "misc_expense",
 };
+const INCOME_CATEGORY_CODE_BY_LABEL: Record<string, string> = {
+  "ขายไก่หมัก": "marinated_chicken_sales",
+  "ขายไก่สด": "fresh_chicken_sales",
+  "ขายหนังสือสูตร": "recipe_book_sales",
+  "ขายคอร์สออนไลน์": "online_course_sales",
+  "ขายคอร์สสอนสด": "live_course_sales",
+  "ยอดขายหน้าร้าน": "sales_revenue",
+  "รายได้แฟรนไชส์": "franchise_income",
+  "รายรับอื่น": "other_income",
+};
+const INCOME_CATEGORY_LABEL_BY_CODE = Object.fromEntries(
+  Object.entries(INCOME_CATEGORY_CODE_BY_LABEL).map(([label, code]) => [code, label]),
+) as Record<string, string>;
+
 const RECEIPT_CATEGORY_LABEL_BY_CODE: Record<string, string> = {
   rent_payment: "จ่ายค่าเช่าที่",
   internet_payment: "จ่ายค่าอินเทอร์เน็ต",
@@ -84,6 +99,8 @@ type TextExpenseAnalysis = {
   category: string;
 };
 
+type TextIncomeAnalysis = TextExpenseAnalysis;
+
 export type LineWebhookResult = {
   ok: boolean;
   status: number;
@@ -96,6 +113,7 @@ type HandleDeps = {
   fetchFn?: typeof fetch;
   analyzeReceipt?: typeof analyzeReceiptImage;
   analyzeTextExpense?: typeof analyzeCashFlowText;
+  analyzeTextIncome?: typeof analyzeCashFlowIncomeText;
 };
 
 function clean(value: string | undefined) {
@@ -194,6 +212,17 @@ function cashFlowStatusForReceipt(analysis: ReceiptAnalysis) {
 
 function receiptCategoryLabel(code: string) {
   return RECEIPT_CATEGORY_LABEL_BY_CODE[code] ?? RECEIPT_CATEGORY_LABEL_BY_CODE.misc_expense;
+}
+
+function incomeCategory(value: unknown) {
+  const text = String(value ?? "").trim();
+  if (text in INCOME_CATEGORY_CODE_BY_LABEL) return INCOME_CATEGORY_CODE_BY_LABEL[text];
+  if (text in INCOME_CATEGORY_LABEL_BY_CODE) return text;
+  return "other_income";
+}
+
+function incomeCategoryLabel(code: string) {
+  return INCOME_CATEGORY_LABEL_BY_CODE[code] ?? INCOME_CATEGORY_LABEL_BY_CODE.other_income;
 }
 
 function receiptReviewReasons(analysis: ReceiptAnalysis) {
@@ -379,6 +408,79 @@ export async function analyzeCashFlowText(
   };
 }
 
+function looksLikeIncomeCommand(value: string) {
+  return /^\s*ขาย/u.test(value) && /\d/.test(value);
+}
+
+export async function analyzeCashFlowIncomeText(
+  text: string,
+  eventAt: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<TextIncomeAnalysis> {
+  const apiKey = clean(process.env.OPENAI_API_KEY);
+  if (!apiKey) throw new Error("OPENAI_API_KEY is missing");
+
+  const response = await fetchFn("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: clean(process.env.OPENAI_RECEIPT_MODEL) || "gpt-4.1-mini",
+      temperature: 0,
+      max_completion_tokens: 220,
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "cash_flow_text_income",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              transactionDate: { type: "string", description: "วันที่รูปแบบ YYYY-MM-DD" },
+              amount: { type: "number", description: "ยอดรับเงินจริง ผลลัพธ์สุดท้ายของสมการถ้ามี" },
+              description: { type: "string", description: "สินค้าและชื่อลูกค้าแบบกระชับ" },
+              paymentMethod: { type: "string" },
+              category: { type: "string", enum: Object.keys(INCOME_CATEGORY_CODE_BY_LABEL) },
+            },
+            required: ["transactionDate", "amount", "description", "paymentMethod", "category"],
+            additionalProperties: false,
+          },
+        },
+      },
+      messages: [{
+        role: "user",
+        content: `แยกข้อความขายสดที่รับเงินแล้วสำหรับ Cash Flow: "${text}". คำนวณสมการจำนวนคูณราคา เช่น 68*50=3400 และใช้ยอดหลังเครื่องหมายเท่ากับ หากไม่ระบุช่องทางให้ใช้ "ไม่ระบุ" หากไม่ระบุวันที่ให้ใช้ ${thailandDate(eventAt)} สินค้าที่ไม่ตรงหมวดเฉพาะให้ใช้รายรับอื่น`,
+      }],
+    }),
+  });
+
+  if (!response.ok) throw new Error(`Cash Flow income text analysis failed with status ${response.status}`);
+  const body = await response.json() as {
+    choices?: Array<{ finish_reason?: string; message?: { content?: string; refusal?: string | null } }>;
+  };
+  const choice = body.choices?.[0];
+  if (choice?.finish_reason !== "stop" || choice.message?.refusal) {
+    throw new Error(`Cash Flow income text analysis returned an incomplete response: ${choice?.finish_reason ?? "missing"}`);
+  }
+
+  const parsed = JSON.parse(choice.message?.content ?? "{}") as Record<string, unknown>;
+  const amount = Number(parsed.amount);
+  const description = String(parsed.description ?? "").trim();
+  const paymentMethod = String(parsed.paymentMethod ?? "").trim();
+  const transactionDate = String(parsed.transactionDate ?? "").trim();
+
+  if (!(Number.isFinite(amount) && amount > 0 && description)) {
+    throw new Error("Cash Flow sales text does not contain a valid received amount");
+  }
+
+  return {
+    transactionDate: isActualISODate(transactionDate) ? transactionDate : thailandDate(eventAt),
+    amount,
+    description,
+    paymentMethod: paymentMethod || "ไม่ระบุ",
+    category: incomeCategory(parsed.category),
+  };
+}
+
 async function replyToLine(replyToken: string | undefined, text: string, channelAccessToken: string, fetchFn: typeof fetch) {
   if (!replyToken) return;
 
@@ -531,6 +633,42 @@ async function insertTextCashFlowExpense(
   return (data as { id?: string } | null)?.id ?? null;
 }
 
+async function insertTextCashFlowIncome(
+  supabase: NonNullable<SupabaseClient>,
+  event: LineEvent,
+  analysis: TextIncomeAnalysis,
+) {
+  const sourceRefId = `line:${safeMessageId(event)}`;
+  const { data, error } = await supabase.from("cash_flow_entries").insert({
+    transaction_date: analysis.transactionDate,
+    type: "income",
+    status: "received",
+    category: analysis.category,
+    description: analysis.description,
+    amount: analysis.amount,
+    payment_method: analysis.paymentMethod,
+    source: "other",
+    source_ref_id: sourceRefId,
+    attachment_url: null,
+    document_type: "no_document",
+    has_attachment: false,
+    note: "บันทึกรายรับจากข้อความขายสดใน LINE OA โดยไม่มีเอกสารแนบ",
+  }).select("id").maybeSingle();
+
+  if (error?.code === "23505") {
+    const { data: existing, error: lookupError } = await supabase
+      .from("cash_flow_entries")
+      .select("id")
+      .eq("source_ref_id", sourceRefId)
+      .maybeSingle();
+    if (lookupError) throw new Error(`Failed to find existing text income entry: ${lookupError.code ?? "unknown"}`);
+    return (existing as { id?: string } | null)?.id ?? null;
+  }
+
+  if (error) throw new Error(`Failed to create text income entry: ${error.code ?? "unknown"}`);
+  return (data as { id?: string } | null)?.id ?? null;
+}
+
 async function uploadBillImage(
   supabase: NonNullable<SupabaseClient>,
   messageId: string,
@@ -606,12 +744,26 @@ export async function processLineWebhookPayload(payload: LineWebhookPayload, dep
               fetchFn,
             );
           }
+        } else if (looksLikeIncomeCommand(messageText)) {
+          const eventAt = eventDate(event.timestamp);
+          const analysis = await (deps.analyzeTextIncome ?? analyzeCashFlowIncomeText)(messageText, eventAt, fetchFn);
+          const cashFlowEntryId = await insertTextCashFlowIncome(deps.supabase, event, analysis);
+          const { inserted } = await insertBillReceiptEvent(deps.supabase, event, null, undefined, cashFlowEntryId);
+
+          if (inserted) {
+            await replyToLine(
+              event.replyToken,
+              `บันทึกรายรับเข้า Cash Flow แล้ว\n${analysis.description}\n${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nสถานะ รับแล้ว\nหมวด ${incomeCategoryLabel(analysis.category)}\nเอกสาร ไม่มีเอกสาร`,
+              deps.channelAccessToken,
+              fetchFn,
+            );
+          }
         } else {
           const { inserted } = await insertBillReceiptEvent(deps.supabase, event, null);
           if (inserted) {
             await replyToLine(
               event.replyToken,
-              "พิมพ์รายการ เช่น จ่ายค่าน้ำแข็ง 350 บาท หรือส่งรูปบิลเพื่อบันทึกค่าใช้จ่าย",
+              "พิมพ์รายการ เช่น จ่ายค่าน้ำแข็ง 350 บาท หรือ ขายไก่หมัก 68*50=3,400 บาท หรือส่งรูปบิล",
               deps.channelAccessToken,
               fetchFn,
             );
@@ -685,6 +837,7 @@ export async function handleLineWebhookRequest(request: Request, deps: HandleDep
       logger,
       analyzeReceipt: deps.analyzeReceipt,
       analyzeTextExpense: deps.analyzeTextExpense,
+      analyzeTextIncome: deps.analyzeTextIncome,
     },
   );
 }
