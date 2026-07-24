@@ -161,3 +161,25 @@ export const thaiDistrictsByProvince: Record<(typeof thaiProvinces)[number], str
 export const thaiAddress: Record<string, string[]> = thaiDistrictsByProvince;
 
 export const provincesWithIncompleteDistricts = thaiProvinces.filter((province) => thaiAddress[province].length <= 1);
+
+const knownSubdistricts: Record<string, string[]> = {
+  "กรุงเทพมหานคร|เขตจตุจักร": ["จตุจักร", "จอมพล", "จันทรเกษม", "ลาดยาว", "เสนานิคม"],
+  "นครสวรรค์|เมืองนครสวรรค์": ["ปากน้ำโพ", "กลางแดด", "เกรียงไกร", "แควใหญ่", "ตะเคียนเลื่อน", "นครสวรรค์ตก", "นครสวรรค์ออก", "บางพระหลวง", "บางม่วง", "บ้านมะเกลือ", "บ้านแก่ง", "พระนอน", "วัดไทร", "หนองกรด", "หนองกระโดน", "หนองปลิง", "บึงเสนาท"],
+};
+
+export const thaiSubdistrictsByProvinceDistrict = Object.fromEntries(
+  Object.entries(thaiDistrictsByProvince).flatMap(([province, districts]) =>
+    districts.map((district) => {
+      const key = `${province}|${district}`;
+      return [key, knownSubdistricts[key] ?? [district]];
+    }),
+  ),
+) as Record<string, string[]>;
+
+export function getThaiDistricts(province: string) {
+  return province in thaiDistrictsByProvince ? thaiDistrictsByProvince[province as keyof typeof thaiDistrictsByProvince] : [];
+}
+
+export function getThaiSubdistricts(province: string, district: string) {
+  return thaiSubdistrictsByProvinceDistrict[`${province}|${district}`] ?? [];
+}
