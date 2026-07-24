@@ -225,7 +225,8 @@ export type MiniFranchiseApplication = {
   opening_district: string;
   opening_subdistrict: string;
   location_address: string;
-  google_maps_url: string;
+  location_description: string;
+  google_maps_url: string | null;
   location_type: string;
   monthly_rent: string | null;
   planned_opening_period: string;
@@ -239,6 +240,7 @@ export type MiniFranchiseApplication = {
   can_follow_online_course: boolean;
   extra_budget_range: string;
   terms_acknowledged: Record<string, boolean>;
+  submission_token: string | null;
   internal_note: string | null;
   status: MiniApplicationStatus;
   created_at: string;
