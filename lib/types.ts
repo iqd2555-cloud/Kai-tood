@@ -206,3 +206,41 @@ export type FranchiseLead = {
   created_at: string;
   updated_at: string;
 };
+
+export type MiniApplicationStatus = "new" | "area_conflict" | "awaiting_location_info" | "prequalified" | "appointment_scheduled" | "approved" | "rejected" | "paid" | "delivered" | "opened";
+
+export type MiniFranchiseApplication = {
+  id: string;
+  reference_code: string;
+  application_type: "mini";
+  source: string;
+  full_name: string;
+  age: number;
+  phone: string;
+  line_id: string | null;
+  current_occupation: string;
+  residence_province: string;
+  residence_district: string;
+  opening_province: string;
+  opening_district: string;
+  opening_subdistrict: string;
+  location_address: string;
+  google_maps_url: string;
+  location_type: string;
+  monthly_rent: string | null;
+  planned_opening_period: string;
+  nearby_competitors: string | null;
+  location_photo_paths: string[];
+  has_location: string;
+  actual_seller: string;
+  ready_to_open: string;
+  food_business_experience: string;
+  experience_details: string | null;
+  can_follow_online_course: boolean;
+  extra_budget_range: string;
+  terms_acknowledged: Record<string, boolean>;
+  internal_note: string | null;
+  status: MiniApplicationStatus;
+  created_at: string;
+  updated_at: string;
+};
