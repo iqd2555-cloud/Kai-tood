@@ -1,25 +1,132 @@
 import { redirect } from "next/navigation";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
+import { qualifyMiniApplication } from "@/lib/mini-application-qualification";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { MiniApplicationStatus, MiniFranchiseApplication } from "@/lib/types";
 import { updateMiniApplication } from "./actions";
 import { MiniApplicationFilters } from "./mini-application-filters";
+import { MiniContactActions } from "./mini-contact-actions";
 
-const statusLabels: Record<MiniApplicationStatus, string> = { new: "สมัครใหม่", area_conflict: "พื้นที่ซ้ำ", awaiting_location_info: "รอข้อมูลทำเล", prequalified: "ผ่านการคัดกรองเบื้องต้น", appointment_scheduled: "นัดพูดคุย", approved: "อนุมัติ", rejected: "ไม่ผ่าน", paid: "ชำระเงินแล้ว", delivered: "ส่งมอบแล้ว", opened: "เปิดขายแล้ว" };
+const statusLabels: Record<MiniApplicationStatus, string> = {
+  new: "สมัครใหม่",
+  area_conflict: "พื้นที่ซ้ำ",
+  awaiting_location_info: "รอข้อมูลทำเล",
+  prequalified: "ผ่านการคัดกรองเบื้องต้น",
+  appointment_scheduled: "นัดพูดคุย",
+  approved: "อนุมัติ",
+  rejected: "ไม่ผ่าน",
+  paid: "ชำระเงินแล้ว",
+  delivered: "ส่งมอบแล้ว",
+  opened: "เปิดขายแล้ว",
+};
 const statuses = Object.keys(statusLabels) as MiniApplicationStatus[];
 type Params = { q?: string; province?: string; district?: string; subdistrict?: string; status?: string; from?: string; to?: string };
-function formatDate(value: string) { return new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Bangkok" }).format(new Date(value)); }
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Bangkok" }).format(new Date(value));
+}
 
 export default async function MiniApplicationsPage({ searchParams }: { searchParams?: Promise<Params> }) {
-  const profile = await getCurrentProfile(); if (!isOwner(profile)) redirect("/dashboard");
-  const params = await searchParams; const q = params?.q?.trim() ?? ""; const status = statuses.includes(params?.status as MiniApplicationStatus) ? (params?.status as MiniApplicationStatus) : "";
-  const supabase = await createSupabaseServerClient(); if (!supabase) redirect("/login?setup=supabase");
+  const profile = await getCurrentProfile();
+  if (!isOwner(profile)) redirect("/dashboard");
+  const params = await searchParams;
+  const q = params?.q?.trim() ?? "";
+  const status = statuses.includes(params?.status as MiniApplicationStatus) ? (params?.status as MiniApplicationStatus) : "";
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) redirect("/login?setup=supabase");
+
   let query = supabase.from("mini_franchise_applications").select("*");
-  if (q) query = query.or(`full_name.ilike.%${q}%,phone.ilike.%${q}%,reference_code.ilike.%${q}%`); if (params?.province) query = query.ilike("opening_province", `%${params.province}%`); if (params?.district) query = query.ilike("opening_district", `%${params.district}%`); if (params?.subdistrict) query = query.ilike("opening_subdistrict", `%${params.subdistrict}%`); if (status) query = query.eq("status", status); if (params?.from) query = query.gte("created_at", params.from); if (params?.to) query = query.lte("created_at", `${params.to}T23:59:59`);
+  if (q) query = query.or(`full_name.ilike.%${q}%,phone.ilike.%${q}%,reference_code.ilike.%${q}%`);
+  if (params?.province) query = query.ilike("opening_province", `%${params.province}%`);
+  if (params?.district) query = query.ilike("opening_district", `%${params.district}%`);
+  if (params?.subdistrict) query = query.ilike("opening_subdistrict", `%${params.subdistrict}%`);
+  if (status) query = query.eq("status", status);
+  if (params?.from) query = query.gte("created_at", params.from);
+  if (params?.to) query = query.lte("created_at", `${params.to}T23:59:59`);
+
   const { data, error } = await query.order("created_at", { ascending: false }).returns<MiniFranchiseApplication[]>();
   if (error) console.error("Failed to load MINI franchise applications:", { code: error.code, message: error.message, details: error.details });
   const apps = error ? [] : data ?? [];
   const signed = new Map<string, string>();
-  if (!error) for (const app of apps) for (const path of app.location_photo_paths ?? []) { const { data } = await supabase.storage.from("mini-location-photos").createSignedUrl(path, 60 * 10); if (data?.signedUrl) signed.set(path, data.signedUrl); }
-  return <div className="space-y-5"><div><h1 className="text-3xl font-black">ใบสมัคร MINI</h1><p className="mt-1 font-bold text-black/55">จัดการใบสมัครแฟรนไชส์ MINI STARTER แยกจากชุดมาตรฐาน</p></div>{!error && <MiniApplicationFilters q={q} province={params?.province ?? ""} district={params?.district ?? ""} subdistrict={params?.subdistrict ?? ""} status={status} from={params?.from ?? ""} to={params?.to ?? ""} />}{error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-5 font-bold leading-7 text-red-700"><p>โหลดใบสมัคร MINI ไม่สำเร็จ กรุณาตรวจสอบว่า migration ของตาราง MINI ถูกใช้กับ Production และบัญชี Owner มีสิทธิ์อ่านข้อมูล</p><p className="mt-2 text-sm text-red-600">รายละเอียดเชิงเทคนิคถูกบันทึกใน server log แล้ว</p><a href="/mini-applications" className="mt-4 inline-flex rounded-full bg-red-700 px-5 py-3 font-black text-white">ลองใหม่</a></div> : <div className="space-y-4">{apps.map((app) => <article key={app.id} className="rounded-[1.5rem] border border-black/10 bg-white p-5 shadow-sm"><div className="flex flex-col gap-3 sm:flex-row sm:justify-between"><div><p className="font-mono text-sm font-black text-[#E60012]">{app.reference_code}</p><h2 className="text-xl font-black">{app.full_name}</h2><p className="font-bold text-black/60">{app.phone} • {app.opening_province} / {app.opening_district} / {app.opening_subdistrict}</p><p className="mt-1 text-sm font-bold text-black/45">สมัครเมื่อ {formatDate(app.created_at)}</p></div><span className="h-fit w-fit rounded-full bg-[#ffc400] px-3 py-1 text-sm font-black">{statusLabels[app.status]}</span></div><dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2"><div><b>สถานะทำเล:</b> {app.has_location}</div><div><b>งบประมาณ:</b> {app.extra_budget_range}</div><div><b>ประเภททำเล:</b> {app.location_type}</div><div><b>ค่าเช่า:</b> {app.monthly_rent || "-"}</div><div><b>พร้อมเปิด:</b> {app.ready_to_open}</div><div><b>ผู้ขายจริง:</b> {app.actual_seller}</div><div className="sm:col-span-2"><b>สถานที่หรือพิกัดโดยประมาณ:</b> {app.location_description || app.google_maps_url || "-"}</div><div className="sm:col-span-2"><b>ลิงก์ Google Maps เดิม:</b> {app.google_maps_url ? <a className="text-blue-700 underline" href={app.google_maps_url} target="_blank">เปิด Google Maps</a> : "-"}</div><div className="sm:col-span-2"><b>ที่อยู่:</b> {app.location_address}</div></dl><details className="mt-4 rounded-2xl bg-[#fff9df] p-4"><summary className="cursor-pointer font-black">เปิดดูรายละเอียดและรูปทำเล</summary><div className="mt-3 grid gap-3 text-sm font-bold"><p>อาชีพ: {app.current_occupation}</p><p>ประสบการณ์: {app.food_business_experience} {app.experience_details || ""}</p><p>คู่แข่ง: {app.nearby_competitors || "-"}</p><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{(app.location_photo_paths ?? []).length > 0 ? (app.location_photo_paths ?? []).map((p) => signed.get(p) ? <a key={p} href={signed.get(p)} target="_blank"><img src={signed.get(p)} alt="รูปทำเล" className="h-32 rounded-2xl object-cover" /></a> : null) : <p className="rounded-2xl bg-white p-4 text-black/55 sm:col-span-4">ผู้สมัครไม่ได้แนบรูปทำเล</p>}</div></div></details><form action={updateMiniApplication} className="mt-4 grid gap-3 border-t border-black/10 pt-4 sm:grid-cols-[220px_1fr_auto]"><input type="hidden" name="id" value={app.id} /><label className="grid gap-1 text-sm font-black text-black/65"><span>สถานะใบสมัคร</span><select name="status" defaultValue={app.status} className="rounded-2xl border border-black/10 px-4 py-3 font-bold text-black">{statuses.map((s) => <option key={s} value={s}>{statusLabels[s]}</option>)}</select></label><label className="grid gap-1 text-sm font-black text-black/65"><span>หมายเหตุภายใน</span><input name="internal_note" defaultValue={app.internal_note ?? ""} className="rounded-2xl border border-black/10 px-4 py-3 font-bold text-black" /></label><button className="self-end rounded-2xl bg-[#E60012] px-5 py-3 font-black text-white">บันทึก</button></form></article>)}{apps.length === 0 && <div className="rounded-[1.5rem] bg-white p-6 text-center font-black text-black/50">ยังไม่มีใบสมัคร MINI ตามเงื่อนไขนี้</div>}</div>}</div>;
+  if (!error) {
+    for (const app of apps) {
+      for (const path of app.location_photo_paths ?? []) {
+        const { data: signedData } = await supabase.storage.from("mini-location-photos").createSignedUrl(path, 60 * 10);
+        if (signedData?.signedUrl) signed.set(path, signedData.signedUrl);
+      }
+    }
+  }
+
+  return <div className="space-y-5">
+    <div>
+      <h1 className="text-3xl font-black">ใบสมัคร MINI</h1>
+      <p className="mt-1 font-bold text-black/55">คัดกรองก่อนติดต่อ โทรเฉพาะผู้สมัครกลุ่ม A และใช้ข้อความมาตรฐานกับกลุ่ม B–C</p>
+    </div>
+    {!error && <MiniApplicationFilters q={q} province={params?.province ?? ""} district={params?.district ?? ""} subdistrict={params?.subdistrict ?? ""} status={status} from={params?.from ?? ""} to={params?.to ?? ""} />}
+    {error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-5 font-bold leading-7 text-red-700">
+      <p>โหลดใบสมัคร MINI ไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อฐานข้อมูลและสิทธิ์บัญชี Owner</p>
+      <p className="mt-2 text-sm text-red-600">รายละเอียดเชิงเทคนิคถูกบันทึกใน server log แล้ว</p>
+      <a href="/mini-applications" className="mt-4 inline-flex rounded-full bg-red-700 px-5 py-3 font-black text-white">ลองใหม่</a>
+    </div> : <div className="space-y-4">
+      {apps.map((app) => {
+        const qualification = qualifyMiniApplication(app);
+        return <article key={app.id} className="rounded-[1.5rem] border border-black/10 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+            <div>
+              <p className="font-mono text-sm font-black text-[#E60012]">{app.reference_code}</p>
+              <h2 className="text-xl font-black">{app.full_name}</h2>
+              <p className="font-bold text-black/60">{app.phone} • {app.opening_province} / {app.opening_district} / {app.opening_subdistrict}</p>
+              <p className="mt-1 text-sm font-bold text-black/45">สมัครเมื่อ {formatDate(app.created_at)}</p>
+            </div>
+            <span className="h-fit w-fit rounded-full bg-[#ffc400] px-3 py-1 text-sm font-black">{statusLabels[app.status]}</span>
+          </div>
+
+          <div className={`mt-4 rounded-2xl border p-3 ${qualification.tone}`}>
+            <p className="font-black">{qualification.label} · {qualification.score}/10</p>
+            <p className="mt-1 text-sm font-bold">{qualification.reason}</p>
+            <p className="mt-1 text-xs font-bold opacity-70">คะแนนนี้ใช้จัดลำดับติดต่อเบื้องต้น ไม่ใช่ผลอนุมัติแฟรนไชส์</p>
+          </div>
+          <MiniContactActions fullName={app.full_name} phone={app.phone} lineId={app.line_id} referenceCode={app.reference_code} group={qualification.group} />
+
+          <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+            <div><b>สถานะทำเล:</b> {app.has_location}</div>
+            <div><b>งบประมาณ:</b> {app.extra_budget_range}</div>
+            <div><b>ประเภททำเล:</b> {app.location_type}</div>
+            <div><b>ค่าเช่า:</b> {app.monthly_rent || "-"}</div>
+            <div><b>พร้อมเปิด:</b> {app.ready_to_open}</div>
+            <div><b>ผู้ขายจริง:</b> {app.actual_seller}</div>
+            <div className="sm:col-span-2"><b>สถานที่หรือพิกัดโดยประมาณ:</b> {app.location_description || app.google_maps_url || "-"}</div>
+            <div className="sm:col-span-2"><b>ลิงก์ Google Maps:</b> {app.google_maps_url ? <a className="text-blue-700 underline" href={app.google_maps_url} target="_blank">เปิด Google Maps</a> : "-"}</div>
+            <div className="sm:col-span-2"><b>ที่อยู่:</b> {app.location_address}</div>
+          </dl>
+
+          <details className="mt-4 rounded-2xl bg-[#fff9df] p-4">
+            <summary className="cursor-pointer font-black">เปิดดูรายละเอียดและรูปทำเล</summary>
+            <div className="mt-3 grid gap-3 text-sm font-bold">
+              <p>อาชีพ: {app.current_occupation}</p>
+              <p>ประสบการณ์: {app.food_business_experience} {app.experience_details || ""}</p>
+              <p>คู่แข่ง: {app.nearby_competitors || "-"}</p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {(app.location_photo_paths ?? []).length > 0 ? (app.location_photo_paths ?? []).map((path) => signed.get(path) ? <a key={path} href={signed.get(path)} target="_blank"><img src={signed.get(path)} alt="รูปทำเล" className="h-32 rounded-2xl object-cover" /></a> : null) : <p className="rounded-2xl bg-white p-4 text-black/55 sm:col-span-4">ผู้สมัครไม่ได้แนบรูปทำเล</p>}
+              </div>
+            </div>
+          </details>
+
+          <form action={updateMiniApplication} className="mt-4 grid gap-3 border-t border-black/10 pt-4 sm:grid-cols-[220px_1fr_auto]">
+            <input type="hidden" name="id" value={app.id} />
+            <label className="grid gap-1 text-sm font-black text-black/65">
+              <span>สถานะใบสมัคร</span>
+              <select name="status" defaultValue={app.status} className="rounded-2xl border border-black/10 px-4 py-3 font-bold text-black">{statuses.map((item) => <option key={item} value={item}>{statusLabels[item]}</option>)}</select>
+            </label>
+            <label className="grid gap-1 text-sm font-black text-black/65">
+              <span>หมายเหตุภายใน</span>
+              <input name="internal_note" defaultValue={app.internal_note ?? ""} className="rounded-2xl border border-black/10 px-4 py-3 font-bold text-black" />
+            </label>
+            <button className="self-end rounded-2xl bg-[#E60012] px-5 py-3 font-black text-white">บันทึก</button>
+          </form>
+        </article>;
+      })}
+      {apps.length === 0 && <div className="rounded-[1.5rem] bg-white p-6 text-center font-black text-black/50">ยังไม่มีใบสมัคร MINI ตามเงื่อนไขนี้</div>}
+    </div>}
+  </div>;
 }
