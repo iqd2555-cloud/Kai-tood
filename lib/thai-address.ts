@@ -2,9 +2,12 @@ import thaiAddressData from "../data/thai-address.json";
 
 type ThaiAddressTree = Record<string, Record<string, string[]>>;
 
-const thaiAddress = thaiAddressData as ThaiAddressTree;
+const thaiAddressTree = thaiAddressData as ThaiAddressTree;
 
-export const thaiProvinces = Object.keys(thaiAddress).sort((a, b) => a.localeCompare(b, "th"));
+export const thaiProvinces = Object.keys(thaiAddressTree).sort((a, b) => a.localeCompare(b, "th"));
+export const thaiAddress = Object.fromEntries(
+  thaiProvinces.map((province) => [province, Object.keys(thaiAddressTree[province])]),
+) as Record<string, string[]>;
 
 export const thaiAddressDatasetMeta = {
   source: "@riz007/thai-address-data 0.1.4, derived from thailand-geography-json",
@@ -13,13 +16,13 @@ export const thaiAddressDatasetMeta = {
 } as const;
 
 export const provincesWithIncompleteDistricts = thaiProvinces.filter(
-  (province) => Object.keys(thaiAddress[province] ?? {}).length === 0,
+  (province) => (thaiAddress[province] ?? []).length === 0,
 );
 
 export function getThaiDistricts(province: string) {
-  return Object.keys(thaiAddress[province] ?? {}).sort((a, b) => a.localeCompare(b, "th"));
+  return (thaiAddress[province] ?? []).slice().sort((a, b) => a.localeCompare(b, "th"));
 }
 
 export function getThaiSubdistricts(province: string, district: string) {
-  return thaiAddress[province]?.[district] ?? [];
+  return thaiAddressTree[province]?.[district] ?? [];
 }
