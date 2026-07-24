@@ -51,7 +51,8 @@ export async function saveMarinationMovement(input: SaveMovementInput) {
   }
 
   let finalNote = note;
-  if (movementType === "adjustment" && !movementId) {
+  const needsBalanceCheck = movementType === "used" || (movementType === "adjustment" && !movementId);
+  if (needsBalanceCheck) {
     const [{ data: previousMovements, error: readError }, { data: resetRows, error: resetError }] = await Promise.all([
       supabase
         .from("marination_stock_movements")
@@ -73,10 +74,27 @@ export async function saveMarinationMovement(input: SaveMovementInput) {
         .limit(1)
         .returns<{ reset_date: string }[]>(),
     ]);
-    if (readError) return { ok: false, message: `ตรวจสอบยอดก่อนปรับไม่สำเร็จ: ${readError.message}` };
+    if (readError) return { ok: false, message: `ตรวจสอบยอดคงเหลือไม่สำเร็จ: ${readError.message}` };
     if (resetError) return { ok: false, message: `ตรวจสอบวันตั้งต้นสต๊อกไม่สำเร็จ: ${resetError.message}` };
+
+    // When editing an existing use row, calculate available stock without the
+    // old version of that same row so changing 5 -> 10 kg is validated against
+    // the true balance before this movement.
+    const balanceMovements = (previousMovements ?? []).filter((movement) => movement.id !== movementId);
     const activeResetDate = resetRows?.[0]?.reset_date ?? null;
-    finalNote = buildAdjustmentNoteForMarination(note ?? "", input.quantityKg, calculateMarinationSystemBalance(previousMovements ?? [], activeResetDate));
+    const currentSystemBalance = calculateMarinationSystemBalance(balanceMovements, activeResetDate);
+
+    if (movementType === "used" && input.quantityKg > currentSystemBalance + 0.000001) {
+      const available = currentSystemBalance.toLocaleString("th-TH", { maximumFractionDigits: 2 });
+      return {
+        ok: false,
+        message: `บันทึกใช้หมักไม่ได้: คงเหลือตามระบบ ${available} กก. แต่นำไปใช้ ${input.quantityKg.toLocaleString("th-TH", { maximumFractionDigits: 2 })} กก. กรุณาตรวจสอบรายการรับเข้า หรือให้ Owner ปรับยอดก่อน`,
+      };
+    }
+
+    if (movementType === "adjustment" && !movementId) {
+      finalNote = buildAdjustmentNoteForMarination(note ?? "", input.quantityKg, currentSystemBalance);
+    }
   }
 
   const payload = {
