@@ -41,20 +41,20 @@ const movements = [
 ];
 
 const { summaries, totals } = buildMarinationSummaries(parts, movements, "2026-07-02");
-assertPart("bl-scrap", 80, 80, 100);
+assertPart("bl-scrap", 50, 80, 70);
 const blScrap = summaries.find((summary) => summary.partId === "bl-scrap");
 assert.equal(blScrap.receivedKg, 100);
 const blScrapAudit = buildMarinationCalculationAudit({ selectedDate: "2026-07-02", part: parts[0], movements });
-assert.equal(blScrapAudit.openingKg, 80);
+assert.equal(blScrapAudit.openingKg, 50);
 assert.equal(blScrapAudit.receivedKg, 100);
 assert.equal(blScrapAudit.usedKg, 80);
-assert.equal(blScrapAudit.systemRemainingKg, 100);
+assert.equal(blScrapAudit.systemRemainingKg, 70);
 assert.equal(blScrapAudit.adjustmentKg, 0);
-assert.equal(blScrapAudit.formulaText, "80 + 100 - 80 + 0 = 100");
+assert.equal(blScrapAudit.formulaText, "50 + 100 - 80 + 0 = 70");
 assert.equal(blScrap.adjustmentKg, 0);
 assert.equal(blScrapAudit.totalReceiveBeforeDate, 200);
 assert.equal(blScrapAudit.totalUseBeforeDate, 90);
-assert.equal(blScrapAudit.adjustmentEffectsBeforeDate, -30);
+assert.equal(blScrapAudit.adjustmentEffectsBeforeDate, -60);
 assert.equal(blScrapAudit.ignoredRows.filter((row) => row.bucket === "ignored" && row.reason.includes("แทนที่")).length, 2);
 assert.equal(blScrapAudit.stockCheckIgnoredBeforeDate, 120);
 
@@ -67,12 +67,28 @@ const blScrapOutOfEntryOrderMovements = [
   movement("next-use", "2026-07-02", "bl-scrap", "used", 80, "ใช้หมักวันที่เลือก"),
 ];
 const outOfEntryOrderAudit = buildMarinationCalculationAudit({ selectedDate: "2026-07-02", part: parts[0], movements: blScrapOutOfEntryOrderMovements });
-assert.equal(outOfEntryOrderAudit.openingKg, 80, "2026-07-02 opening must use 2026-07-01 closing of 50 - 50 + 70 + 10 even if the adjustment was entered later");
+assert.equal(outOfEntryOrderAudit.openingKg, 50, "the latest daily adjustment is the authoritative 2026-07-01 closing snapshot");
 assert.equal(outOfEntryOrderAudit.receivedKg, 100);
 assert.equal(outOfEntryOrderAudit.usedKg, 80);
 assert.equal(outOfEntryOrderAudit.adjustmentKg, 0);
-assert.equal(outOfEntryOrderAudit.systemRemainingKg, 100);
-assert.equal(outOfEntryOrderAudit.formulaText, "80 + 100 - 80 + 0 = 100");
+assert.equal(outOfEntryOrderAudit.systemRemainingKg, 70);
+assert.equal(outOfEntryOrderAudit.formulaText, "50 + 100 - 80 + 0 = 70");
+
+const adjustmentClosesAtExactTarget = [
+  movement("target-opening", "2026-07-10", "bl-scrap", "received", 100),
+  movement("target-receive", "2026-07-11", "bl-scrap", "received", 70),
+  movement("target-use", "2026-07-11", "bl-scrap", "used", 80),
+  movement("target-close", "2026-07-11", "bl-scrap", "adjustment", 50, "ชั่งจริงและปิดยอดเป็น 50 กก.", "2026-07-11T18:00:00.000Z"),
+];
+const targetDay = buildMarinationSummaries(parts, adjustmentClosesAtExactTarget, "2026-07-11").summaries.find((summary) => summary.partId === "bl-scrap");
+assert.equal(targetDay.openingKg, 100);
+assert.equal(targetDay.receivedKg, 70);
+assert.equal(targetDay.usedKg, 80);
+assert.equal(targetDay.adjustmentKg, -40);
+assert.equal(targetDay.systemRemainingKg, 50, "adjustment target must be the exact displayed closing balance");
+const targetNextDay = buildMarinationSummaries(parts, adjustmentClosesAtExactTarget, "2026-07-12").summaries.find((summary) => summary.partId === "bl-scrap");
+assert.equal(targetNextDay.openingKg, 50, "the exact adjusted closing must carry forward to the next day");
+assert.equal(targetNextDay.systemRemainingKg, 50);
 
 const multipleSameDayAdjustments = [
   movement("multi-adjust-1", "2026-07-01", "bl-scrap", "adjustment", 50, "ปรับยอดเก่าถูกแทนที่", "2026-07-01T07:00:00.000Z"),
@@ -85,10 +101,10 @@ const multipleSameDayAdjustments = [
   movement("multi-next-use", "2026-07-02", "bl-scrap", "used", 80, "ใช้หมัก 80"),
 ];
 const multipleSameDayAudit = buildMarinationCalculationAudit({ selectedDate: "2026-07-02", part: parts[0], movements: multipleSameDayAdjustments });
-assert.equal(multipleSameDayAudit.openingKg, 80, "only the final same-day adjustment should set the 2026-07-01 base balance");
+assert.equal(multipleSameDayAudit.openingKg, 50, "only the latest same-day adjustment must become the 2026-07-01 closing balance");
 assert.equal(multipleSameDayAudit.receivedKg, 100);
 assert.equal(multipleSameDayAudit.usedKg, 80);
-assert.equal(multipleSameDayAudit.systemRemainingKg, 100);
+assert.equal(multipleSameDayAudit.systemRemainingKg, 70);
 assert.equal(multipleSameDayAudit.ignoredRows.filter((row) => row.reason.includes("แทนที่")).length, 2);
 
 assertPart("bb-scrap", 30, 30, 0);
@@ -103,9 +119,9 @@ assert.equal(offal.receivedKg, 0);
 assert.equal(offal.latestPhysicalCountKg, 43, "count is displayed separately");
 assert.equal(offal.varianceKg, -2, "count must not overwrite system balance");
 assert.equal(offal.latestNote, "ใช้หมักวันนี้", "latest note should come from selected-date movements only");
-assert.equal(totals.opening, 265);
-assert.equal(totals.systemBalance, 160);
-assert.equal(sumOpeningByPart(movements.filter((item) => item.movement_date < "2026-07-02")), 265);
+assert.equal(totals.opening, 235);
+assert.equal(totals.systemBalance, 130);
+assert.equal(sumOpeningByPart(movements.filter((item) => item.movement_date < "2026-07-02")), 235);
 assert.equal(sumClosingByPart(movements, "2026-07-01"), totals.opening, "2026-07-02 opening must equal 2026-07-01 system closing after received, used, and adjustments");
 assert.equal(sumSystemBalanceByPart(movements), totals.systemBalance);
 
