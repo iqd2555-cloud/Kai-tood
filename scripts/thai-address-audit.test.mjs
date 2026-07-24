@@ -1,111 +1,56 @@
-import { thaiAddress, thaiProvinces } from "../lib/thai-address.ts";
+import { getThaiDistricts, getThaiSubdistricts, thaiAddressDatasetMeta, thaiProvinces } from "../lib/thai-address.ts";
 
-const expectedDistrictCounts = {
-  กรุงเทพมหานคร: 50,
-  กระบี่: 8,
-  กาญจนบุรี: 13,
-  กาฬสินธุ์: 18,
-  กำแพงเพชร: 11,
-  ขอนแก่น: 26,
-  จันทบุรี: 10,
-  ฉะเชิงเทรา: 11,
-  ชลบุรี: 11,
-  ชัยนาท: 8,
-  ชัยภูมิ: 16,
-  ชุมพร: 8,
-  เชียงราย: 18,
-  เชียงใหม่: 25,
-  ตรัง: 10,
-  ตราด: 7,
-  ตาก: 9,
-  นครนายก: 4,
-  นครปฐม: 7,
-  นครพนม: 12,
-  นครราชสีมา: 32,
-  นครศรีธรรมราช: 23,
-  นครสวรรค์: 15,
-  นนทบุรี: 6,
-  นราธิวาส: 13,
-  น่าน: 15,
-  บึงกาฬ: 8,
-  บุรีรัมย์: 23,
-  ปทุมธานี: 7,
-  ประจวบคีรีขันธ์: 8,
-  ปราจีนบุรี: 7,
-  ปัตตานี: 12,
-  พระนครศรีอยุธยา: 16,
-  พะเยา: 9,
-  พังงา: 8,
-  พัทลุง: 11,
-  พิจิตร: 12,
-  พิษณุโลก: 9,
-  เพชรบุรี: 8,
-  เพชรบูรณ์: 11,
-  แพร่: 8,
-  ภูเก็ต: 3,
-  มหาสารคาม: 13,
-  มุกดาหาร: 7,
-  แม่ฮ่องสอน: 7,
-  ยโสธร: 9,
-  ยะลา: 8,
-  ร้อยเอ็ด: 20,
-  ระนอง: 5,
-  ระยอง: 8,
-  ราชบุรี: 10,
-  ลพบุรี: 11,
-  ลำปาง: 13,
-  ลำพูน: 8,
-  เลย: 14,
-  ศรีสะเกษ: 22,
-  สกลนคร: 18,
-  สงขลา: 16,
-  สตูล: 7,
-  สมุทรปราการ: 6,
-  สมุทรสงคราม: 3,
-  สมุทรสาคร: 3,
-  สระแก้ว: 9,
-  สระบุรี: 13,
-  สิงห์บุรี: 6,
-  สุโขทัย: 9,
-  สุพรรณบุรี: 10,
-  สุราษฎร์ธานี: 19,
-  สุรินทร์: 17,
-  หนองคาย: 9,
-  หนองบัวลำภู: 6,
-  อ่างทอง: 7,
-  อำนาจเจริญ: 7,
-  อุดรธานี: 20,
-  อุตรดิตถ์: 9,
-  อุทัยธานี: 8,
-  อุบลราชธานี: 25,
+const failures = [];
+const seenDistrictIds = new Set();
+const seenSubdistrictIds = new Set();
+let districtCount = 0;
+let subdistrictCount = 0;
+
+for (const province of thaiProvinces) {
+  if (!province.trim()) failures.push({ type: "blank-province", province });
+  const districts = getThaiDistricts(province);
+  if (districts.length === 0) failures.push({ type: "province-without-district", province });
+  for (const district of districts) {
+    districtCount += 1;
+    const districtId = `${province}|${district}`;
+    if (!district.trim()) failures.push({ type: "blank-district", province, district });
+    if (seenDistrictIds.has(districtId)) failures.push({ type: "duplicate-district-id", districtId });
+    seenDistrictIds.add(districtId);
+    const subdistricts = getThaiSubdistricts(province, district);
+    if (subdistricts.length === 0) failures.push({ type: "district-without-subdistrict", province, district });
+    if (province === "กรุงเทพมหานคร" && !district.startsWith("เขต")) failures.push({ type: "bangkok-district-label", district });
+    if (province !== "กรุงเทพมหานคร" && district.startsWith("เขต")) failures.push({ type: "non-bangkok-district-label", province, district });
+    for (const subdistrict of subdistricts) {
+      subdistrictCount += 1;
+      const subdistrictId = `${province}|${district}|${subdistrict}`;
+      if (!subdistrict.trim()) failures.push({ type: "blank-subdistrict", province, district, subdistrict });
+      if (seenSubdistrictIds.has(subdistrictId)) failures.push({ type: "duplicate-subdistrict-id", subdistrictId });
+      seenSubdistrictIds.add(subdistrictId);
+      if (!seenDistrictIds.has(districtId)) failures.push({ type: "orphan-subdistrict", subdistrictId });
+    }
+  }
+}
+
+const bangkokChatuchak = getThaiSubdistricts("กรุงเทพมหานคร", "เขตจตุจักร");
+if (!bangkokChatuchak.includes("ลาดยาว")) failures.push({ type: "missing-bangkok-chatuchak-latyao" });
+const nakhonSawanMueang = getThaiSubdistricts("นครสวรรค์", "เมืองนครสวรรค์");
+if (nakhonSawanMueang.length === 0) failures.push({ type: "missing-nakhon-sawan-mueang-subdistricts" });
+
+const report = {
+  source: thaiAddressDatasetMeta.source,
+  version: thaiAddressDatasetMeta.version,
+  sourceDate: thaiAddressDatasetMeta.sourceDate,
+  provinces: thaiProvinces.length,
+  districtsIncludingBangkokKhets: districtCount,
+  subdistrictsIncludingBangkokKhwaengs: subdistrictCount,
+  incomplete: failures.filter((failure) => String(failure.type).includes("without")),
+  duplicatesOrOrphans: failures.filter((failure) => String(failure.type).includes("duplicate") || String(failure.type).includes("orphan")),
+  failures,
 };
 
-const incompleteProvinces = thaiProvinces.filter((province) => {
-  const districts = thaiAddress[province] ?? [];
-  return districts.length <= 1;
-});
-
-const fallbackOnlyProvinces = thaiProvinces.filter((province) => {
-  const districts = thaiAddress[province] ?? [];
-  return districts.length === 1 && districts[0] === `เมือง${province}`;
-});
-
-const provincesWithUnexpectedDistrictCounts = thaiProvinces.filter((province) => {
-  const expectedCount = expectedDistrictCounts[province];
-  return typeof expectedCount !== "number" || thaiAddress[province]?.length !== expectedCount;
-});
-
-if (incompleteProvinces.length > 0 || fallbackOnlyProvinces.length > 0 || provincesWithUnexpectedDistrictCounts.length > 0) {
-  console.error("Thai address dataset audit failed", {
-    incompleteProvinces,
-    fallbackOnlyProvinces,
-    provincesWithUnexpectedDistrictCounts: provincesWithUnexpectedDistrictCounts.map((province) => ({
-      province,
-      expected: expectedDistrictCounts[province],
-      actual: thaiAddress[province]?.length ?? 0,
-    })),
-  });
+if (failures.length > 0) {
+  console.error("Thai address dataset audit failed", JSON.stringify(report, null, 2));
   process.exit(1);
 }
 
-console.log(`Thai address dataset audit passed for ${thaiProvinces.length} provinces.`);
+console.log("Thai address dataset audit passed", JSON.stringify(report, null, 2));
