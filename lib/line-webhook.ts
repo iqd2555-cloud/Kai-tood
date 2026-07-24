@@ -38,7 +38,7 @@ type ProcessDeps = {
 const LINE_REPLY_API_URL = "https://api.line.me/v2/bot/message/reply";
 const LINE_CONTENT_API_BASE_URL = "https://api-data.line.me/v2/bot/message";
 const BILL_IMAGE_BUCKET = "line-bill-receipts";
-const RECEIPT_CONFIDENCE_THRESHOLD = 0.7;
+const RECEIPT_CONFIDENCE_THRESHOLD = 0.9;
 
 type ReceiptAnalysis = {
   merchant: string;
@@ -237,7 +237,18 @@ async function insertCashFlowExpense(
     note: `บันทึกอัตโนมัติจาก LINE OA (ความมั่นใจ ${Math.round(analysis.confidence * 100)}%)`,
   }).select("id").maybeSingle();
 
-  if (error && error.code !== "23505") throw new Error(`Failed to create cash flow entry: ${error.code ?? "unknown"}`);
+  if (error?.code === "23505") {
+    const { data: existing, error: lookupError } = await supabase
+      .from("cash_flow_entries")
+      .select("id")
+      .eq("source_ref_id", `line:${safeMessageId(event)}`)
+      .maybeSingle();
+
+    if (lookupError) throw new Error(`Failed to find existing cash flow entry: ${lookupError.code ?? "unknown"}`);
+    return (existing as { id?: string } | null)?.id ?? null;
+  }
+
+  if (error) throw new Error(`Failed to create cash flow entry: ${error.code ?? "unknown"}`);
   return (data as { id?: string } | null)?.id ?? null;
 }
 
@@ -246,7 +257,8 @@ async function uploadBillImage(supabase: NonNullable<SupabaseClient>, messageId:
   const path = `line/${new Date().toISOString().slice(0, 10)}/${messageId}.${extension}`;
   const { error } = await supabase.storage.from(BILL_IMAGE_BUCKET).upload(path, image.data, {
     contentType: image.contentType,
-    upsert: false,
+    // LINE may retry the same webhook after a partial failure. Reusing the deterministic path is safe.
+    upsert: true,
   });
 
   if (error) throw new Error("Failed to upload LINE bill receipt image");
