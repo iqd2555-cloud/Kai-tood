@@ -1,4 +1,13 @@
-import { getThaiDistricts, getThaiSubdistricts, thaiAddressDatasetMeta, thaiProvinces } from "../lib/thai-address.ts";
+import thaiAddressData from "../data/thai-address.json" with { type: "json" };
+
+const thaiProvinces = Object.keys(thaiAddressData);
+const getThaiDistricts = (province) => Object.keys(thaiAddressData[province] ?? {});
+const getThaiSubdistricts = (province, district) => thaiAddressData[province]?.[district] ?? [];
+const thaiAddressDatasetMeta = {
+  source: "@riz007/thai-address-data 0.1.4, derived from thailand-geography-json",
+  version: "0.1.4",
+  sourceDate: "2026-01-25",
+};
 
 const failures = [];
 const seenDistrictIds = new Set();
