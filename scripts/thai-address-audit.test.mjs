@@ -48,6 +48,10 @@ const report = {
   failures,
 };
 
+if (thaiProvinces.length !== 77) failures.push({ type: "unexpected-province-count", actual: thaiProvinces.length, expected: 77 });
+if (districtCount !== 928) failures.push({ type: "unexpected-district-count", actual: districtCount, expected: 928 });
+if (subdistrictCount !== 7436) failures.push({ type: "unexpected-subdistrict-count", actual: subdistrictCount, expected: 7436 });
+
 if (failures.length > 0) {
   console.error("Thai address dataset audit failed", JSON.stringify(report, null, 2));
   process.exit(1);
