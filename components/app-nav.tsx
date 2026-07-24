@@ -42,6 +42,7 @@ export function AppNav({ profile }: { profile: Profile }) {
           {isOwner && <Link className="focus-ring glass-button rounded-full px-3 py-2" href="/reports">รายงาน</Link>}
           {isOwner && <Link className="focus-ring glass-button rounded-full px-3 py-2" href="/orders">สั่งของ</Link>}
           {isOwner && <Link className="focus-ring glass-button rounded-full px-3 py-2" href="/leads">รายชื่อผู้สนใจแฟรนไชส์</Link>}
+          {isOwner && <Link className="focus-ring glass-button rounded-full px-3 py-2" href="/mini-applications">ใบสมัคร MINI</Link>}
           {!isOwner && canUseMyReport && <Link className="focus-ring glass-button rounded-full px-3 py-2" href="/my-reports">รายงานของฉัน</Link>}
           <form action={signOut}>
             <button className="focus-ring rounded-full border border-white/15 bg-[#E60012]/90 px-3 py-2 font-black text-white shadow-lg shadow-[#E60012]/20 backdrop-blur-md">ออก</button>
