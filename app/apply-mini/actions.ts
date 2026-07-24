@@ -21,6 +21,8 @@ export async function submitMiniApplication(_prev: MiniApplyFormState, formData:
   if (!parsed.success) return { ok: false, message: parsed.error.flatten().fieldErrors.location_description?.[0] ?? "กรุณากรอกข้อมูลบังคับให้ครบ และตรวจสอบเบอร์โทร" };
   if (parsed.data.website) return { ok: false, message: "ส่งข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" };
   if (parsed.data.started_at && Date.now() - parsed.data.started_at < 3000) return { ok: false, message: "กรุณาตรวจสอบข้อมูลก่อนส่งอีกครั้ง" };
+  if (!thaiProvinces.includes(parsed.data.residence_province)) return { ok: false, message: "กรุณาเลือกจังหวัดที่พักอาศัยจากรายการ" };
+  if (!getThaiDistricts(parsed.data.residence_province).includes(parsed.data.residence_district)) return { ok: false, message: "กรุณาเลือกอำเภอ/เขตที่พักอาศัยให้ตรงกับจังหวัด" };
   if (!thaiProvinces.includes(parsed.data.opening_province as (typeof thaiProvinces)[number])) return { ok: false, message: "กรุณาเลือกจังหวัดจากรายการ" };
   if (!getThaiDistricts(parsed.data.opening_province).includes(parsed.data.opening_district)) return { ok: false, message: "กรุณาเลือกอำเภอ/เขตให้ตรงกับจังหวัด" };
   if (!getThaiSubdistricts(parsed.data.opening_province, parsed.data.opening_district).includes(parsed.data.opening_subdistrict)) return { ok: false, message: "กรุณาเลือกตำบล/แขวงให้ตรงกับอำเภอ/เขต" };
