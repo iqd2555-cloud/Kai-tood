@@ -6,7 +6,7 @@ const LOGIN_PATH = "/login";
 const DEFAULT_AUTHENTICATED_PATH = "/dashboard";
 const LOGIN_PASSTHROUGH_ERRORS = new Set(["auth", "profile"]);
 
-const publicRoutes = ["/", "/franchise/apply"] as const;
+const publicRoutes = ["/", "/franchise/apply", "/apply-mini"] as const;
 
 function normalizePathname(pathname: string) {
   return pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
