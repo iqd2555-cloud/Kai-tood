@@ -350,6 +350,41 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
 }
 
 {
+  const supabase = createSupabaseMock();
+  const fetchFn = createFetchMock();
+  const missingPaymentMethod = async () => ({
+    merchant: "บริษัท เควีเอส เฟรชโปรดักส์ จำกัด",
+    transactionDate: "2026-07-24",
+    amount: 6300,
+    paymentMethod: "ไม่ระบุ",
+    category: "chicken_purchase",
+    confidence: 0.95,
+  });
+  const result = await processLineWebhookPayload(
+    {
+      events: [
+        {
+          type: "message",
+          replyToken: "reply-token-missing-payment",
+          timestamp: 1784851200000,
+          source: { userId: "line-user-missing-payment" },
+          message: { id: "image-message-missing-payment", type: "image" },
+        },
+      ],
+    },
+    { supabase, channelAccessToken: "channel-token", fetchFn, analyzeReceipt: missingPaymentMethod, logger: console },
+  );
+
+  assert.equal(result.ok, true, "clear invoice with no payment method is accepted for review");
+  assert.equal(supabase.cashFlowRows.length, 0, "missing payment method is not guessed or saved as paid");
+  assert.equal(supabase.insertedRows[0].processing_status, "pending_review");
+  assert.match(supabase.insertedRows[0].processing_error, /ไม่พบวิธีชำระเงิน/);
+  assert.match(fetchFn.calls[1].init.body, /6,300\.00/);
+  assert.match(fetchFn.calls[1].init.body, /ไม่พบวิธีชำระเงิน/);
+  assert.doesNotMatch(fetchFn.calls[1].init.body, /ข้อมูลไม่ชัดเจน/);
+}
+
+{
   const supabase = createSupabaseMock({ insertError: { code: "23505" } });
   const fetchFn = createFetchMock();
   const result = await processLineWebhookPayload(

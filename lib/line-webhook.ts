@@ -162,6 +162,27 @@ function receiptCategoryLabel(code: string) {
   return RECEIPT_CATEGORY_LABEL_BY_CODE[code] ?? RECEIPT_CATEGORY_LABEL_BY_CODE.misc_expense;
 }
 
+function receiptReviewReasons(analysis: ReceiptAnalysis) {
+  const reasons: string[] = [];
+  if (!(analysis.amount > 0)) reasons.push("ไม่พบยอดชำระ");
+  if (!isActualISODate(analysis.transactionDate)) reasons.push("ไม่พบวันที่เอกสาร");
+  if (analysis.merchant === "ไม่ทราบชื่อร้าน") reasons.push("ไม่พบชื่อร้าน");
+  if (analysis.paymentMethod === "ไม่ระบุ") reasons.push("ไม่พบวิธีชำระเงิน");
+  if (!(analysis.category in RECEIPT_CATEGORY_LABEL_BY_CODE)) reasons.push("ไม่สามารถระบุหมวดค่าใช้จ่าย");
+  if (analysis.confidence < RECEIPT_CONFIDENCE_THRESHOLD) reasons.push("ความมั่นใจในการอ่านข้อมูลต่ำ");
+  return reasons;
+}
+
+function receiptReviewMessage(analysis: ReceiptAnalysis) {
+  const reasons = receiptReviewReasons(analysis);
+  const amount = analysis.amount > 0
+    ? `อ่านยอดได้ ${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท แต่`
+    : "";
+  const reasonText = reasons.length > 0 ? reasons.join(" และ") : "ข้อมูลยังไม่ครบถ้วน";
+
+  return `${amount}${reasonText} จึงยังไม่บันทึกเป็นรายการจ่าย และเก็บไว้รอตรวจสอบ`;
+}
+
 export async function analyzeReceiptImage(
   image: { contentType: string; data: Buffer },
   eventAt: string,
@@ -303,7 +324,7 @@ async function insertBillReceiptEvent(
     extracted_data: analysis ?? null,
     confidence: analysis?.confidence ?? null,
     cash_flow_entry_id: cashFlowEntryId ?? null,
-    processing_error: analysis && !processed ? "ข้อมูลจากภาพไม่ชัดเจนหรือไม่พบยอดชำระ" : null,
+    processing_error: analysis && !processed ? receiptReviewReasons(analysis).join("; ") || "ข้อมูลยังไม่ครบถ้วน" : null,
   };
   const { error } = await supabase.from("line_bill_receipts").insert(receiptPayload);
 
@@ -414,7 +435,7 @@ export async function processLineWebhookPayload(payload: LineWebhookPayload, dep
             event.replyToken,
             saved
               ? `บันทึกค่าใช้จ่ายแล้ว\n${analysis.merchant}\n${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nหมวด ${receiptCategoryLabel(analysis.category)}`
-              : "ได้รับรูปบิลแล้ว แต่ข้อมูลไม่ชัดเจน จึงยังไม่บันทึกยอดและเก็บไว้รอตรวจสอบ",
+              : receiptReviewMessage(analysis),
             deps.channelAccessToken,
             fetchFn,
           );
