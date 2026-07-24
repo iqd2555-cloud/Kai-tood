@@ -51,6 +51,17 @@ export function ApplyForm() {
   const [selectedProvince, setSelectedProvince] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
   const districtOptions = useMemo(() => thaiAddress[selectedProvince] ?? [], [selectedProvince]);
+  if (state.ok) return (
+    <div className="rounded-[2rem] border border-green-200 bg-green-50 p-7 text-center shadow-xl">
+      <h2 className="text-3xl font-black text-green-900">ส่งใบสมัครสำเร็จ</h2>
+      <p className="mt-4 font-bold leading-8 text-green-900">{state.message}</p>
+      <div className="mt-5 rounded-2xl bg-white p-4 text-left">
+        <p className="font-black text-green-900">ขั้นตอนต่อไป</p>
+        <p className="mt-2 text-sm font-bold leading-7 text-black/65">เพิ่ม LINE Official Account แล้วส่งชื่อ–นามสกุลและเบอร์โทรที่ใช้สมัคร เพื่อยืนยันว่าต้องการให้ทีมงานตรวจสอบต่อ ผู้สมัครที่ไม่ยืนยันผ่าน LINE จะยังไม่ถูกนัดพูดคุย</p>
+      </div>
+      <a href="https://line.me/R/ti/p/@kaikoy" target="_blank" rel="noreferrer" className="mt-4 inline-flex w-full justify-center rounded-full bg-[#06C755] px-6 py-4 text-lg font-black text-white">เพิ่ม LINE @kaikoy เพื่อรับผลสมัคร</a>
+    </div>
+  );
   return (
     <form action={action} className="grid gap-5 rounded-[2.25rem] border border-black/10 bg-[#fff9df] p-4 shadow-xl shadow-black/5 sm:p-6">
       {state.message && (
@@ -112,6 +123,10 @@ export function ApplyForm() {
         </label>
       </Section>
 
+      <div className="rounded-2xl border-2 border-[#06C755]/25 bg-[#06C755]/10 p-4 text-center">
+        <p className="font-black text-[#087a3d]">ขั้นตอนรับผลสมัครทาง LINE</p>
+        <p className="mt-2 text-sm font-bold leading-7 text-black/65">กรอกข้อมูลและส่งใบสมัครให้สำเร็จก่อน ระบบจะแสดงปุ่มเพิ่ม LINE <span className="font-black text-black">@kaikoy</span> กรุณาส่งชื่อ–นามสกุลและเบอร์โทรที่ใช้สมัครทาง LINE เพื่อยืนยันการสมัคร</p>
+      </div>
       <button disabled={pending} className="min-h-14 rounded-full bg-[#ffc400] px-6 py-4 text-lg font-black text-black shadow-lg shadow-yellow-300/30 transition hover:bg-[#ffd84d] disabled:opacity-60">{pending ? "กำลังส่งข้อมูล..." : "ส่งข้อมูลให้ทีมงานติดต่อกลับ"}</button>
     </form>
   );
