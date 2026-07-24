@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { FranchiseLead, LeadStatus } from "@/lib/types";
 import { updateLead } from "./actions";
 import { ExportLeadsButton } from "./export-button";
+import { LeadContactActions } from "./lead-contact-actions";
 
 const statusLabels: Record<LeadStatus, string> = { new: "ใหม่", contacted: "ติดต่อแล้ว", awaiting_info: "รอข้อมูลเพิ่มเติม", interested: "สนใจจริง", appointment_scheduled: "นัดคุยแล้ว", not_ready: "ไม่พร้อมลงทุน", not_qualified: "ไม่ผ่านการคัดกรอง", converted: "ปิดการขายแล้ว" };
 const statuses = Object.keys(statusLabels) as LeadStatus[];
@@ -42,6 +43,7 @@ export default async function LeadsPage({ searchParams }: { searchParams?: Promi
         {leads.map((lead) => (
           <article key={lead.id} className="rounded-[1.5rem] border border-black/10 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h2 className="text-xl font-black">{lead.full_name}</h2><p className="font-bold text-black/60">{lead.phone} • {lead.province}{lead.district ? ` / ${lead.district}` : ""}</p><p className="mt-1 text-sm font-bold text-black/45">ส่งเมื่อ {formatDate(lead.created_at)}</p></div><span className="w-fit rounded-full bg-[#E60012] px-3 py-1 text-sm font-black text-white">{statusLabels[lead.status]}</span></div>
+            <LeadContactActions lead={lead} />
             <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
               <div><b>Line:</b> {lead.line_id || "-"}</div>
               <div><b>จังหวัด/อำเภอ:</b> {lead.province}{lead.district ? ` / ${lead.district}` : ""}</div>
