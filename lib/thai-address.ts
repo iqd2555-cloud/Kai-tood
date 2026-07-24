@@ -160,6 +160,12 @@ export const thaiDistrictsByProvince: Record<(typeof thaiProvinces)[number], str
 
 export const thaiAddress: Record<string, string[]> = thaiDistrictsByProvince;
 
+export const thaiAddressDatasetMeta = {
+  source: "Project local Thai address dataset compiled from previous district list plus verified full-subdistrict entries maintained in lib/thai-address.ts; migration note recommends replacing with a current DOPA/official complete dataset when credentials allow.",
+  version: "2026-07-24-local",
+  sourceDate: "2026-07-24",
+} as const;
+
 export const provincesWithIncompleteDistricts = thaiProvinces.filter((province) => thaiAddress[province].length <= 1);
 
 const knownSubdistricts: Record<string, string[]> = {
