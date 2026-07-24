@@ -484,6 +484,49 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
 {
   const supabase = createSupabaseMock();
   const fetchFn = createFetchMock();
+  const textIncomeAnalysis = async () => ({
+    transactionDate: "2026-07-24",
+    amount: 3400,
+    description: "ขายไก่หมักให้ Vinaibabee Kaokaew",
+    paymentMethod: "ไม่ระบุ",
+    category: "marinated_chicken_sales",
+  });
+  const result = await processLineWebhookPayload(
+    {
+      events: [
+        {
+          type: "message",
+          replyToken: "reply-token-text-income",
+          timestamp: 1784907600000,
+          source: { userId: "line-user-text-income" },
+          message: {
+            id: "text-income-1",
+            type: "text",
+            text: "ขายไก่หมัก\n@Vinaibabee Kaokaew 68*50=3,400บาท",
+          },
+        },
+      ],
+    },
+    { supabase, channelAccessToken: "channel-token", fetchFn, analyzeTextIncome: textIncomeAnalysis, logger: console },
+  );
+
+  assert.equal(result.ok, true, "sales text is recorded as received income");
+  assert.equal(supabase.cashFlowRows.length, 1);
+  assert.equal(supabase.cashFlowRows[0].type, "income");
+  assert.equal(supabase.cashFlowRows[0].status, "received");
+  assert.equal(supabase.cashFlowRows[0].category, "marinated_chicken_sales");
+  assert.equal(supabase.cashFlowRows[0].amount, 3400);
+  assert.equal(supabase.cashFlowRows[0].payment_method, "ไม่ระบุ");
+  assert.equal(supabase.cashFlowRows[0].document_type, "no_document");
+  assert.equal(supabase.insertedRows[0].processing_status, "processed");
+  assert.match(fetchFn.calls[0].init.body, /บันทึกรายรับเข้า Cash Flow แล้ว/);
+  assert.match(fetchFn.calls[0].init.body, /3,400\.00/);
+  assert.match(fetchFn.calls[0].init.body, /สถานะ รับแล้ว/);
+}
+
+{
+  const supabase = createSupabaseMock();
+  const fetchFn = createFetchMock();
   const result = await processLineWebhookPayload(
     {
       events: [
