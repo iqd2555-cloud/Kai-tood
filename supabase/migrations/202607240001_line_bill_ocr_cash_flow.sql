@@ -21,4 +21,10 @@ alter table public.line_bill_receipts
 create index if not exists line_bill_receipts_cash_flow_entry_id_idx
   on public.line_bill_receipts(cash_flow_entry_id);
 
+-- Database-enforced idempotency for LINE retries. The partial index avoids
+-- changing duplicate rules for entries created by other integrations.
+create unique index if not exists cash_flow_entries_line_source_ref_id_unique
+  on public.cash_flow_entries(source_ref_id)
+  where source_ref_id like 'line:%';
+
 notify pgrst, 'reload schema';
