@@ -306,7 +306,7 @@ export async function analyzeReceiptImage(
 }
 
 function looksLikeExpenseCommand(value: string) {
-  return /^\s*(จ่าย|ชำระ|โอนจ่าย)\b/u.test(value) && /\d/.test(value);
+  return /^\s*(จ่าย|ชำระ|โอนจ่าย)/u.test(value) && /\d/.test(value);
 }
 
 export async function analyzeCashFlowText(
