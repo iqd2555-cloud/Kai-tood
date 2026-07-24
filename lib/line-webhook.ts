@@ -39,6 +39,7 @@ const LINE_REPLY_API_URL = "https://api.line.me/v2/bot/message/reply";
 const LINE_CONTENT_API_BASE_URL = "https://api-data.line.me/v2/bot/message";
 const BILL_IMAGE_BUCKET = "line-bill-receipts";
 const RECEIPT_CONFIDENCE_THRESHOLD = 0.9;
+const RECEIPT_PENDING_CONFIDENCE_THRESHOLD = 0.85;
 const MAX_INCOMPLETE_RECEIPT_CONFIDENCE = RECEIPT_CONFIDENCE_THRESHOLD - 0.01;
 const THAILAND_TIME_ZONE = "Asia/Bangkok";
 const RECEIPT_CATEGORY_CODE_BY_LABEL: Record<string, string> = {
@@ -156,6 +157,21 @@ function canAutoSaveReceipt(analysis: ReceiptAnalysis) {
     && analysis.merchant !== "ไม่ทราบชื่อร้าน"
     && analysis.paymentMethod !== "ไม่ระบุ"
     && analysis.category in RECEIPT_CATEGORY_LABEL_BY_CODE;
+}
+
+function canCreatePendingCashFlowReceipt(analysis: ReceiptAnalysis) {
+  return analysis.amount > 0
+    && analysis.confidence >= RECEIPT_PENDING_CONFIDENCE_THRESHOLD
+    && isActualISODate(analysis.transactionDate)
+    && analysis.merchant !== "ไม่ทราบชื่อร้าน"
+    && analysis.paymentMethod === "ไม่ระบุ"
+    && analysis.category in RECEIPT_CATEGORY_LABEL_BY_CODE;
+}
+
+function cashFlowStatusForReceipt(analysis: ReceiptAnalysis) {
+  if (canAutoSaveReceipt(analysis)) return "paid";
+  if (canCreatePendingCashFlowReceipt(analysis)) return "pending_pay";
+  return null;
 }
 
 function receiptCategoryLabel(code: string) {
@@ -351,12 +367,13 @@ async function insertCashFlowExpense(
   imageStoragePath: string,
   analysis: ReceiptAnalysis,
 ) {
-  if (!canAutoSaveReceipt(analysis)) return null;
+  const status = cashFlowStatusForReceipt(analysis);
+  if (!status) return null;
 
   const { data, error } = await supabase.from("cash_flow_entries").insert({
     transaction_date: analysis.transactionDate,
     type: "expense",
-    status: "paid",
+    status,
     category: analysis.category,
     description: analysis.merchant,
     amount: analysis.amount,
@@ -366,7 +383,9 @@ async function insertCashFlowExpense(
     attachment_url: imageStoragePath,
     document_type: "receipt",
     has_attachment: true,
-    note: `บันทึกอัตโนมัติจาก LINE OA (ความมั่นใจ ${Math.round(analysis.confidence * 100)}%)`,
+    note: status === "paid"
+      ? `บันทึกอัตโนมัติจาก LINE OA (ความมั่นใจ ${Math.round(analysis.confidence * 100)}%)`
+      : `บันทึกอัตโนมัติจาก LINE OA เป็นรายการรอจ่าย เนื่องจากไม่พบวิธีชำระเงิน (ความมั่นใจ ${Math.round(analysis.confidence * 100)}%)`,
   }).select("id").maybeSingle();
 
   if (error?.code === "23505") {
@@ -431,11 +450,14 @@ export async function processLineWebhookPayload(payload: LineWebhookPayload, dep
 
         if (inserted) {
           const saved = canAutoSaveReceipt(analysis);
+          const savedPending = canCreatePendingCashFlowReceipt(analysis) && Boolean(cashFlowEntryId);
           await replyToLine(
             event.replyToken,
             saved
               ? `บันทึกค่าใช้จ่ายแล้ว\n${analysis.merchant}\n${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nหมวด ${receiptCategoryLabel(analysis.category)}`
-              : receiptReviewMessage(analysis),
+              : savedPending
+                ? `บันทึกเข้า Cash Flow แล้ว\n${analysis.merchant}\n${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nสถานะ รอจ่าย\nกรุณาตรวจสอบและระบุวิธีชำระเงิน`
+                : receiptReviewMessage(analysis),
             deps.channelAccessToken,
             fetchFn,
           );

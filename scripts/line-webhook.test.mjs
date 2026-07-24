@@ -376,11 +376,15 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
   );
 
   assert.equal(result.ok, true, "clear invoice with no payment method is accepted for review");
-  assert.equal(supabase.cashFlowRows.length, 0, "missing payment method is not guessed or saved as paid");
+  assert.equal(supabase.cashFlowRows.length, 1, "missing payment method creates one pending Cash Flow expense");
+  assert.equal(supabase.cashFlowRows[0].status, "pending_pay", "pending invoice is not marked paid");
+  assert.equal(supabase.cashFlowRows[0].payment_method, "ไม่ระบุ", "payment method is not guessed");
   assert.equal(supabase.insertedRows[0].processing_status, "pending_review");
+  assert.equal(supabase.insertedRows[0].cash_flow_entry_id, "cash-flow-entry-1");
   assert.match(supabase.insertedRows[0].processing_error, /ไม่พบวิธีชำระเงิน/);
+  assert.match(fetchFn.calls[1].init.body, /บันทึกเข้า Cash Flow แล้ว/);
   assert.match(fetchFn.calls[1].init.body, /6,300\.00/);
-  assert.match(fetchFn.calls[1].init.body, /ไม่พบวิธีชำระเงิน/);
+  assert.match(fetchFn.calls[1].init.body, /สถานะ รอจ่าย/);
   assert.doesNotMatch(fetchFn.calls[1].init.body, /ข้อมูลไม่ชัดเจน/);
 }
 
