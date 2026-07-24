@@ -25,7 +25,7 @@ export function MiniApplyForm() {
   const districts = getThaiDistricts(openingProvince);
   const subdistricts = getThaiSubdistricts(openingProvince, openingDistrict);
   const previews = useMemo(() => files.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })), [files]);
-  if (state.ok) return <div className="rounded-[2rem] border border-green-200 bg-green-50 p-7 text-center shadow-xl"><p className="text-sm font-black text-green-700">เลขอ้างอิงใบสมัคร</p><h2 className="mt-2 text-4xl font-black">{state.referenceCode}</h2><p className="mt-4 font-bold leading-8 text-green-900">{state.message}</p></div>;
+  if (state.ok) return <div className="rounded-[2rem] border border-green-200 bg-green-50 p-7 text-center shadow-xl">{state.referenceCode && <><p className="text-sm font-black text-green-700">เลขอ้างอิงใบสมัคร</p><h2 className="mt-2 text-4xl font-black">{state.referenceCode}</h2></>}<p className={`${state.referenceCode ? "mt-4" : ""} font-bold leading-8 text-green-900`}>{state.message}</p></div>;
   return <form action={action} className="grid gap-5 rounded-[2.25rem] border border-black/10 bg-[#fff9df] p-4 shadow-xl shadow-black/5 sm:p-6">
     <input type="hidden" name="started_at" value={Date.now()} /><input type="hidden" name="submission_token" value={submissionToken} /><input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" />
     {state.message && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-black text-red-700">{state.message}</div>}
