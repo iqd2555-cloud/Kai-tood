@@ -136,8 +136,15 @@ function thailandDate(value: string | number | undefined) {
     : dateOnlyInTimeZone(date, THAILAND_TIME_ZONE);
 }
 
-function receiptCategory(value: unknown) {
+function receiptCategory(value: unknown, merchant: string) {
   const text = String(value ?? "").trim();
+  const normalizedMerchant = merchant.toLocaleLowerCase("th-TH");
+  const isKvsChickenSupplier = normalizedMerchant.includes("เควีเอส เฟรชโปรดักส์")
+    || normalizedMerchant.includes("kvs fresh products");
+
+  // KVS invoices contain chicken, skin and offal. Keep this deterministic because
+  // accounting categories must not depend solely on an OCR model's classification.
+  if (isKvsChickenSupplier) return { code: "chicken_purchase", recognized: true };
   if (text in RECEIPT_CATEGORY_CODE_BY_LABEL) return { code: RECEIPT_CATEGORY_CODE_BY_LABEL[text], recognized: true };
   if (text in RECEIPT_CATEGORY_LABEL_BY_CODE) return { code: text, recognized: true };
   return { code: "misc_expense", recognized: false };
@@ -239,7 +246,7 @@ export async function analyzeReceiptImage(
         content: [
           {
             type: "text",
-            text: `อ่านบิลค่าใช้จ่ายภาษาไทย แยก merchant, transactionDate, amount, paymentMethod, category และ confidence. หากไม่เห็นวันที่ให้ใช้ ${thailandDate(eventAt)} และตั้ง confidence ต่ำกว่า ${RECEIPT_CONFIDENCE_THRESHOLD}`,
+            text: `อ่านบิลค่าใช้จ่ายภาษาไทย แยก merchant, transactionDate, amount, paymentMethod, category และ confidence. รายการไก่ เนื้อไก่ หนังไก่ หรือเครื่องในไก่ให้จัด category เป็นไก่สด. หากไม่เห็นวันที่ให้ใช้ ${thailandDate(eventAt)} และตั้ง confidence ต่ำกว่า ${RECEIPT_CONFIDENCE_THRESHOLD}`,
           },
           {
             type: "image_url",
@@ -264,7 +271,7 @@ export async function analyzeReceiptImage(
   const merchant = String(parsed.merchant ?? "").trim();
   const paymentMethod = String(parsed.paymentMethod ?? "").trim();
   const transactionDate = String(parsed.transactionDate ?? "").trim();
-  const category = receiptCategory(parsed.category);
+  const category = receiptCategory(parsed.category, merchant);
   const hasCompleteFields = Boolean(
     merchant
     && paymentMethod
