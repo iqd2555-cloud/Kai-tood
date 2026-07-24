@@ -7,7 +7,9 @@ const ownerPage = readFileSync("app/(app)/mini-applications/page.tsx", "utf8");
 const migration = readFileSync("supabase/migrations/202607240003_mini_franchise_applications_production_contract.sql", "utf8");
 
 assert.match(applyAction, /from\("mini_franchise_applications"\)\.insert/, "MINI form must insert into mini_franchise_applications");
+assert.match(applyAction, /select\("id, reference_code"\)/, "MINI form must return the database id and real reference code after insert/idempotent replay");
 assert.match(ownerPage, /from\("mini_franchise_applications"\)\.select/, "Owner MINI page must read from mini_franchise_applications");
+assert.doesNotMatch(ownerPage, /รายละเอียด: \{error\.message\}/, "Owner UI must not expose raw database errors");
 assert.match(ownerPage, /opening_subdistrict/, "Owner MINI page must display and filter subdistrict");
 assert.match(migration, /create table if not exists public\.mini_franchise_applications/i, "Production repair migration must create canonical MINI table");
 assert.match(migration, /enable row level security/i, "Production repair migration must keep RLS enabled");

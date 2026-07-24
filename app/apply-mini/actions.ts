@@ -14,7 +14,7 @@ const schema = z.object({
   has_location: z.string().trim().min(1), actual_seller: z.string().trim().min(1), ready_to_open: z.string().trim().min(1), food_business_experience: z.string().trim().min(1), experience_details: z.string().trim().optional(), can_follow_online_course: z.literal("true"), extra_budget_range: z.string().trim().min(1), source: z.string().trim().optional(), website: z.string().max(0).optional(), started_at: z.coerce.number().optional(),
 }).passthrough();
 
-export type MiniApplyFormState = { ok: boolean; message: string; referenceCode?: string };
+export type MiniApplyFormState = { ok: boolean; message: string; applicationId?: string; referenceCode?: string };
 
 export async function submitMiniApplication(_prev: MiniApplyFormState, formData: FormData): Promise<MiniApplyFormState> {
   const parsed = schema.safeParse(Object.fromEntries(formData.entries()));
@@ -44,11 +44,14 @@ export async function submitMiniApplication(_prev: MiniApplyFormState, formData:
     paths.push(path);
   }
 
-  const { data, error } = await supabase.from("mini_franchise_applications").insert({ ...parsed.data, google_maps_url: parsed.data.google_maps_url || null, line_id: parsed.data.line_id || null, monthly_rent: parsed.data.monthly_rent || null, nearby_competitors: parsed.data.nearby_competitors || null, experience_details: parsed.data.experience_details || null, source: parsed.data.source === "campaign-mini" ? "campaign-mini" : "apply-mini", can_follow_online_course: true, terms_acknowledged: terms, location_photo_paths: paths, status: "new" }).select("reference_code").single();
+  const { data, error } = await supabase.from("mini_franchise_applications").insert({ ...parsed.data, google_maps_url: parsed.data.google_maps_url || null, line_id: parsed.data.line_id || null, monthly_rent: parsed.data.monthly_rent || null, nearby_competitors: parsed.data.nearby_competitors || null, experience_details: parsed.data.experience_details || null, source: parsed.data.source === "campaign-mini" ? "campaign-mini" : "apply-mini", can_follow_online_course: true, terms_acknowledged: terms, location_photo_paths: paths, status: "new" }).select("id, reference_code").single();
   if (error?.code === "23505") {
-    const existing = await supabase.from("mini_franchise_applications").select("reference_code").eq("submission_token", parsed.data.submission_token).maybeSingle();
-    if (existing.data?.reference_code) return { ok: true, message: "บริษัทได้รับใบสมัครของท่านแล้ว การส่งใบสมัครยังไม่ถือว่าได้รับสิทธิ์ ทีมงานจะตรวจสอบพื้นที่และความพร้อมก่อนติดต่อกลับ กรุณาอย่าเพิ่งชำระเงินจนกว่าจะได้รับแจ้งผลอนุมัติ", referenceCode: existing.data.reference_code };
+    const existing = await supabase.from("mini_franchise_applications").select("id, reference_code").eq("submission_token", parsed.data.submission_token).maybeSingle();
+    if (existing.data?.reference_code) return { ok: true, message: "บริษัทได้รับใบสมัครของท่านแล้ว การส่งใบสมัครยังไม่ถือว่าได้รับสิทธิ์ ทีมงานจะตรวจสอบพื้นที่และความพร้อมก่อนติดต่อกลับ กรุณาอย่าเพิ่งชำระเงินจนกว่าจะได้รับแจ้งผลอนุมัติ", applicationId: existing.data.id, referenceCode: existing.data.reference_code };
   }
-  if (error) return { ok: false, message: "ยังส่งใบสมัครไม่สำเร็จ กรุณาลองอีกครั้ง" };
-  return { ok: true, message: "บริษัทได้รับใบสมัครของท่านแล้ว การส่งใบสมัครยังไม่ถือว่าได้รับสิทธิ์ ทีมงานจะตรวจสอบพื้นที่และความพร้อมก่อนติดต่อกลับ กรุณาอย่าเพิ่งชำระเงินจนกว่าจะได้รับแจ้งผลอนุมัติ", referenceCode: data.reference_code };
+  if (error) {
+    console.error("Failed to submit MINI franchise application:", { code: error.code, message: error.message, details: error.details });
+    return { ok: false, message: "ยังส่งใบสมัครไม่สำเร็จ กรุณาลองอีกครั้ง" };
+  }
+  return { ok: true, message: "บริษัทได้รับใบสมัครของท่านแล้ว การส่งใบสมัครยังไม่ถือว่าได้รับสิทธิ์ ทีมงานจะตรวจสอบพื้นที่และความพร้อมก่อนติดต่อกลับ กรุณาอย่าเพิ่งชำระเงินจนกว่าจะได้รับแจ้งผลอนุมัติ", applicationId: data.id, referenceCode: data.reference_code };
 }
