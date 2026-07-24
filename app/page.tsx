@@ -12,14 +12,15 @@ const categoryMenu = [
   { label: "หนังสือสูตรไก่ทอด", href: "#book-recipes", detail: "10 สูตร + ข้าวเหนียว" },
   { label: "คอร์สสอนสด", href: "#live-course", detail: "จับมือทำ 2 วัน" },
   { label: "คอร์สออนไลน์", href: "#online-course", detail: "เรียนซ้ำได้ไม่จำกัด" },
-  { label: "แพ็กเกจแฟรนไชส์", href: "#franchise-packages", detail: "55,000 / 99,000 บาท" },
+  { label: "แพ็กเกจแฟรนไชส์", href: "#franchise-packages", detail: "MINI / 55,000 / 99,000 บาท" },
+  { label: "MINI STARTER", href: "/apply-mini", detail: "สมัครแยก 9,900 บาท" },
   { label: "เหมาะกับใคร", href: "#target-audience", detail: "เช็กความพร้อม" },
   { label: "ระบบหลังบ้าน", href: "#back-office-system", detail: "ยอดขาย วัตถุดิบ รายงาน" },
   { label: "สมัครแฟรนไชส์", href: "#apply-franchise", detail: "กรอกข้อมูลเบื้องต้น" },
 ];
 
 const stats = [
-  { value: "55K", label: "เริ่มต้น", detail: "แพ็กเกจเคาน์เตอร์" },
+  { value: "9.9K", label: "MINI STARTER", detail: "สมัครแยกที่ /apply-mini" },
   { value: "2", label: "รูปแบบ", detail: "เคาน์เตอร์ / ซุ้ม" },
   { value: "2×3 ม.", label: "พื้นที่ขั้นต่ำ", detail: "เริ่มขายได้จริง" },
 ];
@@ -33,6 +34,19 @@ const systemHighlights = [
 
 const franchiseModels = [
   {
+    badge: "Mini Starter",
+    title: "MINI STARTER",
+    price: "9,900 บาท",
+    imageSrc: "/kiosk.png",
+    imageAlt: "เคาน์เตอร์ Mini พร้อมป้ายแบรนด์ MINI STARTER",
+    area: "เริ่มเล็กสำหรับทดลองทำเล ต้องตรวจสอบพื้นที่ก่อนอนุมัติ",
+    location: "เหมาะกับผู้ที่มีทำเลขนาดเล็ก ต้องการเริ่มขายด้วยเคาน์เตอร์ Mini พร้อมป้ายแบรนด์ และยอมรับว่าไม่มีสิทธิ์ผูกขาดพื้นที่",
+    suitableFor: "ผู้เริ่มต้นที่ต้องการคอร์สออนไลน์ สิทธิ์ซื้อไก่หมักพร้อมทอด 75 บาท/กก. และเข้าใจว่า 9,900 บาทไม่รวมอุปกรณ์ทั้งหมด",
+    highlights: ["เคาน์เตอร์ Mini พร้อมป้ายแบรนด์", "ถาดไก่ 10 ใบ + ทัพพี + ถ้วยตวง + เครื่องชั่งดิจิทัล", "สั่งครบ 45 กก. จัดส่งฟรี"],
+    applyHref: "/apply-mini",
+    applyLabel: "ดูรายละเอียดและสมัคร MINI STARTER",
+  },
+  {
     badge: "Starter Pack",
     title: "รูปแบบเคาน์เตอร์",
     price: "55,000 บาท",
@@ -42,6 +56,8 @@ const franchiseModels = [
     location: "เหมาะกับพื้นที่ในอาคาร พื้นที่ที่มีหลังคา หน้าร้าน ห้องเช่า ตลาดในร่ม หรือพื้นที่หน้าบ้านที่มีหลังคาคลุม",
     suitableFor: "ผู้เริ่มต้นที่มีพื้นที่จำกัด แต่อยากเริ่มขายจริงแบบเป็นระบบ",
     highlights: ["ใช้พื้นที่ไม่มาก", "คุมงบเริ่มต้นง่าย", "เหมาะกับจุดขายในอาคาร"],
+    applyHref: "/franchise/apply",
+    applyLabel: "สมัคร / สอบถามแฟรนไชส์ชุดมาตรฐาน",
   },
   {
     badge: "Signature Pack",
@@ -53,6 +69,8 @@ const franchiseModels = [
     location: "เหมาะกับคนที่ต้องการหน้าร้านชัดเจน ใช้พื้นที่ประมาณ 3 × 3 เมตร ทำงานคล่องตัวขึ้น",
     suitableFor: "ผู้ที่ต้องการหน้าร้านชัดเจนและพื้นที่ทำงานคล่องตัวขึ้น",
     highlights: ["ทำงานคล่องตัวขึ้น", "จัดวางอุปกรณ์เป็นระบบ", "สร้างภาพจำหน้าร้านชัด"],
+    applyHref: "/franchise/apply",
+    applyLabel: "สมัคร / สอบถามแฟรนไชส์ชุดมาตรฐาน",
   },
 ];
 
@@ -139,6 +157,7 @@ function PublicHeader() {
             <a href="#book-recipes" className="hidden rounded-xl px-4 py-3 text-white/72 transition hover:bg-white/10 hover:text-white lg:inline-flex">หนังสือสูตร</a>
             <a href="#live-course" className="hidden rounded-xl px-4 py-3 text-white/72 transition hover:bg-white/10 hover:text-white lg:inline-flex">คอร์สสด</a>
             <a href="#franchise-packages" className="hidden rounded-xl px-4 py-3 text-white/72 transition hover:bg-white/10 hover:text-white lg:inline-flex">แพ็กเกจ</a>
+            <Link href="/apply-mini" className="rounded-xl bg-[#f6c400] px-3 py-3 text-center text-[#151515] transition hover:bg-[#ffd43b] focus-ring sm:px-5">MINI STARTER</Link>
             <Link href="/franchise/apply" className="rounded-xl bg-[#f47b00] px-3 py-3 text-center text-white transition hover:bg-[#ff8c19] focus-ring sm:px-5">สมัครแฟรนไชส์</Link>
             <Link href="/login" className="rounded-xl border border-white/20 bg-white px-3 py-3 text-center text-[#1f1f1f] transition hover:bg-[#fff1df] focus-ring sm:px-5">เข้าสู่ระบบ</Link>
           </div>
@@ -163,11 +182,11 @@ function HeroCatalog() {
             <div className="flex flex-col justify-center p-6 text-white sm:p-10 lg:p-12">
               <div className="inline-flex w-fit rounded-full bg-[#1f1f1f] px-4 py-2 text-sm font-black text-[#f6c400]">Franchise Catalog Landing Page</div>
               <h1 className="mt-5 text-4xl font-black leading-[1.04] tracking-tight sm:text-6xl lg:text-7xl">เริ่มต้นธุรกิจข้าวเหนียวไก่ทอด<br />จากระบบที่ผ่านการขายจริง</h1>
-              <p className="mt-5 max-w-2xl text-lg font-bold leading-9 text-white/88 sm:text-xl">รวมทุกทางเลือกสำหรับคนอยากเริ่มต้น ตั้งแต่หนังสือสูตร คอร์สออนไลน์ คอร์สสอนสด ไปจนถึงแพ็กเกจแฟรนไชส์ 55,000 และ 99,000 บาท</p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row"><Link href="/franchise/apply" className={primaryButton}>สมัคร / สอบถามแฟรนไชส์</Link><a href="#franchise-packages" className={secondaryButton}>ดูแพ็กเกจลงทุน</a></div>
+              <p className="mt-5 max-w-2xl text-lg font-bold leading-9 text-white/88 sm:text-xl">รวมทุกทางเลือกสำหรับคนอยากเริ่มต้น ตั้งแต่หนังสือสูตร คอร์สออนไลน์ คอร์สสอนสด MINI STARTER 9,900 บาท ไปจนถึงแพ็กเกจแฟรนไชส์ 55,000 และ 99,000 บาท</p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row"><Link href="/apply-mini" className="inline-flex min-h-14 items-center justify-center rounded-xl bg-[#f6c400] px-7 py-4 text-base font-black text-[#151515] shadow-xl shadow-[#f6c400]/25 transition hover:-translate-y-0.5 hover:bg-[#ffd43b] focus-ring">ดูรายละเอียดและสมัคร MINI STARTER</Link><Link href="/franchise/apply" className={primaryButton}>สมัคร / สอบถามแฟรนไชส์</Link><a href="#franchise-packages" className={secondaryButton}>ดูแพ็กเกจลงทุน</a></div>
             </div>
             <div className="relative min-h-[24rem] bg-[#fff1df] p-5">
-              <div className="absolute right-5 top-5 z-10 rounded-2xl bg-white px-5 py-3 text-right shadow-xl"><p className="text-sm font-black text-[#666666]">ราคาเริ่มต้น</p><p className="text-3xl font-black text-[#d71920]">55,000</p></div>
+              <div className="absolute right-5 top-5 z-10 rounded-2xl bg-white px-5 py-3 text-right shadow-xl"><p className="text-sm font-black text-[#666666]">ราคาเริ่มต้น</p><p className="text-3xl font-black text-[#d71920]">9,900</p></div>
               <img src="/images/AAwebsite.jpg" alt="ข้าวเหนียวไก่ทอด เหนียวไก่เยอะโคตร" className="h-full min-h-[24rem] w-full rounded-[1.5rem] object-cover shadow-2xl shadow-black/15" />
             </div>
           </div>
@@ -391,7 +410,7 @@ function FranchiseModelsSection() {
     <Section id="franchise-packages" className="pt-0">
       <div className="rounded-[2.5rem] border border-[#eadfca] bg-white p-5 shadow-2xl shadow-black/8 sm:p-8 lg:p-10">
         <SectionHeader kicker="Packages" title="แพ็กเกจแฟรนไชส์แบบเปรียบเทียบง่าย" text="วางข้อมูลแบบ catalog เพื่อให้ผู้สนใจเห็นราคา พื้นที่ ทำเลที่เหมาะสม และจุดเด่นของแต่ละรูปแบบทันที" />
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid gap-5 lg:grid-cols-3">
           {franchiseModels.map((model, index) => (
             <article key={model.title} className="flex flex-col overflow-hidden rounded-[2rem] border border-[#eadfca] bg-[#fff8ed] text-[#151515] shadow-xl shadow-black/8">
               <div className="grid gap-4 bg-[#1f1f1f] p-5 text-white sm:p-7 md:grid-cols-[1fr_auto] md:items-start"><div><span className="rounded-full bg-[#f6c400] px-4 py-2 text-sm font-black text-[#151515]">{model.badge}</span><h3 className="mt-5 text-3xl font-black leading-tight sm:text-4xl">{model.title}</h3></div><div className="rounded-2xl bg-white px-5 py-4 text-left md:text-right"><p className="text-sm font-black text-[#666666]">ราคา</p><p className="text-3xl font-black text-[#d71920]">{model.price}</p></div></div>
@@ -399,6 +418,7 @@ function FranchiseModelsSection() {
               <div className="flex flex-1 flex-col p-5 sm:p-7">
                 <div id={index === 0 ? "required-space" : undefined} className="grid scroll-mt-28 gap-3">{[["พื้นที่แนะนำ", model.area], ["ลักษณะพื้นที่", model.location], ["เหมาะสำหรับ", model.suitableFor]].map(([label, value]) => <div key={label} className="rounded-2xl border border-[#eadfca] bg-white p-4"><p className="text-sm font-black text-[#f47b00]">{label}</p><p className="mt-1 font-bold leading-7 text-[#666666]">{value}</p></div>)}</div>
                 <ul className="mt-5 grid gap-2">{model.highlights.map((highlight) => <li key={highlight} className="flex gap-3 rounded-2xl border border-[#eadfca] bg-[#fff1df] px-4 py-3 font-black text-[#151515]"><span className="text-[#d71920]">✓</span><span>{highlight}</span></li>)}</ul>
+                <Link href={model.applyHref} className={`mt-6 ${model.applyHref === "/apply-mini" ? "inline-flex min-h-14 items-center justify-center rounded-xl bg-[#f6c400] px-5 py-4 text-center text-base font-black text-[#151515] shadow-lg shadow-[#f6c400]/25 transition hover:-translate-y-0.5 hover:bg-[#ffd43b] focus-ring" : primaryButton}`}>{model.applyLabel}</Link>
               </div>
             </article>
           ))}
@@ -428,7 +448,7 @@ export default function LandingPage() {
 
       <Section id="back-office-system" className="pt-0"><div className="rounded-[2.5rem] border border-[#eadfca] bg-white p-6 shadow-2xl shadow-black/8 sm:p-10"><SectionHeader kicker="Back Office System" title="ระบบหลังบ้านที่ช่วยให้ร้านเดินเป็นระบบ" text="ระบบหลังบ้านถูกออกแบบมาเพื่อช่วยให้เจ้าของร้านติดตามข้อมูลสำคัญ เช่น ยอดขาย วัตถุดิบ โรงหมักไก่ Cash Flow รายงาน และรายชื่อผู้สนใจแฟรนไชส์ เพื่อให้บริหารร้านด้วยข้อมูลมากกว่าความจำ" /></div></Section>
 
-      <Section id="apply-franchise" className="pt-0"><div className="overflow-hidden rounded-[2.5rem] bg-[#1f1f1f] p-8 text-center text-white shadow-2xl shadow-black/20 sm:p-12"><h2 className="mx-auto max-w-4xl text-3xl font-black leading-tight sm:text-5xl">ก่อนสมัครแฟรนไชส์</h2><p className="mx-auto mt-4 max-w-3xl text-base font-bold leading-8 text-white/70 sm:text-lg">ก่อนสมัคร แนะนำให้ประเมินตัวเองเรื่องงบลงทุน ทำเล ความพร้อมในการดูแลร้าน และความพร้อมในการทำตามระบบ หากพร้อมเริ่มต้น สามารถกรอกข้อมูลสมัครแฟรนไชส์เพื่อให้ทีมงานตรวจสอบเบื้องต้นได้</p><Link href="/franchise/apply" className={`${primaryButton} mt-8`}>สมัครแฟรนไชส์</Link></div></Section>
+      <Section id="apply-franchise" className="pt-0"><div className="overflow-hidden rounded-[2.5rem] bg-[#1f1f1f] p-8 text-center text-white shadow-2xl shadow-black/20 sm:p-12"><h2 className="mx-auto max-w-4xl text-3xl font-black leading-tight sm:text-5xl">ก่อนสมัครแฟรนไชส์</h2><p className="mx-auto mt-4 max-w-3xl text-base font-bold leading-8 text-white/70 sm:text-lg">ก่อนสมัคร แนะนำให้ประเมินตัวเองเรื่องงบลงทุน ทำเล ความพร้อมในการดูแลร้าน และความพร้อมในการทำตามระบบ หากพร้อมเริ่มต้น สามารถกรอกข้อมูลสมัครแฟรนไชส์เพื่อให้ทีมงานตรวจสอบเบื้องต้นได้</p><div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row"><Link href="/apply-mini" className="inline-flex min-h-14 items-center justify-center rounded-xl bg-[#f6c400] px-7 py-4 text-base font-black text-[#151515] shadow-xl shadow-[#f6c400]/25 transition hover:-translate-y-0.5 hover:bg-[#ffd43b] focus-ring">ดูรายละเอียดและสมัคร MINI STARTER</Link><Link href="/franchise/apply" className={primaryButton}>สมัครแฟรนไชส์ชุดมาตรฐาน</Link></div></div></Section>
 
       <footer id="footer-contact" className="border-t border-[#eadfca] bg-white"><div className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_auto] lg:px-8"><div className="flex items-center gap-3"><BrandLogo size={52} /><div><div className="text-2xl font-black">{BRAND_NAME}</div><div className="mt-1 font-bold text-[#666666]">{BRAND_SUBTITLE}</div></div></div><div className="grid gap-2 text-sm font-black sm:grid-cols-2 lg:text-right">{contact.map((item) => <span key={item}>{item}</span>)}<Link href="/login" className="underline decoration-2 underline-offset-4">เข้าสู่ระบบ</Link></div></div></footer>
     </main>
