@@ -268,6 +268,38 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
 {
   const supabase = createSupabaseMock();
   const fetchFn = createFetchMock();
+  const belowAutoSaveThreshold = async () => ({
+    merchant: "ร้านที่ต้องตรวจ",
+    transactionDate: "2026-07-22",
+    amount: 999,
+    paymentMethod: "โอนเงิน",
+    category: "อื่นๆ",
+    confidence: 0.85,
+  });
+  const result = await processLineWebhookPayload(
+    {
+      events: [
+        {
+          type: "message",
+          replyToken: "reply-token-pending",
+          timestamp: 1784678400000,
+          source: { userId: "line-user-pending" },
+          message: { id: "image-message-pending", type: "image" },
+        },
+      ],
+    },
+    { supabase, channelAccessToken: "channel-token", fetchFn, analyzeReceipt: belowAutoSaveThreshold, logger: console },
+  );
+
+  assert.equal(result.ok, true, "uncertain receipt is accepted for review");
+  assert.equal(supabase.cashFlowRows.length, 0, "85% confidence does not create a paid expense");
+  assert.equal(supabase.insertedRows[0].processing_status, "pending_review");
+  assert.match(fetchFn.calls[1].init.body, /ยังไม่บันทึกยอด/);
+}
+
+{
+  const supabase = createSupabaseMock();
+  const fetchFn = createFetchMock();
   const result = await processLineWebhookPayload(
     {
       events: [
