@@ -6,6 +6,7 @@ import { CategoryMenuToggle } from "@/components/category-menu-toggle";
 import { CourseReviewCarousel } from "@/components/course-review-carousel";
 import { FounderStoryPreview } from "@/components/founder-story";
 import { BRAND_NAME, BRAND_SUBTITLE } from "@/lib/brand";
+import { franchisePackages } from "@/lib/franchise-packages";
 
 const categoryMenu = [
   { label: "ภาพรวมธุรกิจ", href: "#business-overview", detail: "เริ่มจากร้านขายจริง" },
@@ -32,47 +33,7 @@ const systemHighlights = [
   { title: "ระบบหลังบ้าน", text: "มีระบบช่วยติดตามยอดขาย วัตถุดิบ รายงาน และข้อมูลแฟรนไชส์" },
 ];
 
-const franchiseModels = [
-  {
-    badge: "Mini Starter",
-    title: "MINI STARTER",
-    price: "9,900 บาท",
-    imageSrc: "/kiosk.png",
-    imageAlt: "เคาน์เตอร์ Mini พร้อมป้ายแบรนด์ MINI STARTER",
-    area: "เริ่มเล็กสำหรับทดลองทำเล ต้องตรวจสอบพื้นที่ก่อนอนุมัติ",
-    location: "เหมาะกับผู้ที่มีทำเลขนาดเล็ก ต้องการเริ่มขายด้วยเคาน์เตอร์ Mini พร้อมป้ายแบรนด์ และยอมรับว่าไม่มีสิทธิ์ผูกขาดพื้นที่",
-    suitableFor: "ผู้เริ่มต้นที่ต้องการคอร์สออนไลน์ สิทธิ์ซื้อไก่หมักพร้อมทอด 75 บาท/กก. และเข้าใจว่า 9,900 บาทไม่รวมอุปกรณ์ทั้งหมด",
-    highlights: ["เคาน์เตอร์ Mini พร้อมป้ายแบรนด์", "ถาดไก่ 10 ใบ + ทัพพี + ถ้วยตวง + เครื่องชั่งดิจิทัล", "สั่งครบ 45 กก. จัดส่งฟรี"],
-    applyHref: "/apply-mini",
-    applyLabel: "ดูรายละเอียดและสมัคร MINI STARTER",
-  },
-  {
-    badge: "Starter Pack",
-    title: "รูปแบบเคาน์เตอร์",
-    price: "55,000 บาท",
-    imageSrc: "/new-kiosk.png",
-    imageAlt: "แฟรนไชส์รูปแบบเคาน์เตอร์ 55,000 บาท",
-    area: "พื้นที่อย่างต่ำ 2 × 3 เมตร",
-    location: "เหมาะกับพื้นที่ในอาคาร พื้นที่ที่มีหลังคา หน้าร้าน ห้องเช่า ตลาดในร่ม หรือพื้นที่หน้าบ้านที่มีหลังคาคลุม",
-    suitableFor: "ผู้เริ่มต้นที่มีพื้นที่จำกัด แต่อยากเริ่มขายจริงแบบเป็นระบบ",
-    highlights: ["ใช้พื้นที่ไม่มาก", "คุมงบเริ่มต้นง่าย", "เหมาะกับจุดขายในอาคาร"],
-    applyHref: "/franchise/apply",
-    applyLabel: "สมัคร / สอบถามแฟรนไชส์ชุดมาตรฐาน",
-  },
-  {
-    badge: "Signature Pack",
-    title: "รูปแบบซุ้ม",
-    price: "99,000 บาท",
-    imageSrc: "/stand-alone.png",
-    imageAlt: "แฟรนไชส์รูปแบบซุ้ม 99,000 บาท",
-    area: "พื้นที่ประมาณ 3 × 3 เมตร",
-    location: "เหมาะกับคนที่ต้องการหน้าร้านชัดเจน ใช้พื้นที่ประมาณ 3 × 3 เมตร ทำงานคล่องตัวขึ้น",
-    suitableFor: "ผู้ที่ต้องการหน้าร้านชัดเจนและพื้นที่ทำงานคล่องตัวขึ้น",
-    highlights: ["ทำงานคล่องตัวขึ้น", "จัดวางอุปกรณ์เป็นระบบ", "สร้างภาพจำหน้าร้านชัด"],
-    applyHref: "/franchise/apply",
-    applyLabel: "สมัคร / สอบถามแฟรนไชส์ชุดมาตรฐาน",
-  },
-];
+const franchiseModels = franchisePackages;
 
 
 const courseSections = [
@@ -414,7 +375,7 @@ function FranchiseModelsSection() {
           {franchiseModels.map((model, index) => (
             <article key={model.title} className="flex flex-col overflow-hidden rounded-[2rem] border border-[#eadfca] bg-[#fff8ed] text-[#151515] shadow-xl shadow-black/8">
               <div className="grid gap-4 bg-[#1f1f1f] p-5 text-white sm:p-7 md:grid-cols-[1fr_auto] md:items-start"><div><span className="rounded-full bg-[#f6c400] px-4 py-2 text-sm font-black text-[#151515]">{model.badge}</span><h3 className="mt-5 text-3xl font-black leading-tight sm:text-4xl">{model.title}</h3></div><div className="rounded-2xl bg-white px-5 py-4 text-left md:text-right"><p className="text-sm font-black text-[#666666]">ราคา</p><p className="text-3xl font-black text-[#d71920]">{model.price}</p></div></div>
-              <div className="flex min-h-[25rem] w-full items-center justify-center bg-white p-1 sm:min-h-[32rem] lg:min-h-[34rem]"><img src={model.imageSrc} alt={model.imageAlt} className="h-full min-h-[24.5rem] w-full rounded-[1.5rem] object-contain sm:min-h-[31.5rem] lg:min-h-[33.5rem]" /></div>
+              <div className="flex min-h-[25rem] w-full items-center justify-center bg-white p-1 sm:min-h-[32rem] lg:min-h-[34rem]"><img src={model.image} alt={model.imageAlt} className="h-full min-h-[24.5rem] w-full rounded-[1.5rem] object-contain sm:min-h-[31.5rem] lg:min-h-[33.5rem]" /></div>
               <div className="flex flex-1 flex-col p-5 sm:p-7">
                 <div id={index === 0 ? "required-space" : undefined} className="grid scroll-mt-28 gap-3">{[["พื้นที่แนะนำ", model.area], ["ลักษณะพื้นที่", model.location], ["เหมาะสำหรับ", model.suitableFor]].map(([label, value]) => <div key={label} className="rounded-2xl border border-[#eadfca] bg-white p-4"><p className="text-sm font-black text-[#f47b00]">{label}</p><p className="mt-1 font-bold leading-7 text-[#666666]">{value}</p></div>)}</div>
                 <ul className="mt-5 grid gap-2">{model.highlights.map((highlight) => <li key={highlight} className="flex gap-3 rounded-2xl border border-[#eadfca] bg-[#fff1df] px-4 py-3 font-black text-[#151515]"><span className="text-[#d71920]">✓</span><span>{highlight}</span></li>)}</ul>
