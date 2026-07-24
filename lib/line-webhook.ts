@@ -32,11 +32,22 @@ type ProcessDeps = {
   fetchFn?: typeof fetch;
   logger?: LineWebhookLogger;
   supabaseDiagnostics?: { missing: string[]; invalid: string[] };
+  analyzeReceipt?: typeof analyzeReceiptImage;
 };
 
 const LINE_REPLY_API_URL = "https://api.line.me/v2/bot/message/reply";
 const LINE_CONTENT_API_BASE_URL = "https://api-data.line.me/v2/bot/message";
 const BILL_IMAGE_BUCKET = "line-bill-receipts";
+const RECEIPT_CONFIDENCE_THRESHOLD = 0.7;
+
+type ReceiptAnalysis = {
+  merchant: string;
+  transactionDate: string;
+  amount: number;
+  paymentMethod: string;
+  category: string;
+  confidence: number;
+};
 
 export type LineWebhookResult = {
   ok: boolean;
@@ -48,6 +59,7 @@ type HandleDeps = {
   logger?: LineWebhookLogger;
   createSupabase?: typeof createSupabaseAdminClient;
   fetchFn?: typeof fetch;
+  analyzeReceipt?: typeof analyzeReceiptImage;
 };
 
 function clean(value: string | undefined) {
@@ -79,6 +91,64 @@ function eventDate(timestamp: number | undefined) {
 
 function safeMessageId(event: LineEvent) {
   return event.message?.id?.trim() ?? "";
+}
+
+function receiptCategory(value: unknown) {
+  const text = String(value ?? "").trim();
+  const allowed = ["ค่าเช่าที่", "อินเทอร์เน็ต", "ไก่สด", "ข้าวเหนียว", "เครื่องปรุง", "ค่าแรง", "น้ำแข็ง", "ขนส่ง", "อื่นๆ"];
+  return allowed.includes(text) ? text : "อื่นๆ";
+}
+
+function validDate(value: unknown, fallback: string) {
+  const text = String(value ?? "");
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : fallback;
+}
+
+export async function analyzeReceiptImage(
+  image: { contentType: string; data: Buffer },
+  eventAt: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<ReceiptAnalysis> {
+  const apiKey = clean(process.env.OPENAI_API_KEY);
+  if (!apiKey) throw new Error("OPENAI_API_KEY is missing");
+
+  const response = await fetchFn("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: clean(process.env.OPENAI_RECEIPT_MODEL) || "gpt-4.1-mini",
+      temperature: 0,
+      response_format: { type: "json_object" },
+      messages: [{
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `อ่านบิลค่าใช้จ่ายภาษาไทย ตอบ JSON เท่านั้น: merchant, transactionDate (YYYY-MM-DD), amount (ยอดชำระสุทธิ), paymentMethod, category, confidence (0-1). category ต้องเป็นหนึ่งใน ค่าเช่าที่, อินเทอร์เน็ต, ไก่สด, ข้าวเหนียว, เครื่องปรุง, ค่าแรง, น้ำแข็ง, ขนส่ง, อื่นๆ หากไม่เห็นวันที่ให้ใช้ ${eventAt.slice(0, 10)} และลด confidence`,
+          },
+          {
+            type: "image_url",
+            image_url: { url: `data:${image.contentType};base64,${image.data.toString("base64")}` },
+          },
+        ],
+      }],
+    }),
+  });
+
+  if (!response.ok) throw new Error(`Receipt OCR failed with status ${response.status}`);
+  const body = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+  const parsed = JSON.parse(body.choices?.[0]?.message?.content ?? "{}") as Record<string, unknown>;
+  const amount = Number(parsed.amount);
+  const confidence = Math.max(0, Math.min(1, Number(parsed.confidence) || 0));
+
+  return {
+    merchant: String(parsed.merchant ?? "").trim() || "ไม่ทราบชื่อร้าน",
+    transactionDate: validDate(parsed.transactionDate, eventAt.slice(0, 10)),
+    amount: Number.isFinite(amount) && amount > 0 ? amount : 0,
+    paymentMethod: String(parsed.paymentMethod ?? "").trim() || "ไม่ระบุ",
+    category: receiptCategory(parsed.category),
+    confidence,
+  };
 }
 
 async function replyToLine(replyToken: string | undefined, text: string, channelAccessToken: string, fetchFn: typeof fetch) {
@@ -116,14 +186,25 @@ async function downloadLineImage(messageId: string, channelAccessToken: string, 
   return { contentType, data: Buffer.from(arrayBuffer) };
 }
 
-async function insertBillReceiptEvent(supabase: NonNullable<SupabaseClient>, event: LineEvent, imageStoragePath: string | null) {
+async function insertBillReceiptEvent(
+  supabase: NonNullable<SupabaseClient>,
+  event: LineEvent,
+  imageStoragePath: string | null,
+  analysis?: ReceiptAnalysis,
+  cashFlowEntryId?: string | null,
+) {
+  const processed = Boolean(analysis && analysis.amount > 0 && analysis.confidence >= RECEIPT_CONFIDENCE_THRESHOLD);
   const { error } = await supabase.from("line_bill_receipts").insert({
     message_id: safeMessageId(event),
     line_user_id: event.source?.userId ?? null,
     message_type: event.message?.type ?? "unknown",
     event_at: eventDate(event.timestamp),
-    processing_status: imageStoragePath ? "image_received" : "message_received",
+    processing_status: processed ? "processed" : imageStoragePath ? "pending_review" : "message_received",
     image_storage_path: imageStoragePath,
+    extracted_data: analysis ?? null,
+    confidence: analysis?.confidence ?? null,
+    cash_flow_entry_id: cashFlowEntryId ?? null,
+    processing_error: analysis && !processed ? "ข้อมูลจากภาพไม่ชัดเจนหรือไม่พบยอดชำระ" : null,
   });
 
   if (error) {
@@ -132,6 +213,32 @@ async function insertBillReceiptEvent(supabase: NonNullable<SupabaseClient>, eve
   }
 
   return { inserted: true };
+}
+
+async function insertCashFlowExpense(
+  supabase: NonNullable<SupabaseClient>,
+  event: LineEvent,
+  imageStoragePath: string,
+  analysis: ReceiptAnalysis,
+) {
+  if (analysis.amount <= 0 || analysis.confidence < RECEIPT_CONFIDENCE_THRESHOLD) return null;
+
+  const { data, error } = await supabase.from("cash_flow_entries").insert({
+    transaction_date: analysis.transactionDate,
+    type: "expense",
+    status: "paid",
+    category: analysis.category,
+    description: analysis.merchant,
+    amount: analysis.amount,
+    payment_method: analysis.paymentMethod,
+    source: "other",
+    source_ref_id: `line:${safeMessageId(event)}`,
+    attachment_url: imageStoragePath,
+    note: `บันทึกอัตโนมัติจาก LINE OA (ความมั่นใจ ${Math.round(analysis.confidence * 100)}%)`,
+  }).select("id").maybeSingle();
+
+  if (error && error.code !== "23505") throw new Error(`Failed to create cash flow entry: ${error.code ?? "unknown"}`);
+  return (data as { id?: string } | null)?.id ?? null;
 }
 
 async function uploadBillImage(supabase: NonNullable<SupabaseClient>, messageId: string, image: { contentType: string; data: Buffer }) {
@@ -168,10 +275,20 @@ export async function processLineWebhookPayload(payload: LineWebhookPayload, dep
       if (event.message?.type === "image") {
         const image = await downloadLineImage(safeMessageId(event), deps.channelAccessToken, fetchFn);
         const imageStoragePath = await uploadBillImage(deps.supabase, safeMessageId(event), image);
-        const { inserted } = await insertBillReceiptEvent(deps.supabase, event, imageStoragePath);
+        const analysis = await (deps.analyzeReceipt ?? analyzeReceiptImage)(image, eventDate(event.timestamp), fetchFn);
+        const cashFlowEntryId = await insertCashFlowExpense(deps.supabase, event, imageStoragePath, analysis);
+        const { inserted } = await insertBillReceiptEvent(deps.supabase, event, imageStoragePath, analysis, cashFlowEntryId);
 
         if (inserted) {
-          await replyToLine(event.replyToken, "ได้รับรูปบิลแล้ว กำลังรอตรวจสอบและบันทึกข้อมูล", deps.channelAccessToken, fetchFn);
+          const saved = analysis.amount > 0 && analysis.confidence >= RECEIPT_CONFIDENCE_THRESHOLD;
+          await replyToLine(
+            event.replyToken,
+            saved
+              ? `บันทึกค่าใช้จ่ายแล้ว\n${analysis.merchant}\n${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nหมวด ${analysis.category}`
+              : "ได้รับรูปบิลแล้ว แต่ข้อมูลไม่ชัดเจน จึงยังไม่บันทึกยอดและเก็บไว้รอตรวจสอบ",
+            deps.channelAccessToken,
+            fetchFn,
+          );
         }
       } else if (event.message?.type === "text") {
         const { inserted } = await insertBillReceiptEvent(deps.supabase, event, null);
@@ -245,6 +362,7 @@ export async function handleLineWebhookRequest(request: Request, deps: HandleDep
       channelAccessToken,
       fetchFn: deps.fetchFn,
       logger,
+      analyzeReceipt: deps.analyzeReceipt,
     },
   );
 }
