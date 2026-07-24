@@ -44,14 +44,34 @@ export async function submitMiniApplication(_prev: MiniApplyFormState, formData:
     paths.push(path);
   }
 
-  const { data, error } = await supabase.from("mini_franchise_applications").insert({ ...parsed.data, google_maps_url: parsed.data.google_maps_url || null, line_id: parsed.data.line_id || null, monthly_rent: parsed.data.monthly_rent || null, nearby_competitors: parsed.data.nearby_competitors || null, experience_details: parsed.data.experience_details || null, source: parsed.data.source === "campaign-mini" ? "campaign-mini" : "apply-mini", can_follow_online_course: true, terms_acknowledged: terms, location_photo_paths: paths, status: "new" }).select("id, reference_code").single();
+  // The public form intentionally has INSERT-only RLS access. Asking PostgREST
+  // to return the inserted row with `.select()` also requires SELECT access and
+  // makes an otherwise valid submission fail. Generate the identifiers in this
+  // trusted Server Action, insert once without a representation response, and
+  // return the same identifiers to the applicant.
+  const applicationId = crypto.randomUUID();
+  const referenceCode = `MINI-${crypto.randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase()}`;
+  const { error } = await supabase.from("mini_franchise_applications").insert({
+    ...parsed.data,
+    id: applicationId,
+    reference_code: referenceCode,
+    google_maps_url: parsed.data.google_maps_url || null,
+    line_id: parsed.data.line_id || null,
+    monthly_rent: parsed.data.monthly_rent || null,
+    nearby_competitors: parsed.data.nearby_competitors || null,
+    experience_details: parsed.data.experience_details || null,
+    source: parsed.data.source === "campaign-mini" ? "campaign-mini" : "apply-mini",
+    can_follow_online_course: true,
+    terms_acknowledged: terms,
+    location_photo_paths: paths,
+    status: "new",
+  });
   if (error?.code === "23505") {
-    const existing = await supabase.from("mini_franchise_applications").select("id, reference_code").eq("submission_token", parsed.data.submission_token).maybeSingle();
-    if (existing.data?.reference_code) return { ok: true, message: "บริษัทได้รับใบสมัครของท่านแล้ว การส่งใบสมัครยังไม่ถือว่าได้รับสิทธิ์ ทีมงานจะตรวจสอบพื้นที่และความพร้อมก่อนติดต่อกลับ กรุณาอย่าเพิ่งชำระเงินจนกว่าจะได้รับแจ้งผลอนุมัติ", applicationId: existing.data.id, referenceCode: existing.data.reference_code };
+    return { ok: true, message: "บริษัทได้รับใบสมัครนี้แล้ว การส่งใบสมัครยังไม่ถือว่าได้รับสิทธิ์ ทีมงานจะตรวจสอบพื้นที่และความพร้อมก่อนติดต่อกลับ กรุณาอย่าเพิ่งชำระเงินจนกว่าจะได้รับแจ้งผลอนุมัติ" };
   }
   if (error) {
     console.error("Failed to submit MINI franchise application:", { code: error.code, message: error.message, details: error.details });
     return { ok: false, message: "ยังส่งใบสมัครไม่สำเร็จ กรุณาลองอีกครั้ง" };
   }
-  return { ok: true, message: "บริษัทได้รับใบสมัครของท่านแล้ว การส่งใบสมัครยังไม่ถือว่าได้รับสิทธิ์ ทีมงานจะตรวจสอบพื้นที่และความพร้อมก่อนติดต่อกลับ กรุณาอย่าเพิ่งชำระเงินจนกว่าจะได้รับแจ้งผลอนุมัติ", applicationId: data.id, referenceCode: data.reference_code };
+  return { ok: true, message: "บริษัทได้รับใบสมัครของท่านแล้ว การส่งใบสมัครยังไม่ถือว่าได้รับสิทธิ์ ทีมงานจะตรวจสอบพื้นที่และความพร้อมก่อนติดต่อกลับ กรุณาอย่าเพิ่งชำระเงินจนกว่าจะได้รับแจ้งผลอนุมัติ", applicationId, referenceCode };
 }
