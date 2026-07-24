@@ -445,6 +445,45 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
 {
   const supabase = createSupabaseMock();
   const fetchFn = createFetchMock();
+  const textExpenseAnalysis = async () => ({
+    transactionDate: "2026-07-24",
+    amount: 350,
+    description: "ค่าน้ำแข็ง",
+    paymentMethod: "ไม่ระบุ",
+    category: "ice_cost",
+  });
+  const result = await processLineWebhookPayload(
+    {
+      events: [
+        {
+          type: "message",
+          replyToken: "reply-token-text-expense",
+          timestamp: 1784907600000,
+          source: { userId: "line-user-text-expense" },
+          message: { id: "text-expense-1", type: "text", text: "จ่ายค่าน้ำแข็ง 350 บาท" },
+        },
+      ],
+    },
+    { supabase, channelAccessToken: "channel-token", fetchFn, analyzeTextExpense: textExpenseAnalysis, logger: console },
+  );
+
+  assert.equal(result.ok, true, "explicit text expense is recorded");
+  assert.equal(supabase.cashFlowRows.length, 1);
+  assert.equal(supabase.cashFlowRows[0].status, "paid");
+  assert.equal(supabase.cashFlowRows[0].category, "ice_cost");
+  assert.equal(supabase.cashFlowRows[0].amount, 350);
+  assert.equal(supabase.cashFlowRows[0].document_type, "no_document");
+  assert.equal(supabase.cashFlowRows[0].has_attachment, false);
+  assert.equal(supabase.insertedRows[0].processing_status, "processed");
+  assert.equal(supabase.insertedRows[0].cash_flow_entry_id, "cash-flow-entry-1");
+  assert.match(fetchFn.calls[0].init.body, /บันทึกเข้า Cash Flow แล้ว/);
+  assert.match(fetchFn.calls[0].init.body, /350\.00/);
+  assert.match(fetchFn.calls[0].init.body, /สถานะ จ่ายแล้ว/);
+}
+
+{
+  const supabase = createSupabaseMock();
+  const fetchFn = createFetchMock();
   const result = await processLineWebhookPayload(
     {
       events: [

@@ -4,6 +4,7 @@ import { createSupabaseAdminClient, getSupabaseAdminClientDiagnostics } from "./
 type LineMessage = {
   id?: string;
   type?: string;
+  text?: string;
 };
 
 type LineSource = {
@@ -33,6 +34,7 @@ type ProcessDeps = {
   logger?: LineWebhookLogger;
   supabaseDiagnostics?: { missing: string[]; invalid: string[] };
   analyzeReceipt?: typeof analyzeReceiptImage;
+  analyzeTextExpense?: typeof analyzeCashFlowText;
 };
 
 const LINE_REPLY_API_URL = "https://api.line.me/v2/bot/message/reply";
@@ -74,6 +76,14 @@ type ReceiptAnalysis = {
   confidence: number;
 };
 
+type TextExpenseAnalysis = {
+  transactionDate: string;
+  amount: number;
+  description: string;
+  paymentMethod: string;
+  category: string;
+};
+
 export type LineWebhookResult = {
   ok: boolean;
   status: number;
@@ -85,6 +95,7 @@ type HandleDeps = {
   createSupabase?: typeof createSupabaseAdminClient;
   fetchFn?: typeof fetch;
   analyzeReceipt?: typeof analyzeReceiptImage;
+  analyzeTextExpense?: typeof analyzeCashFlowText;
 };
 
 function clean(value: string | undefined) {
@@ -294,6 +305,80 @@ export async function analyzeReceiptImage(
   };
 }
 
+function looksLikeExpenseCommand(value: string) {
+  return /^\s*(จ่าย|ชำระ|โอนจ่าย)/u.test(value) && /\d/.test(value);
+}
+
+export async function analyzeCashFlowText(
+  text: string,
+  eventAt: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<TextExpenseAnalysis> {
+  const apiKey = clean(process.env.OPENAI_API_KEY);
+  if (!apiKey) throw new Error("OPENAI_API_KEY is missing");
+
+  const response = await fetchFn("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: clean(process.env.OPENAI_RECEIPT_MODEL) || "gpt-4.1-mini",
+      temperature: 0,
+      max_completion_tokens: 200,
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "cash_flow_text_expense",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              transactionDate: { type: "string", description: "วันที่รูปแบบ YYYY-MM-DD" },
+              amount: { type: "number" },
+              description: { type: "string" },
+              paymentMethod: { type: "string" },
+              category: { type: "string", enum: Object.keys(RECEIPT_CATEGORY_CODE_BY_LABEL) },
+            },
+            required: ["transactionDate", "amount", "description", "paymentMethod", "category"],
+            additionalProperties: false,
+          },
+        },
+      },
+      messages: [{
+        role: "user",
+        content: `แยกข้อความค่าใช้จ่ายสำหรับ Cash Flow: "${text}". คำว่า "จ่าย" หมายถึงจ่ายเงินจริงแล้ว หากไม่ระบุช่องทางให้ใช้ "ไม่ระบุ" หากไม่ระบุวันที่ให้ใช้ ${thailandDate(eventAt)} หมวดต้องเลือกจากรายการที่กำหนด`,
+      }],
+    }),
+  });
+
+  if (!response.ok) throw new Error(`Cash Flow text analysis failed with status ${response.status}`);
+  const body = await response.json() as {
+    choices?: Array<{ finish_reason?: string; message?: { content?: string; refusal?: string | null } }>;
+  };
+  const choice = body.choices?.[0];
+  if (choice?.finish_reason !== "stop" || choice.message?.refusal) {
+    throw new Error(`Cash Flow text analysis returned an incomplete response: ${choice?.finish_reason ?? "missing"}`);
+  }
+
+  const parsed = JSON.parse(choice.message?.content ?? "{}") as Record<string, unknown>;
+  const amount = Number(parsed.amount);
+  const description = String(parsed.description ?? "").trim();
+  const paymentMethod = String(parsed.paymentMethod ?? "").trim();
+  const transactionDate = String(parsed.transactionDate ?? "").trim();
+  const category = receiptCategory(parsed.category, "");
+
+  if (!(Number.isFinite(amount) && amount > 0 && description && category.recognized)) {
+    throw new Error("Cash Flow text does not contain a valid expense");
+  }
+
+  return {
+    transactionDate: isActualISODate(transactionDate) ? transactionDate : thailandDate(eventAt),
+    amount,
+    description,
+    paymentMethod: paymentMethod || "ไม่ระบุ",
+    category: category.code,
+  };
+}
+
 async function replyToLine(replyToken: string | undefined, text: string, channelAccessToken: string, fetchFn: typeof fetch) {
   if (!replyToken) return;
 
@@ -342,7 +427,7 @@ async function insertBillReceiptEvent(
     line_user_id: event.source?.userId ?? null,
     message_type: event.message?.type ?? "unknown",
     event_at: eventDate(event.timestamp),
-    processing_status: processed ? "processed" : imageStoragePath ? "pending_review" : "message_received",
+    processing_status: processed || cashFlowEntryId ? "processed" : imageStoragePath ? "pending_review" : "message_received",
     image_storage_path: imageStoragePath,
     extracted_data: analysis ?? null,
     confidence: analysis?.confidence ?? null,
@@ -410,6 +495,42 @@ async function insertCashFlowExpense(
   return (data as { id?: string } | null)?.id ?? null;
 }
 
+async function insertTextCashFlowExpense(
+  supabase: NonNullable<SupabaseClient>,
+  event: LineEvent,
+  analysis: TextExpenseAnalysis,
+) {
+  const sourceRefId = `line:${safeMessageId(event)}`;
+  const { data, error } = await supabase.from("cash_flow_entries").insert({
+    transaction_date: analysis.transactionDate,
+    type: "expense",
+    status: "paid",
+    category: analysis.category,
+    description: analysis.description,
+    amount: analysis.amount,
+    payment_method: analysis.paymentMethod,
+    source: "other",
+    source_ref_id: sourceRefId,
+    attachment_url: null,
+    document_type: "no_document",
+    has_attachment: false,
+    note: "บันทึกอัตโนมัติจากข้อความ LINE OA โดยไม่มีเอกสารแนบ",
+  }).select("id").maybeSingle();
+
+  if (error?.code === "23505") {
+    const { data: existing, error: lookupError } = await supabase
+      .from("cash_flow_entries")
+      .select("id")
+      .eq("source_ref_id", sourceRefId)
+      .maybeSingle();
+    if (lookupError) throw new Error(`Failed to find existing text cash flow entry: ${lookupError.code ?? "unknown"}`);
+    return (existing as { id?: string } | null)?.id ?? null;
+  }
+
+  if (error) throw new Error(`Failed to create text cash flow entry: ${error.code ?? "unknown"}`);
+  return (data as { id?: string } | null)?.id ?? null;
+}
+
 async function uploadBillImage(
   supabase: NonNullable<SupabaseClient>,
   messageId: string,
@@ -470,10 +591,31 @@ export async function processLineWebhookPayload(payload: LineWebhookPayload, dep
           );
         }
       } else if (event.message?.type === "text") {
-        const { inserted } = await insertBillReceiptEvent(deps.supabase, event, null);
+        const messageText = event.message.text?.trim() ?? "";
+        if (looksLikeExpenseCommand(messageText)) {
+          const eventAt = eventDate(event.timestamp);
+          const analysis = await (deps.analyzeTextExpense ?? analyzeCashFlowText)(messageText, eventAt, fetchFn);
+          const cashFlowEntryId = await insertTextCashFlowExpense(deps.supabase, event, analysis);
+          const { inserted } = await insertBillReceiptEvent(deps.supabase, event, null, undefined, cashFlowEntryId);
 
-        if (inserted) {
-          await replyToLine(event.replyToken, "กรุณาส่งรูปบิลหรือใบเสร็จเพื่อบันทึกค่าใช้จ่าย", deps.channelAccessToken, fetchFn);
+          if (inserted) {
+            await replyToLine(
+              event.replyToken,
+              `บันทึกเข้า Cash Flow แล้ว\n${analysis.description}\n${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nสถานะ จ่ายแล้ว\nหมวด ${receiptCategoryLabel(analysis.category)}\nเอกสาร ไม่มีเอกสาร`,
+              deps.channelAccessToken,
+              fetchFn,
+            );
+          }
+        } else {
+          const { inserted } = await insertBillReceiptEvent(deps.supabase, event, null);
+          if (inserted) {
+            await replyToLine(
+              event.replyToken,
+              "พิมพ์รายการ เช่น จ่ายค่าน้ำแข็ง 350 บาท หรือส่งรูปบิลเพื่อบันทึกค่าใช้จ่าย",
+              deps.channelAccessToken,
+              fetchFn,
+            );
+          }
         }
       }
     } catch (error) {
@@ -542,6 +684,7 @@ export async function handleLineWebhookRequest(request: Request, deps: HandleDep
       fetchFn: deps.fetchFn,
       logger,
       analyzeReceipt: deps.analyzeReceipt,
+      analyzeTextExpense: deps.analyzeTextExpense,
     },
   );
 }
