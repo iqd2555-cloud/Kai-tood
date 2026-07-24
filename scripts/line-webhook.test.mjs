@@ -13,17 +13,31 @@ function sign(body, secret) {
 
 function createSupabaseMock({ insertError = null, uploadError = null } = {}) {
   const insertedRows = [];
+  const cashFlowRows = [];
   const uploadedFiles = [];
 
   return {
     insertedRows,
+    cashFlowRows,
     uploadedFiles,
     from(table) {
-      assert.equal(table, "line_bill_receipts");
       return {
         insert(row) {
-          insertedRows.push(row);
-          return Promise.resolve({ error: insertError });
+          if (table === "line_bill_receipts") {
+            insertedRows.push(row);
+            return Promise.resolve({ error: insertError });
+          }
+          assert.equal(table, "cash_flow_entries");
+          cashFlowRows.push(row);
+          return {
+            select() {
+              return {
+                maybeSingle() {
+                  return Promise.resolve({ data: { id: "cash-flow-entry-1" }, error: null });
+                },
+              };
+            },
+          };
         },
       };
     },
@@ -41,6 +55,14 @@ function createSupabaseMock({ insertError = null, uploadError = null } = {}) {
   };
 }
 
+const successfulAnalysis = async () => ({
+  merchant: "ร้านทดสอบ",
+  transactionDate: "2026-07-22",
+  amount: 125.5,
+  paymentMethod: "โอนเงิน",
+  category: "เครื่องปรุง",
+  confidence: 0.95,
+});
 
 function createSignedRequest(body, secret, signature = sign(body, secret)) {
   return new Request("https://kai-tood.test/api/line/webhook", {
@@ -200,6 +222,7 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
     handleLineWebhookRequest(createSignedRequest(imageBody, secret), {
       createSupabase: () => supabase,
       fetchFn,
+      analyzeReceipt: successfulAnalysis,
       logger: console,
     }),
   );
@@ -226,18 +249,20 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
         },
       ],
     },
-    { supabase, channelAccessToken: "channel-token", fetchFn, logger: console },
+    { supabase, channelAccessToken: "channel-token", fetchFn, analyzeReceipt: successfulAnalysis, logger: console },
   );
 
   assert.equal(result.ok, true, "image event succeeds");
   assert.equal(supabase.insertedRows.length, 1, "image event is persisted");
   assert.equal(supabase.insertedRows[0].message_id, "image-message-1");
   assert.equal(supabase.insertedRows[0].message_type, "image");
-  assert.equal(supabase.insertedRows[0].processing_status, "image_received");
+  assert.equal(supabase.insertedRows[0].processing_status, "processed");
+  assert.equal(supabase.cashFlowRows.length, 1, "image creates one paid cash flow expense");
+  assert.equal(supabase.cashFlowRows[0].source_ref_id, "line:image-message-1");
   assert.match(supabase.insertedRows[0].image_storage_path, /image-message-1\.jpg$/);
   assert.equal(supabase.uploadedFiles.length, 1, "image is uploaded to storage");
   assert.equal(fetchFn.calls.length, 2, "content and reply APIs are called");
-  assert.match(fetchFn.calls[1].init.body, /ได้รับรูปบิลแล้ว/);
+  assert.match(fetchFn.calls[1].init.body, /บันทึกค่าใช้จ่ายแล้ว/);
 }
 
 {
