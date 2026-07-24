@@ -1,4 +1,4 @@
-import thaiAddressData from "../data/thai-address.json" with { type: "json" };
+import thaiAddressData from "../data/thai-address.json";
 
 type ThaiAddressTree = Record<string, Record<string, string[]>>;
 
