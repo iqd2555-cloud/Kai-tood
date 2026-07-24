@@ -30,7 +30,10 @@ export function MiniContactActions(props: Props) {
   return <div className="mt-4 grid gap-2 rounded-2xl border border-black/10 bg-black/[0.025] p-3 sm:grid-cols-3">
     <a href={`tel:${phone}`} className="rounded-xl bg-black px-4 py-3 text-center font-black text-white">โทรหาผู้สมัคร</a>
     <button type="button" onClick={copyMessage} className="rounded-xl bg-[#ffc400] px-4 py-3 font-black text-black">{copied ? "คัดลอกแล้ว" : "คัดลอกข้อความตอบกลับ"}</button>
-    <a href={LINE_URL} target="_blank" rel="noreferrer" className="rounded-xl bg-[#06C755] px-4 py-3 text-center font-black text-white">เปิด LINE Official</a>
-    {props.lineId && <p className="text-sm font-bold text-black/60 sm:col-span-3">LINE ID ที่ผู้สมัครแจ้ง: <span className="font-black text-black">{props.lineId}</span></p>}
+    <a href={LINE_URL} target="_blank" rel="noreferrer" className="rounded-xl bg-[#06C755] px-4 py-3 text-center font-black text-white">เปิด LINE OA เพื่อตรวจข้อความ</a>
+    <div className="rounded-xl bg-white p-3 text-sm font-bold leading-6 text-black/60 sm:col-span-3">
+      <p>ใช้เลขอ้างอิง <span className="font-mono font-black text-[#E60012]">{props.referenceCode}</span> ตรวจสอบข้อความที่ลูกค้าส่งเข้ามา ปุ่มนี้ไม่ได้เปิดห้องแชตของผู้สมัครโดยตรง</p>
+      {props.lineId && <p className="mt-1">LINE ID ที่ผู้สมัครแจ้ง: <span className="font-black text-black">{props.lineId}</span></p>}
+    </div>
   </div>;
 }
