@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import {
+  analyzeReceiptImage,
   handleLineWebhookRequest,
   processLineWebhookPayload,
   verifyLineSignature,
@@ -11,19 +12,44 @@ function sign(body, secret) {
   return createHmac("sha256", secret).update(body).digest("base64");
 }
 
-function createSupabaseMock({ insertError = null, uploadError = null } = {}) {
+function createSupabaseMock({ insertError = null, uploadError = null, updateError = null } = {}) {
   const insertedRows = [];
+  const cashFlowRows = [];
   const uploadedFiles = [];
+  const updatedRows = [];
 
   return {
     insertedRows,
+    cashFlowRows,
     uploadedFiles,
+    updatedRows,
     from(table) {
-      assert.equal(table, "line_bill_receipts");
       return {
         insert(row) {
-          insertedRows.push(row);
-          return Promise.resolve({ error: insertError });
+          if (table === "line_bill_receipts") {
+            insertedRows.push(row);
+            return Promise.resolve({ error: insertError });
+          }
+          assert.equal(table, "cash_flow_entries");
+          cashFlowRows.push(row);
+          return {
+            select() {
+              return {
+                maybeSingle() {
+                  return Promise.resolve({ data: { id: "cash-flow-entry-1" }, error: null });
+                },
+              };
+            },
+          };
+        },
+        update(row) {
+          assert.equal(table, "line_bill_receipts");
+          return {
+            eq(column, value) {
+              updatedRows.push({ row, column, value });
+              return Promise.resolve({ error: updateError });
+            },
+          };
         },
       };
     },
@@ -41,6 +67,14 @@ function createSupabaseMock({ insertError = null, uploadError = null } = {}) {
   };
 }
 
+const successfulAnalysis = async () => ({
+  merchant: "ร้านทดสอบ",
+  transactionDate: "2026-07-22",
+  amount: 125.5,
+  paymentMethod: "โอนเงิน",
+  category: "seasoning_cost",
+  confidence: 0.95,
+});
 
 function createSignedRequest(body, secret, signature = sign(body, secret)) {
   return new Request("https://kai-tood.test/api/line/webhook", {
@@ -90,6 +124,43 @@ const body = JSON.stringify({ events: [] });
 assert.equal(verifyLineSignature(body, sign(body, secret), secret), true, "valid signature passes");
 assert.equal(verifyLineSignature(body, "invalid", secret), false, "invalid signature fails");
 assert.equal(verifyLineSignature(body, null, secret), false, "missing signature fails");
+
+{
+  const calls = [];
+  const fetchFn = async (url, init) => {
+    calls.push({ url: String(url), init });
+    return Response.json({
+      choices: [{
+        finish_reason: "stop",
+        message: {
+          content: JSON.stringify({
+            merchant: "ร้านทดสอบ",
+            transactionDate: "2026-02-30",
+            amount: 125.5,
+            paymentMethod: "โอนเงิน",
+            category: "เครื่องปรุง",
+            confidence: 0.99,
+          }),
+        },
+      }],
+    });
+  };
+  const analysis = await withEnv(
+    { OPENAI_API_KEY: "test-openai-key" },
+    () => analyzeReceiptImage(
+      { contentType: "image/jpeg", data: Buffer.from("fake-image") },
+      "2026-07-21T22:30:00.000Z",
+      fetchFn,
+    ),
+  );
+  const requestBody = JSON.parse(calls[0].init.body);
+
+  assert.equal(analysis.transactionDate, "2026-07-22", "invalid or missing bill dates fall back to the Thailand event date");
+  assert.equal(analysis.category, "seasoning_cost", "Thai OCR labels map to canonical Cash Flow category codes");
+  assert.equal(analysis.confidence, 0.89, "fallback fields cannot pass the 90% auto-save threshold");
+  assert.equal(requestBody.response_format.type, "json_schema", "OCR uses schema-constrained structured output");
+  assert.equal(requestBody.messages[0].content[1].image_url.detail, "high", "receipt OCR requests high image detail");
+}
 
 {
   const result = await withEnv(
@@ -200,6 +271,7 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
     handleLineWebhookRequest(createSignedRequest(imageBody, secret), {
       createSupabase: () => supabase,
       fetchFn,
+      analyzeReceipt: successfulAnalysis,
       logger: console,
     }),
   );
@@ -226,18 +298,80 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
         },
       ],
     },
-    { supabase, channelAccessToken: "channel-token", fetchFn, logger: console },
+    { supabase, channelAccessToken: "channel-token", fetchFn, analyzeReceipt: successfulAnalysis, logger: console },
   );
 
   assert.equal(result.ok, true, "image event succeeds");
   assert.equal(supabase.insertedRows.length, 1, "image event is persisted");
   assert.equal(supabase.insertedRows[0].message_id, "image-message-1");
   assert.equal(supabase.insertedRows[0].message_type, "image");
-  assert.equal(supabase.insertedRows[0].processing_status, "image_received");
+  assert.equal(supabase.insertedRows[0].processing_status, "processed");
+  assert.equal(supabase.cashFlowRows.length, 1, "image creates one paid cash flow expense");
+  assert.equal(supabase.cashFlowRows[0].source_ref_id, "line:image-message-1");
+  assert.equal(supabase.cashFlowRows[0].category, "seasoning_cost", "cash flow stores the canonical category code");
+  assert.equal(supabase.cashFlowRows[0].document_type, "receipt");
+  assert.equal(supabase.cashFlowRows[0].has_attachment, true);
   assert.match(supabase.insertedRows[0].image_storage_path, /image-message-1\.jpg$/);
   assert.equal(supabase.uploadedFiles.length, 1, "image is uploaded to storage");
   assert.equal(fetchFn.calls.length, 2, "content and reply APIs are called");
-  assert.match(fetchFn.calls[1].init.body, /ได้รับรูปบิลแล้ว/);
+  assert.match(fetchFn.calls[1].init.body, /บันทึกค่าใช้จ่ายแล้ว/);
+}
+
+{
+  const supabase = createSupabaseMock();
+  const fetchFn = createFetchMock();
+  const belowAutoSaveThreshold = async () => ({
+    merchant: "ร้านที่ต้องตรวจ",
+    transactionDate: "2026-07-22",
+    amount: 999,
+    paymentMethod: "โอนเงิน",
+    category: "misc_expense",
+    confidence: 0.85,
+  });
+  const result = await processLineWebhookPayload(
+    {
+      events: [
+        {
+          type: "message",
+          replyToken: "reply-token-pending",
+          timestamp: 1784678400000,
+          source: { userId: "line-user-pending" },
+          message: { id: "image-message-pending", type: "image" },
+        },
+      ],
+    },
+    { supabase, channelAccessToken: "channel-token", fetchFn, analyzeReceipt: belowAutoSaveThreshold, logger: console },
+  );
+
+  assert.equal(result.ok, true, "uncertain receipt is accepted for review");
+  assert.equal(supabase.cashFlowRows.length, 0, "85% confidence does not create a paid expense");
+  assert.equal(supabase.insertedRows[0].processing_status, "pending_review");
+  assert.match(fetchFn.calls[1].init.body, /ยังไม่บันทึกยอด/);
+}
+
+{
+  const supabase = createSupabaseMock({ insertError: { code: "23505" } });
+  const fetchFn = createFetchMock();
+  const result = await processLineWebhookPayload(
+    {
+      events: [
+        {
+          type: "message",
+          replyToken: "reply-token-image-retry",
+          timestamp: 1784678400000,
+          source: { userId: "line-user-image-retry" },
+          message: { id: "image-message-retry", type: "image" },
+        },
+      ],
+    },
+    { supabase, channelAccessToken: "channel-token", fetchFn, analyzeReceipt: successfulAnalysis, logger: console },
+  );
+
+  assert.equal(result.ok, true, "retried image event reuses the existing receipt row");
+  assert.equal(supabase.cashFlowRows.length, 1, "cash flow insert remains protected by its source reference");
+  assert.equal(supabase.updatedRows.length, 1, "existing receipt metadata and cash flow link are refreshed");
+  assert.equal(supabase.updatedRows[0].value, "image-message-retry");
+  assert.equal(fetchFn.calls.length, 1, "retried image event does not send a duplicate LINE reply");
 }
 
 {
