@@ -262,6 +262,40 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
 }
 
 {
+  const fetchFn = async () => Response.json({
+    choices: [{
+      finish_reason: "stop",
+      message: {
+        content: JSON.stringify({
+          merchant: "นาย ธีรวุฒิ พันธุ์หงษ์",
+          transactionDate: "2026-07-24",
+          amount: 440,
+          paymentMethod: "โอนเงิน",
+          category: "อื่นๆ",
+          confidence: 0.85,
+          documentType: "bank_transfer_slip",
+          memo: "",
+          recipientReference: "xxx-x-x2375-xxx",
+        }),
+      },
+    }],
+  });
+  const analysis = await withEnv(
+    { OPENAI_API_KEY: "test-openai-key" },
+    () => analyzeReceiptImage(
+      { contentType: "image/jpeg", data: Buffer.from("fake-teerawut-transport-slip") },
+      "2026-07-24T08:40:00.000Z",
+      fetchFn,
+    ),
+  );
+
+  assert.equal(analysis.amount, 440);
+  assert.equal(analysis.category, "transport", "Teerawut recipient rule locks the category to transport");
+  assert.equal(analysis.merchant, "ค่าขนส่งไก่ - นาย ธีรวุฒิ พันธุ์หงษ์");
+  assert.equal(analysis.confidence, 0.95, "complete known-recipient transport slip is eligible for automatic recording");
+}
+
+{
   const result = await withEnv(
     {
       NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",

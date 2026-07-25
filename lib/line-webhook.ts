@@ -85,6 +85,7 @@ type LockedRecipientExpenseRule = {
   names: string[];
   references: string[];
   category: keyof typeof RECEIPT_CATEGORY_LABEL_BY_CODE;
+  description?: string;
 };
 
 const LOCKED_RECIPIENT_EXPENSE_RULES: LockedRecipientExpenseRule[] = [
@@ -93,20 +94,30 @@ const LOCKED_RECIPIENT_EXPENSE_RULES: LockedRecipientExpenseRule[] = [
     references: ["010753600031508"],
     category: "seasoning_cost",
   },
+  {
+    names: ["ธีรวุฒิ พันธุ์หงษ์", "ธีรวุฒิ พันธุ์หงส์"],
+    references: [],
+    category: "transport",
+    description: "ค่าขนส่งไก่",
+  },
 ];
 
 function normalizedRecipientIdentity(value: string) {
   return value.replace(/[^\p{L}\p{N}]/gu, "").toLocaleLowerCase("th-TH");
 }
 
-function lockedRecipientCategory(merchant: string, recipientReference: string) {
+function lockedRecipientRule(merchant: string, recipientReference: string) {
   const normalizedMerchant = normalizedRecipientIdentity(merchant);
   const normalizedReference = recipientReference.replace(/\D/gu, "");
 
   return LOCKED_RECIPIENT_EXPENSE_RULES.find((rule) =>
     rule.names.some((name) => normalizedMerchant.includes(normalizedRecipientIdentity(name)))
     || rule.references.some((reference) => normalizedReference.includes(reference.replace(/\D/gu, "")))
-  )?.category ?? null;
+  ) ?? null;
+}
+
+function lockedRecipientCategory(merchant: string, recipientReference: string) {
+  return lockedRecipientRule(merchant, recipientReference)?.category ?? null;
 }
 
 type ReceiptAnalysis = {
@@ -387,8 +398,12 @@ export async function analyzeReceiptImage(
   const memo = String(parsed.memo ?? "").trim();
   const recipientReference = String(parsed.recipientReference ?? "").trim();
   const documentType = String(parsed.documentType ?? "").trim();
-  const recipientCategory = lockedRecipientCategory(merchant, recipientReference);
+  const recipientRule = lockedRecipientRule(merchant, recipientReference);
+  const recipientCategory = recipientRule?.category ?? null;
   const category = receiptCategory(parsed.category, merchant, memo, recipientReference);
+  const description = recipientRule?.description
+    ? `${recipientRule.description} - ${merchant}`
+    : merchant;
   const hasCompleteFields = Boolean(
     merchant
     && paymentMethod
@@ -413,7 +428,7 @@ export async function analyzeReceiptImage(
     : Math.min(reportedConfidence, MAX_INCOMPLETE_RECEIPT_CONFIDENCE);
 
   return {
-    merchant: merchant || "ไม่ทราบชื่อร้าน",
+    merchant: description || "ไม่ทราบชื่อร้าน",
     transactionDate: isActualISODate(transactionDate) ? transactionDate : thailandDate(eventAt),
     amount: Number.isFinite(amount) && amount > 0 ? amount : 0,
     paymentMethod: paymentMethod || "ไม่ระบุ",
