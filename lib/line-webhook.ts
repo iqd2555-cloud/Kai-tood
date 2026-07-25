@@ -248,6 +248,18 @@ function isActualISODate(value: unknown): value is string {
   return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
 }
 
+function normalizeCashFlowDate(value: unknown, eventAt: string) {
+  const raw = typeof value === "string" ? value.trim() : "";
+  const fallback = thailandDate(eventAt);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return fallback;
+
+  const [rawYear, month, day] = raw.split("-").map(Number);
+  const year = rawYear >= 2400 && rawYear <= 2999 ? rawYear - 543 : rawYear;
+  const normalized = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+  return isActualISODate(normalized) ? normalized : fallback;
+}
+
 function canAutoSaveReceipt(analysis: ReceiptAnalysis) {
   return analysis.amount > 0
     && analysis.confidence >= RECEIPT_CONFIDENCE_THRESHOLD
@@ -394,7 +406,7 @@ export async function analyzeReceiptImage(
   const reportedConfidence = Math.max(0, Math.min(1, Number(parsed.confidence) || 0));
   const merchant = String(parsed.merchant ?? "").trim();
   const paymentMethod = String(parsed.paymentMethod ?? "").trim();
-  const transactionDate = String(parsed.transactionDate ?? "").trim();
+  const transactionDate = normalizeCashFlowDate(parsed.transactionDate, eventAt);
   const memo = String(parsed.memo ?? "").trim();
   const recipientReference = String(parsed.recipientReference ?? "").trim();
   const documentType = String(parsed.documentType ?? "").trim();
@@ -429,7 +441,7 @@ export async function analyzeReceiptImage(
 
   return {
     merchant: description || "ไม่ทราบชื่อร้าน",
-    transactionDate: isActualISODate(transactionDate) ? transactionDate : thailandDate(eventAt),
+    transactionDate,
     amount: Number.isFinite(amount) && amount > 0 ? amount : 0,
     paymentMethod: paymentMethod || "ไม่ระบุ",
     category: category.code,
@@ -500,7 +512,7 @@ export async function analyzeCashFlowText(
   const amount = Number(parsed.amount);
   const description = String(parsed.description ?? "").trim();
   const paymentMethod = String(parsed.paymentMethod ?? "").trim();
-  const transactionDate = String(parsed.transactionDate ?? "").trim();
+  const transactionDate = normalizeCashFlowDate(parsed.transactionDate, eventAt);
   const category = receiptCategory(parsed.category, "");
 
   if (!(Number.isFinite(amount) && amount > 0 && description && category.recognized)) {
@@ -508,7 +520,7 @@ export async function analyzeCashFlowText(
   }
 
   return {
-    transactionDate: isActualISODate(transactionDate) ? transactionDate : thailandDate(eventAt),
+    transactionDate,
     amount,
     description,
     paymentMethod: paymentMethod || "ไม่ระบุ",
@@ -574,14 +586,14 @@ export async function analyzeCashFlowIncomeText(
   const amount = Number(parsed.amount);
   const description = String(parsed.description ?? "").trim();
   const paymentMethod = String(parsed.paymentMethod ?? "").trim();
-  const transactionDate = String(parsed.transactionDate ?? "").trim();
+  const transactionDate = normalizeCashFlowDate(parsed.transactionDate, eventAt);
 
   if (!(Number.isFinite(amount) && amount > 0 && description)) {
     throw new Error("Cash Flow sales text does not contain a valid received amount");
   }
 
   return {
-    transactionDate: isActualISODate(transactionDate) ? transactionDate : thailandDate(eventAt),
+    transactionDate,
     amount,
     description,
     paymentMethod: paymentMethod || "ไม่ระบุ",
