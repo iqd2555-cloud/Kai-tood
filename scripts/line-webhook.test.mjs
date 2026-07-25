@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import {
+  analyzeCashFlowIncomeText,
   analyzeReceiptImage,
   handleLineWebhookRequest,
   processLineWebhookPayload,
@@ -124,6 +125,34 @@ const body = JSON.stringify({ events: [] });
 assert.equal(verifyLineSignature(body, sign(body, secret), secret), true, "valid signature passes");
 assert.equal(verifyLineSignature(body, "invalid", secret), false, "invalid signature fails");
 assert.equal(verifyLineSignature(body, null, secret), false, "missing signature fails");
+
+{
+  const fetchFn = async () => Response.json({
+    choices: [{
+      finish_reason: "stop",
+      message: {
+        content: JSON.stringify({
+          transactionDate: "2569-07-25",
+          amount: 650,
+          description: "ขายหนังสือสูตรไก่ทอดเล่มละ 650 บาท 1 เล่ม",
+          paymentMethod: "ไม่ระบุ",
+          category: "ขายหนังสือ",
+        }),
+      },
+    }],
+  });
+  const analysis = await withEnv(
+    { OPENAI_API_KEY: "test-openai-key" },
+    () => analyzeCashFlowIncomeText(
+      "ขายหนังสือสูตรไก่ทอดเล่มละ 650 บาท 1 เล่มวันที่ 25 กรกฎาคม 2569",
+      "2026-07-25T23:13:00.000Z",
+      fetchFn,
+    ),
+  );
+
+  assert.equal(analysis.transactionDate, "2026-07-25", "Thai Buddhist years are converted to Gregorian years");
+  assert.equal(analysis.category, "recipe_book_sales");
+}
 
 {
   const calls = [];
