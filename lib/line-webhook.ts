@@ -764,7 +764,11 @@ export async function processLineWebhookPayload(payload: LineWebhookPayload, dep
           }
         } else if (looksLikeIncomeCommand(messageText)) {
           const eventAt = eventDate(event.timestamp);
-          const analysis = await (deps.analyzeTextIncome ?? analyzeCashFlowIncomeText)(messageText, eventAt, fetchFn);
+          const analyzedIncome = await (deps.analyzeTextIncome ?? analyzeCashFlowIncomeText)(messageText, eventAt, fetchFn);
+          const analysis = {
+            ...analyzedIncome,
+            category: deterministicIncomeCategory(messageText, analyzedIncome.category),
+          };
           const cashFlowEntryId = await insertTextCashFlowIncome(deps.supabase, event, analysis);
           const { inserted } = await insertBillReceiptEvent(deps.supabase, event, null, undefined, cashFlowEntryId);
 
