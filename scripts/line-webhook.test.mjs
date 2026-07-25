@@ -527,6 +527,51 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
 {
   const supabase = createSupabaseMock();
   const fetchFn = createFetchMock();
+  const incorrectlyAnalyzedAsCourse = async () => ({
+    transactionDate: "2026-07-25",
+    amount: 2700,
+    description: "ขายข้าวเหนียวไก่ทอดหน้าร้าน 135 ห่อ",
+    paymentMethod: "ไม่ระบุ",
+    category: "course_sales",
+  });
+  const result = await processLineWebhookPayload(
+    {
+      events: [
+        {
+          type: "message",
+          replyToken: "reply-token-storefront-income",
+          timestamp: 1784990340000,
+          source: { userId: "line-user-storefront-income" },
+          message: {
+            id: "text-income-storefront-1",
+            type: "text",
+            text: "ขายข้าวเหนียวไก่ทอดหน้าร้าน 135 ห่อห่อละ 20 บาท เป็นเงิน 2,700 บาท order โรงเรียนกีฬานครปฐม",
+          },
+        },
+      ],
+    },
+    {
+      supabase,
+      channelAccessToken: "channel-token",
+      fetchFn,
+      analyzeTextIncome: incorrectlyAnalyzedAsCourse,
+      logger: console,
+    },
+  );
+
+  assert.equal(result.ok, true, "storefront sticky-rice fried-chicken sale is recorded");
+  assert.equal(supabase.cashFlowRows.length, 1);
+  assert.equal(
+    supabase.cashFlowRows[0].category,
+    "sales_revenue",
+    "deterministic storefront rule overrides an incorrect AI course category",
+  );
+  assert.match(fetchFn.calls[0].init.body, /หมวด ยอดขายหน้าร้าน/);
+}
+
+{
+  const supabase = createSupabaseMock();
+  const fetchFn = createFetchMock();
   const result = await processLineWebhookPayload(
     {
       events: [
