@@ -88,6 +88,8 @@ type ReceiptAnalysis = {
   paymentMethod: string;
   category: string;
   confidence: number;
+  documentType?: "bank_transfer_slip" | "invoice_receipt" | "other";
+  memo?: string;
 };
 
 type TextExpenseAnalysis = {
@@ -164,12 +166,30 @@ function thailandDate(value: string | number | undefined) {
     : dateOnlyInTimeZone(date, THAILAND_TIME_ZONE);
 }
 
-function receiptCategory(value: unknown, merchant: string) {
+function receiptCategoryFromMemo(memo: string) {
+  const normalized = memo.replace(/\s+/gu, "").toLocaleLowerCase("th-TH");
+  if (normalized.includes("ค่าแรง") || normalized.includes("ค่าจ้าง")) return "labor_cost";
+  if (normalized.includes("ค่าน้ำแข็ง") || normalized.includes("น้ำแข็ง")) return "ice_cost";
+  if (normalized.includes("ค่าขนส่ง") || normalized.includes("ค่าส่ง")) return "transport";
+  if (normalized.includes("ค่าเช่า")) return "rent_payment";
+  if (normalized.includes("อินเทอร์เน็ต")) return "internet_payment";
+  if (normalized.includes("เครื่องปรุง")) return "seasoning_cost";
+  if (normalized.includes("ข้าวเหนียว") || normalized.includes("วัตถุดิบ")) return "ingredient_purchase";
+  if (normalized.includes("ไก่สด")) return "chicken_purchase";
+  return null;
+}
+
+function receiptCategory(value: unknown, merchant: string, memo = "") {
   const text = String(value ?? "").trim();
+  const memoCategory = receiptCategoryFromMemo(memo);
   const normalizedMerchant = merchant.toLocaleLowerCase("th-TH");
   const isKvsChickenSupplier = normalizedMerchant.includes("เควีเอส เฟรชโปรดักส์")
     || normalizedMerchant.includes("kvs fresh products");
 
+  // A bank slip's memo describes the reason for payment and takes precedence over
+  // company or account names. This prevents the sender's chicken-brand name from
+  // turning a wage transfer into a chicken purchase.
+  if (memoCategory) return { code: memoCategory, recognized: true };
   // KVS invoices contain chicken, skin and offal. Keep this deterministic because
   // accounting categories must not depend solely on an OCR model's classification.
   if (isKvsChickenSupplier) return { code: "chicken_purchase", recognized: true };
@@ -287,14 +307,16 @@ export async function analyzeReceiptImage(
           schema: {
             type: "object",
             properties: {
-              merchant: { type: "string" },
+              merchant: { type: "string", description: "สลิปโอนเงินให้ใช้ชื่อผู้รับเงิน (ไปยัง) ไม่ใช่ชื่อผู้โอน (จาก); ใบเสร็จให้ใช้ชื่อร้าน" },
               transactionDate: { type: "string", description: "วันที่บนบิลรูปแบบ YYYY-MM-DD" },
               amount: { type: "number", description: "ยอดชำระสุทธิ" },
-              paymentMethod: { type: "string" },
+              paymentMethod: { type: "string", description: "สลิปที่ระบุโอนเงินสำเร็จให้ใช้ โอนเงิน" },
               category: { type: "string", enum: Object.keys(RECEIPT_CATEGORY_CODE_BY_LABEL) },
               confidence: { type: "number", minimum: 0, maximum: 1 },
+              documentType: { type: "string", enum: ["bank_transfer_slip", "invoice_receipt", "other"] },
+              memo: { type: "string", description: "ข้อความบันทึกช่วยจำ/หมายเหตุบนสลิป ถ้าไม่มีให้เป็นข้อความว่าง" },
             },
-            required: ["merchant", "transactionDate", "amount", "paymentMethod", "category", "confidence"],
+            required: ["merchant", "transactionDate", "amount", "paymentMethod", "category", "confidence", "documentType", "memo"],
             additionalProperties: false,
           },
         },
@@ -304,7 +326,7 @@ export async function analyzeReceiptImage(
         content: [
           {
             type: "text",
-            text: `อ่านบิลค่าใช้จ่ายภาษาไทย แยก merchant, transactionDate, amount, paymentMethod, category และ confidence. รายการไก่ เนื้อไก่ หนังไก่ หรือเครื่องในไก่ให้จัด category เป็นไก่สด. หากไม่เห็นวันที่ให้ใช้ ${thailandDate(eventAt)} และตั้ง confidence ต่ำกว่า ${RECEIPT_CONFIDENCE_THRESHOLD}`,
+            text: `อ่านเอกสารค่าใช้จ่ายภาษาไทย แยก merchant, transactionDate, amount, paymentMethod, category, confidence, documentType และ memo. สำหรับสลิปโอนเงิน: merchant ต้องเป็นชื่อผู้รับใต้คำว่า "ไปยัง" ห้ามใช้ชื่อบริษัทผู้โอนใต้คำว่า "จาก"; ถ้ามี "โอนเงินสำเร็จ" ให้ paymentMethod เป็น "โอนเงิน"; คัดลอก "บันทึกช่วยจำ" ลง memo และใช้ memo เป็นหลักในการเลือกหมวด เช่น ค่าแรง/ค่าจ้างต้องเป็น "ค่าแรง" แม้ชื่อผู้โอนมีคำว่าไก่. สำหรับใบเสร็จซื้อไก่ เนื้อไก่ หนังไก่ หรือเครื่องในไก่ให้ category เป็นไก่สด. หากไม่เห็นวันที่ให้ใช้ ${thailandDate(eventAt)} และตั้ง confidence ต่ำกว่า ${RECEIPT_CONFIDENCE_THRESHOLD}`,
           },
           {
             type: "image_url",
@@ -329,7 +351,9 @@ export async function analyzeReceiptImage(
   const merchant = String(parsed.merchant ?? "").trim();
   const paymentMethod = String(parsed.paymentMethod ?? "").trim();
   const transactionDate = String(parsed.transactionDate ?? "").trim();
-  const category = receiptCategory(parsed.category, merchant);
+  const memo = String(parsed.memo ?? "").trim();
+  const documentType = String(parsed.documentType ?? "").trim();
+  const category = receiptCategory(parsed.category, merchant, memo);
   const hasCompleteFields = Boolean(
     merchant
     && paymentMethod
@@ -338,8 +362,17 @@ export async function analyzeReceiptImage(
     && isActualISODate(transactionDate)
     && category.recognized,
   );
+  const isCompleteBankTransferSlip = Boolean(
+    hasCompleteFields
+    && documentType === "bank_transfer_slip"
+    && paymentMethod.includes("โอน")
+    && memo
+    && receiptCategoryFromMemo(memo),
+  );
   const confidence = hasCompleteFields
-    ? reportedConfidence
+    ? isCompleteBankTransferSlip
+      ? Math.max(reportedConfidence, 0.95)
+      : reportedConfidence
     : Math.min(reportedConfidence, MAX_INCOMPLETE_RECEIPT_CONFIDENCE);
 
   return {
@@ -349,6 +382,10 @@ export async function analyzeReceiptImage(
     paymentMethod: paymentMethod || "ไม่ระบุ",
     category: category.code,
     confidence,
+    documentType: documentType === "bank_transfer_slip" || documentType === "invoice_receipt"
+      ? documentType
+      : "other",
+    memo,
   };
 }
 
