@@ -192,6 +192,41 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
 }
 
 {
+  const fetchFn = async () => Response.json({
+    choices: [{
+      finish_reason: "stop",
+      message: {
+        content: JSON.stringify({
+          merchant: "น.ส. สุชาดา ธัญญผล",
+          transactionDate: "2026-07-25",
+          amount: 350,
+          paymentMethod: "โอนเงิน",
+          category: "ไก่สด",
+          confidence: 0.85,
+          documentType: "bank_transfer_slip",
+          memo: "ค่าแรง",
+        }),
+      },
+    }],
+  });
+  const analysis = await withEnv(
+    { OPENAI_API_KEY: "test-openai-key" },
+    () => analyzeReceiptImage(
+      { contentType: "image/jpeg", data: Buffer.from("fake-labor-bank-slip") },
+      "2026-07-25T05:41:00.000Z",
+      fetchFn,
+    ),
+  );
+
+  assert.equal(analysis.merchant, "น.ส. สุชาดา ธัญญผล", "bank slip stores the payee rather than the sender");
+  assert.equal(analysis.category, "labor_cost", "memo ค่าแรง overrides an incorrect chicken category");
+  assert.equal(analysis.paymentMethod, "โอนเงิน");
+  assert.equal(analysis.documentType, "bank_transfer_slip");
+  assert.equal(analysis.memo, "ค่าแรง");
+  assert.equal(analysis.confidence, 0.95, "complete transfer slip is eligible for automatic recording");
+}
+
+{
   const result = await withEnv(
     {
       NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
