@@ -224,6 +224,25 @@ function incomeCategoryLabel(code: string) {
   return INCOME_CATEGORY_LABEL_BY_CODE[code] ?? INCOME_CATEGORY_LABEL_BY_CODE.other_income;
 }
 
+function deterministicIncomeCategory(messageText: string, analyzedCategory: unknown) {
+  const normalized = messageText.replace(/\s+/gu, "").toLocaleLowerCase("th-TH");
+
+  // Owner-defined sales rules take precedence over the model. A long LINE message
+  // may contain unrelated words, but these product phrases identify the actual sale.
+  if (
+    normalized.includes("ข้าวเหนียวไก่ทอด")
+    || normalized.includes("ขายหน้าร้าน")
+    || (normalized.includes("ไก่ทอด") && normalized.includes("ห่อ"))
+  ) return "sales_revenue";
+  if (normalized.includes("ไก่หมัก")) return "marinated_chicken_sales";
+  if (normalized.includes("ไก่สด")) return "fresh_chicken_sales";
+  if (normalized.includes("หนังสือ")) return "recipe_book_sales";
+  if (normalized.includes("แฟรนไชส์")) return "franchise_income";
+  if (normalized.includes("คอร์ส") || normalized.includes("อบรม")) return "course_sales";
+
+  return incomeCategory(analyzedCategory);
+}
+
 function receiptReviewReasons(analysis: ReceiptAnalysis) {
   const reasons: string[] = [];
   if (!(analysis.amount > 0)) reasons.push("ไม่พบยอดชำระ");
@@ -447,7 +466,7 @@ export async function analyzeCashFlowIncomeText(
       },
       messages: [{
         role: "user",
-        content: `แยกข้อความขายสดที่รับเงินแล้วสำหรับ Cash Flow: "${text}". คำนวณสมการจำนวนคูณราคา เช่น 68*50=3400 และใช้ยอดหลังเครื่องหมายเท่ากับ หากไม่ระบุช่องทางให้ใช้ "ไม่ระบุ" หากไม่ระบุวันที่ให้ใช้ ${thailandDate(eventAt)} สินค้าที่ไม่ตรงหมวดเฉพาะให้ใช้รายรับอื่น`,
+        content: `แยกข้อความขายสดที่รับเงินแล้วสำหรับ Cash Flow: "${text}". คำนวณสมการจำนวนคูณราคา เช่น 68*50=3400 และใช้ยอดหลังเครื่องหมายเท่ากับ หากไม่ระบุช่องทางให้ใช้ "ไม่ระบุ" หากไม่ระบุวันที่ให้ใช้ ${thailandDate(eventAt)} ข้าวเหนียวไก่ทอด การขายเป็นห่อ และคำว่าหน้าร้านต้องเป็นหมวด "ยอดขายหน้าร้าน" ไม่ใช่ "ขายคอร์ส" สินค้าที่ไม่ตรงหมวดเฉพาะให้ใช้รายรับอื่น`,
       }],
     }),
   });
@@ -476,7 +495,7 @@ export async function analyzeCashFlowIncomeText(
     amount,
     description,
     paymentMethod: paymentMethod || "ไม่ระบุ",
-    category: incomeCategory(parsed.category),
+    category: deterministicIncomeCategory(text, parsed.category),
   };
 }
 
