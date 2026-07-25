@@ -227,6 +227,41 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
 }
 
 {
+  const fetchFn = async () => Response.json({
+    choices: [{
+      finish_reason: "stop",
+      message: {
+        content: JSON.stringify({
+          merchant: "ไพรม์สุข",
+          transactionDate: "2026-07-25",
+          amount: 1307,
+          paymentMethod: "โอนเงิน",
+          category: "อื่นๆ",
+          confidence: 0.85,
+          documentType: "bank_transfer_slip",
+          memo: "",
+          recipientReference: "Biller ID: 010753600031508",
+        }),
+      },
+    }],
+  });
+  const analysis = await withEnv(
+    { OPENAI_API_KEY: "test-openai-key" },
+    () => analyzeReceiptImage(
+      { contentType: "image/jpeg", data: Buffer.from("fake-primesuk-bill-slip") },
+      "2026-07-25T04:50:00.000Z",
+      fetchFn,
+    ),
+  );
+
+  assert.equal(analysis.merchant, "ไพรม์สุข");
+  assert.equal(analysis.amount, 1307);
+  assert.equal(analysis.category, "seasoning_cost", "Primesuk recipient rule locks the category to seasoning");
+  assert.equal(analysis.recipientReference, "Biller ID: 010753600031508");
+  assert.equal(analysis.confidence, 0.95, "complete known-recipient bill slip is eligible for automatic recording");
+}
+
+{
   const result = await withEnv(
     {
       NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
