@@ -81,6 +81,34 @@ const RECEIPT_CATEGORY_LABEL_BY_CODE: Record<string, string> = {
   misc_expense: "ค่าใช้จ่ายจิปาถะ",
 };
 
+type LockedRecipientExpenseRule = {
+  names: string[];
+  references: string[];
+  category: keyof typeof RECEIPT_CATEGORY_LABEL_BY_CODE;
+};
+
+const LOCKED_RECIPIENT_EXPENSE_RULES: LockedRecipientExpenseRule[] = [
+  {
+    names: ["ไพรม์สุข", "ไพรมสุข"],
+    references: ["010753600031508"],
+    category: "seasoning_cost",
+  },
+];
+
+function normalizedRecipientIdentity(value: string) {
+  return value.replace(/[^\p{L}\p{N}]/gu, "").toLocaleLowerCase("th-TH");
+}
+
+function lockedRecipientCategory(merchant: string, recipientReference: string) {
+  const normalizedMerchant = normalizedRecipientIdentity(merchant);
+  const normalizedReference = recipientReference.replace(/\D/gu, "");
+
+  return LOCKED_RECIPIENT_EXPENSE_RULES.find((rule) =>
+    rule.names.some((name) => normalizedMerchant.includes(normalizedRecipientIdentity(name)))
+    || rule.references.some((reference) => normalizedReference.includes(reference.replace(/\D/gu, "")))
+  )?.category ?? null;
+}
+
 type ReceiptAnalysis = {
   merchant: string;
   transactionDate: string;
@@ -90,6 +118,7 @@ type ReceiptAnalysis = {
   confidence: number;
   documentType?: "bank_transfer_slip" | "invoice_receipt" | "other";
   memo?: string;
+  recipientReference?: string;
 };
 
 type TextExpenseAnalysis = {
@@ -179,16 +208,19 @@ function receiptCategoryFromMemo(memo: string) {
   return null;
 }
 
-function receiptCategory(value: unknown, merchant: string, memo = "") {
+function receiptCategory(value: unknown, merchant: string, memo = "", recipientReference = "") {
   const text = String(value ?? "").trim();
+  const recipientCategory = lockedRecipientCategory(merchant, recipientReference);
   const memoCategory = receiptCategoryFromMemo(memo);
   const normalizedMerchant = merchant.toLocaleLowerCase("th-TH");
   const isKvsChickenSupplier = normalizedMerchant.includes("เควีเอส เฟรชโปรดักส์")
     || normalizedMerchant.includes("kvs fresh products");
 
+  // Owner-defined recipient rules are authoritative. Biller IDs/account references
+  // are checked alongside OCR-tolerant recipient aliases so gradual additions stay deterministic.
+  if (recipientCategory) return { code: recipientCategory, recognized: true };
   // A bank slip's memo describes the reason for payment and takes precedence over
-  // company or account names. This prevents the sender's chicken-brand name from
-  // turning a wage transfer into a chicken purchase.
+  // company or account names when the recipient has no locked rule.
   if (memoCategory) return { code: memoCategory, recognized: true };
   // KVS invoices contain chicken, skin and offal. Keep this deterministic because
   // accounting categories must not depend solely on an OCR model's classification.
@@ -315,8 +347,9 @@ export async function analyzeReceiptImage(
               confidence: { type: "number", minimum: 0, maximum: 1 },
               documentType: { type: "string", enum: ["bank_transfer_slip", "invoice_receipt", "other"] },
               memo: { type: "string", description: "ข้อความบันทึกช่วยจำ/หมายเหตุบนสลิป ถ้าไม่มีให้เป็นข้อความว่าง" },
+              recipientReference: { type: "string", description: "Biller ID เลขบัญชีผู้รับ หรือรหัสร้านค้า ถ้าไม่มีให้เป็นข้อความว่าง" },
             },
-            required: ["merchant", "transactionDate", "amount", "paymentMethod", "category", "confidence", "documentType", "memo"],
+            required: ["merchant", "transactionDate", "amount", "paymentMethod", "category", "confidence", "documentType", "memo", "recipientReference"],
             additionalProperties: false,
           },
         },
@@ -326,7 +359,7 @@ export async function analyzeReceiptImage(
         content: [
           {
             type: "text",
-            text: `อ่านเอกสารค่าใช้จ่ายภาษาไทย แยก merchant, transactionDate, amount, paymentMethod, category, confidence, documentType และ memo. สำหรับสลิปโอนเงิน: merchant ต้องเป็นชื่อผู้รับใต้คำว่า "ไปยัง" ห้ามใช้ชื่อบริษัทผู้โอนใต้คำว่า "จาก"; ถ้ามี "โอนเงินสำเร็จ" ให้ paymentMethod เป็น "โอนเงิน"; คัดลอก "บันทึกช่วยจำ" ลง memo และใช้ memo เป็นหลักในการเลือกหมวด เช่น ค่าแรง/ค่าจ้างต้องเป็น "ค่าแรง" แม้ชื่อผู้โอนมีคำว่าไก่. สำหรับใบเสร็จซื้อไก่ เนื้อไก่ หนังไก่ หรือเครื่องในไก่ให้ category เป็นไก่สด. หากไม่เห็นวันที่ให้ใช้ ${thailandDate(eventAt)} และตั้ง confidence ต่ำกว่า ${RECEIPT_CONFIDENCE_THRESHOLD}`,
+            text: `อ่านเอกสารค่าใช้จ่ายภาษาไทย แยก merchant, transactionDate, amount, paymentMethod, category, confidence, documentType, memo และ recipientReference. สำหรับสลิปโอนเงิน/จ่ายบิล: merchant ต้องเป็นชื่อผู้รับใต้คำว่า "ไปยัง" ห้ามใช้ชื่อบริษัทผู้โอนใต้คำว่า "จาก"; คัดลอก Biller ID เลขบัญชีผู้รับ หรือรหัสร้านค้าลง recipientReference; ถ้ามี "โอนเงินสำเร็จ" หรือ "จ่ายบิลสำเร็จ" ให้ paymentMethod เป็น "โอนเงิน"; คัดลอก "บันทึกช่วยจำ" ลง memo และใช้ memo เป็นหลักในการเลือกหมวด เช่น ค่าแรง/ค่าจ้างต้องเป็น "ค่าแรง" แม้ชื่อผู้โอนมีคำว่าไก่. สำหรับใบเสร็จซื้อไก่ เนื้อไก่ หนังไก่ หรือเครื่องในไก่ให้ category เป็นไก่สด. หากไม่เห็นวันที่ให้ใช้ ${thailandDate(eventAt)} และตั้ง confidence ต่ำกว่า ${RECEIPT_CONFIDENCE_THRESHOLD}`,
           },
           {
             type: "image_url",
@@ -352,8 +385,10 @@ export async function analyzeReceiptImage(
   const paymentMethod = String(parsed.paymentMethod ?? "").trim();
   const transactionDate = String(parsed.transactionDate ?? "").trim();
   const memo = String(parsed.memo ?? "").trim();
+  const recipientReference = String(parsed.recipientReference ?? "").trim();
   const documentType = String(parsed.documentType ?? "").trim();
-  const category = receiptCategory(parsed.category, merchant, memo);
+  const recipientCategory = lockedRecipientCategory(merchant, recipientReference);
+  const category = receiptCategory(parsed.category, merchant, memo, recipientReference);
   const hasCompleteFields = Boolean(
     merchant
     && paymentMethod
@@ -366,8 +401,10 @@ export async function analyzeReceiptImage(
     hasCompleteFields
     && documentType === "bank_transfer_slip"
     && paymentMethod.includes("โอน")
-    && memo
-    && receiptCategoryFromMemo(memo),
+    && (
+      recipientCategory
+      || (memo && receiptCategoryFromMemo(memo))
+    ),
   );
   const confidence = hasCompleteFields
     ? isCompleteBankTransferSlip
@@ -386,6 +423,7 @@ export async function analyzeReceiptImage(
       ? documentType
       : "other",
     memo,
+    recipientReference,
   };
 }
 
