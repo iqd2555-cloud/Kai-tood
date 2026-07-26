@@ -531,7 +531,7 @@ export async function deleteCashFlowEntry(formData: FormData) {
   const admin = createSupabaseAdminClient();
   if (!admin) return finish(false, "supabase-admin-missing", "ไม่มี service role client บนเซิร์ฟเวอร์", 0);
 
-  let row = byId.data;
+  const row = byId.data;
   if (!row) {
     const adminById = await admin
       .from(CASH_FLOW_ENTRIES_TABLE)
