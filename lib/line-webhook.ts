@@ -95,7 +95,18 @@ const LOCKED_RECIPIENT_EXPENSE_RULES: LockedRecipientExpenseRule[] = [
     category: "seasoning_cost",
   },
   {
-    names: ["ธีรวุฒิ พันธุ์หงษ์", "ธีรวุฒิ พันธุ์หงส์"],
+    names: ["เควีเอส เฟรชโปรดักส์", "KVS FRESH PRODUCTS"],
+    references: [],
+    category: "chicken_purchase",
+    description: "ซื้อไก่สด",
+  },
+  {
+    names: [
+      "ธีรวุฒิ พันธุ์หงษ์",
+      "ธีรวุฒิ พันธุ์หงส์",
+      "ธีระวุฒิ พันธุ์หงษ์",
+      "ธีระวุฒิ พันธุ์หงส์",
+    ],
     references: [],
     category: "transport",
     description: "ค่าขนส่งไก่",
