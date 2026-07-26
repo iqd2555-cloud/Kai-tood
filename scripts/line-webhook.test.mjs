@@ -402,7 +402,7 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
           transactionDate: "2026-07-26",
           amount: 2430,
           paymentMethod: "ไม่ระบุ",
-          category: "ข้าวเหนียว",
+          category: "อื่นๆ",
           confidence: 0.85,
           documentType: "invoice_receipt",
           memo: "",
@@ -423,8 +423,46 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
   assert.equal(analysis.amount, 2430);
   assert.equal(analysis.documentType, "invoice_receipt");
   assert.equal(analysis.paymentMethod, "ไม่ระบุ", "the system does not invent a payment channel");
-  assert.equal(analysis.category, "ingredient_purchase");
+  assert.equal(analysis.category, "ingredient_purchase", "Thepphanya recipient rule locks the category to ingredients");
+  assert.equal(
+    analysis.merchant,
+    "ค่าวัตถุดิบ - บริษัท เทพรัญญะ (นครสวรรค์) จำกัด",
+    "the locked rule labels the expense consistently",
+  );
   assert.equal(analysis.confidence, 0.95, "complete purchase documents are eligible for automatic paid recording");
+}
+
+{
+  const fetchFn = async () => Response.json({
+    choices: [{
+      finish_reason: "stop",
+      message: {
+        content: JSON.stringify({
+          merchant: "บริษัท เทพธัญญะ นครสวรรค์ จำกัด",
+          transactionDate: "2026-07-26",
+          amount: 2430,
+          paymentMethod: "โอนเงิน",
+          category: "เครื่องปรุง",
+          confidence: 0.85,
+          documentType: "bank_transfer_slip",
+          memo: "",
+          recipientReference: "",
+        }),
+      },
+    }],
+  });
+  const analysis = await withEnv(
+    { OPENAI_API_KEY: "test-openai-key" },
+    () => analyzeReceiptImage(
+      { contentType: "image/jpeg", data: Buffer.from("fake-thepphanya-bank-slip") },
+      "2026-07-26T10:54:00.000Z",
+      fetchFn,
+    ),
+  );
+
+  assert.equal(analysis.category, "ingredient_purchase", "owner spelling also locks Thepphanya to ingredients");
+  assert.equal(analysis.merchant, "ค่าวัตถุดิบ - บริษัท เทพธัญญะ นครสวรรค์ จำกัด");
+  assert.equal(analysis.confidence, 0.95);
 }
 
 {
@@ -579,7 +617,8 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
   assert.match(supabase.insertedRows[0].image_storage_path, /image-message-1\.jpg$/);
   assert.equal(supabase.uploadedFiles.length, 1, "image is uploaded to storage");
   assert.equal(fetchFn.calls.length, 2, "content and reply APIs are called");
-  assert.match(fetchFn.calls[1].init.body, /บันทึกค่าใช้จ่ายแล้ว/);
+  assert.match(fetchFn.calls[1].init.body, /บันทึกเข้า Cash Flow แล้ว/);
+  assert.match(fetchFn.calls[1].init.body, /สถานะ จ่ายแล้ว/);
 }
 
 {
@@ -611,7 +650,7 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
   assert.equal(result.ok, true, "uncertain receipt is accepted for review");
   assert.equal(supabase.cashFlowRows.length, 0, "85% confidence does not create a paid expense");
   assert.equal(supabase.insertedRows[0].processing_status, "pending_review");
-  assert.match(fetchFn.calls[1].init.body, /ยังไม่บันทึกยอด/);
+  assert.match(fetchFn.calls[1].init.body, /ยังไม่บันทึกเป็นรายการจ่าย/);
 }
 
 {
@@ -828,7 +867,7 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
   assert.equal(supabase.insertedRows[0].processing_status, "message_received");
   assert.equal(supabase.insertedRows[0].image_storage_path, null);
   assert.equal(fetchFn.calls.length, 1, "only reply API is called for text");
-  assert.match(fetchFn.calls[0].init.body, /กรุณาส่งรูปบิล/);
+  assert.match(fetchFn.calls[0].init.body, /หรือส่งรูปบิล/);
 }
 
 {
