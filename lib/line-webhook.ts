@@ -102,6 +102,17 @@ const LOCKED_RECIPIENT_EXPENSE_RULES: LockedRecipientExpenseRule[] = [
   },
   {
     names: [
+      "เทพธัญญะ",
+      "เทพรัญญะ",
+      "บริษัท เทพธัญญะ (นครสวรรค์) จำกัด",
+      "บริษัท เทพรัญญะ (นครสวรรค์) จำกัด",
+    ],
+    references: [],
+    category: "ingredient_purchase",
+    description: "ค่าวัตถุดิบ",
+  },
+  {
+    names: [
       "ธีรวุฒิ พันธุ์หงษ์",
       "ธีรวุฒิ พันธุ์หงส์",
       "ธีระวุฒิ พันธุ์หงษ์",
@@ -268,16 +279,19 @@ function isActualISODate(value: unknown): value is string {
   return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
 }
 
-function normalizeCashFlowDate(value: unknown, eventAt: string) {
+function parsedCashFlowDate(value: unknown) {
   const raw = typeof value === "string" ? value.trim() : "";
-  const fallback = thailandDate(eventAt);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return fallback;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
 
   const [rawYear, month, day] = raw.split("-").map(Number);
   const year = rawYear >= 2400 && rawYear <= 2999 ? rawYear - 543 : rawYear;
   const normalized = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
-  return isActualISODate(normalized) ? normalized : fallback;
+  return isActualISODate(normalized) ? normalized : null;
+}
+
+function normalizeCashFlowDate(value: unknown, eventAt: string) {
+  return parsedCashFlowDate(value) ?? thailandDate(eventAt);
 }
 
 function isPaidPurchaseDocument(analysis: ReceiptAnalysis) {
@@ -431,6 +445,7 @@ export async function analyzeReceiptImage(
   const reportedConfidence = Math.max(0, Math.min(1, Number(parsed.confidence) || 0));
   const merchant = String(parsed.merchant ?? "").trim();
   const paymentMethod = String(parsed.paymentMethod ?? "").trim();
+  const parsedTransactionDate = parsedCashFlowDate(parsed.transactionDate);
   const transactionDate = normalizeCashFlowDate(parsed.transactionDate, eventAt);
   const memo = String(parsed.memo ?? "").trim();
   const recipientReference = String(parsed.recipientReference ?? "").trim();
@@ -446,7 +461,7 @@ export async function analyzeReceiptImage(
     && paymentMethod
     && Number.isFinite(amount)
     && amount > 0
-    && isActualISODate(transactionDate)
+    && parsedTransactionDate
     && category.recognized,
   );
   const isCompleteBankTransferSlip = Boolean(
@@ -869,7 +884,7 @@ export async function processLineWebhookPayload(payload: LineWebhookPayload, dep
           await replyToLine(
             event.replyToken,
             saved
-              ? `บันทึกค่าใช้จ่ายแล้ว\n${analysis.merchant}\n${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nหมวด ${receiptCategoryLabel(analysis.category)}`
+              ? `บันทึกเข้า Cash Flow แล้ว\n${analysis.merchant}\n${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nสถานะ จ่ายแล้ว\nหมวด ${receiptCategoryLabel(analysis.category)}`
               : savedPending
                 ? `บันทึกเข้า Cash Flow แล้ว\n${analysis.merchant}\n${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nสถานะ รอจ่าย\nกรุณาตรวจสอบและระบุวิธีชำระเงิน`
                 : receiptReviewMessage(analysis),
