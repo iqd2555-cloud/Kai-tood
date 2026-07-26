@@ -575,7 +575,7 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
 
   assert.equal(result.ok, true, "uncertain receipt is accepted for review");
   assert.equal(supabase.cashFlowRows.length, 0, "85% confidence does not create a paid expense");
-  assert.equal(supabase.insertedRows[0].processing_status, "processed");
+  assert.equal(supabase.insertedRows[0].processing_status, "pending_review");
   assert.match(fetchFn.calls[1].init.body, /ยังไม่บันทึกยอด/);
 }
 
@@ -610,7 +610,7 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
   assert.equal(supabase.cashFlowRows.length, 1, "purchase document creates one paid Cash Flow expense");
   assert.equal(supabase.cashFlowRows[0].status, "paid", "receipt and tax invoice are recorded as already paid");
   assert.equal(supabase.cashFlowRows[0].payment_method, "ไม่ระบุ", "payment method is not guessed");
-  assert.equal(supabase.insertedRows[0].processing_status, "pending_review");
+  assert.equal(supabase.insertedRows[0].processing_status, "processed");
   assert.equal(supabase.insertedRows[0].cash_flow_entry_id, "cash-flow-entry-1");
   assert.equal(supabase.insertedRows[0].processing_error, null);
   assert.match(fetchFn.calls[1].init.body, /บันทึกเข้า Cash Flow แล้ว/);
