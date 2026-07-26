@@ -393,6 +393,41 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
 }
 
 {
+  const fetchFn = async () => Response.json({
+    choices: [{
+      finish_reason: "stop",
+      message: {
+        content: JSON.stringify({
+          merchant: "บริษัท เทพรัญญะ (นครสวรรค์) จำกัด",
+          transactionDate: "2026-07-26",
+          amount: 2430,
+          paymentMethod: "ไม่ระบุ",
+          category: "ข้าวเหนียว",
+          confidence: 0.85,
+          documentType: "invoice_receipt",
+          memo: "",
+          recipientReference: "",
+        }),
+      },
+    }],
+  });
+  const analysis = await withEnv(
+    { OPENAI_API_KEY: "test-openai-key" },
+    () => analyzeReceiptImage(
+      { contentType: "image/jpeg", data: Buffer.from("fake-tax-invoice-and-receipt") },
+      "2026-07-26T10:54:00.000Z",
+      fetchFn,
+    ),
+  );
+
+  assert.equal(analysis.amount, 2430);
+  assert.equal(analysis.documentType, "invoice_receipt");
+  assert.equal(analysis.paymentMethod, "ไม่ระบุ", "the system does not invent a payment channel");
+  assert.equal(analysis.category, "ingredient_purchase");
+  assert.equal(analysis.confidence, 0.95, "complete purchase documents are eligible for automatic paid recording");
+}
+
+{
   const result = await withEnv(
     {
       NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
@@ -589,6 +624,7 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
     paymentMethod: "ไม่ระบุ",
     category: "chicken_purchase",
     confidence: 0.95,
+    documentType: "invoice_receipt",
   });
   const result = await processLineWebhookPayload(
     {
@@ -605,16 +641,16 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
     { supabase, channelAccessToken: "channel-token", fetchFn, analyzeReceipt: missingPaymentMethod, logger: console },
   );
 
-  assert.equal(result.ok, true, "clear invoice with no payment method is accepted for review");
-  assert.equal(supabase.cashFlowRows.length, 1, "missing payment method creates one pending Cash Flow expense");
-  assert.equal(supabase.cashFlowRows[0].status, "pending_pay", "pending invoice is not marked paid");
+  assert.equal(result.ok, true, "clear purchase document with no payment method is accepted");
+  assert.equal(supabase.cashFlowRows.length, 1, "purchase document creates one paid Cash Flow expense");
+  assert.equal(supabase.cashFlowRows[0].status, "paid", "receipt and tax invoice are recorded as already paid");
   assert.equal(supabase.cashFlowRows[0].payment_method, "ไม่ระบุ", "payment method is not guessed");
-  assert.equal(supabase.insertedRows[0].processing_status, "pending_review");
+  assert.equal(supabase.insertedRows[0].processing_status, "processed");
   assert.equal(supabase.insertedRows[0].cash_flow_entry_id, "cash-flow-entry-1");
-  assert.match(supabase.insertedRows[0].processing_error, /ไม่พบวิธีชำระเงิน/);
+  assert.equal(supabase.insertedRows[0].processing_error, null);
   assert.match(fetchFn.calls[1].init.body, /บันทึกเข้า Cash Flow แล้ว/);
   assert.match(fetchFn.calls[1].init.body, /6,300\.00/);
-  assert.match(fetchFn.calls[1].init.body, /สถานะ รอจ่าย/);
+  assert.match(fetchFn.calls[1].init.body, /สถานะ จ่ายแล้ว/);
   assert.doesNotMatch(fetchFn.calls[1].init.body, /ข้อมูลไม่ชัดเจน/);
 }
 

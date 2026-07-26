@@ -115,8 +115,9 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
       return;
     }
 
-    if (row.source !== "manual") {
-      const message = "รายการนี้มาจากระบบอื่น ไม่สามารถลบจากหน้านี้ได้";
+    const isLineEntry = row.source_ref_id?.startsWith("line:") ?? false;
+    if (row.source !== "manual" && !isLineEntry) {
+      const message = "รายการยอดขายที่ซิงก์จากระบบต้นทาง ต้องแก้หรือลบจากข้อมูลยอดขายต้นทาง";
       setDeleteError(message);
       alert(message);
       return;
@@ -195,7 +196,8 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
         <tbody>
           {localEntries.map((e) => {
             const hasDbId = Boolean(e.db_id);
-            const canDelete = hasDbId && e.source_table === "cash_flow_entries" && e.source === "manual";
+            const isLineEntry = e.source_ref_id?.startsWith("line:") ?? false;
+            const canDelete = hasDbId && e.source_table === "cash_flow_entries" && (e.source === "manual" || isLineEntry);
             if (!hasDbId) console.error("Cash Flow entry is missing db_id; action buttons were not rendered", e);
             return <tr key={e.db_id || e.id || `${e.transaction_date}-${e.description}`} className="border-b border-black/10 font-bold">
               <td className="p-3">{formatThaiDate(e.transaction_date)}</td>
@@ -209,7 +211,7 @@ export function CashFlowManualForm({ today, branches, categories, entries, branc
                 <div className="relative z-20 flex justify-center gap-2 pointer-events-auto">
                   {hasDbId ? <>
                     <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleEdit(e); }} className="relative z-20 pointer-events-auto rounded-full bg-[#FFD43B] px-3 py-2 font-black text-black">แก้ไข</button>
-                    {canDelete ? <button type="button" disabled={deletingId === e.db_id} onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleDelete(e); }} className="relative z-20 pointer-events-auto rounded-full bg-red-600 px-3 py-2 font-black text-white disabled:opacity-50">ลบ</button> : <span className="max-w-36 text-center text-xs font-black text-black/50">{e.source !== "manual" ? "รายการที่สร้างจากข้อมูลต้นทาง ต้องลบจากเมนูต้นทาง" : "รายการนี้ไม่ได้มาจาก cash_flow_entries"}</span>}
+                    {canDelete ? <button type="button" disabled={deletingId === e.db_id} onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleDelete(e); }} className="relative z-20 pointer-events-auto rounded-full bg-red-600 px-3 py-2 font-black text-white disabled:opacity-50">ลบ</button> : <span className="max-w-36 text-center text-xs font-black text-black/50">{e.source === "sales" ? "ยอดขายซิงก์ ต้องลบจากข้อมูลยอดขายต้นทาง" : "รายการนี้ไม่รองรับการลบจากหน้านี้"}</span>}
                   </> : <span className="text-xs font-black text-red-600">ไม่มี db_id</span>}
                 </div>
               </td>

@@ -280,12 +280,16 @@ function normalizeCashFlowDate(value: unknown, eventAt: string) {
   return isActualISODate(normalized) ? normalized : fallback;
 }
 
+function isPaidPurchaseDocument(analysis: ReceiptAnalysis) {
+  return analysis.documentType === "invoice_receipt";
+}
+
 function canAutoSaveReceipt(analysis: ReceiptAnalysis) {
   return analysis.amount > 0
     && analysis.confidence >= RECEIPT_CONFIDENCE_THRESHOLD
     && isActualISODate(analysis.transactionDate)
     && analysis.merchant !== "ไม่ทราบชื่อร้าน"
-    && analysis.paymentMethod !== "ไม่ระบุ"
+    && (analysis.paymentMethod !== "ไม่ระบุ" || isPaidPurchaseDocument(analysis))
     && analysis.category in RECEIPT_CATEGORY_LABEL_BY_CODE;
 }
 
@@ -295,6 +299,7 @@ function canCreatePendingCashFlowReceipt(analysis: ReceiptAnalysis) {
     && isActualISODate(analysis.transactionDate)
     && analysis.merchant !== "ไม่ทราบชื่อร้าน"
     && analysis.paymentMethod === "ไม่ระบุ"
+    && !isPaidPurchaseDocument(analysis)
     && analysis.category in RECEIPT_CATEGORY_LABEL_BY_CODE;
 }
 
@@ -343,7 +348,7 @@ function receiptReviewReasons(analysis: ReceiptAnalysis) {
   if (!(analysis.amount > 0)) reasons.push("ไม่พบยอดชำระ");
   if (!isActualISODate(analysis.transactionDate)) reasons.push("ไม่พบวันที่เอกสาร");
   if (analysis.merchant === "ไม่ทราบชื่อร้าน") reasons.push("ไม่พบชื่อร้าน");
-  if (analysis.paymentMethod === "ไม่ระบุ") reasons.push("ไม่พบวิธีชำระเงิน");
+  if (analysis.paymentMethod === "ไม่ระบุ" && !isPaidPurchaseDocument(analysis)) reasons.push("ไม่พบวิธีชำระเงิน");
   if (!(analysis.category in RECEIPT_CATEGORY_LABEL_BY_CODE)) reasons.push("ไม่สามารถระบุหมวดค่าใช้จ่าย");
   if (analysis.confidence < RECEIPT_CONFIDENCE_THRESHOLD) reasons.push("ความมั่นใจในการอ่านข้อมูลต่ำ");
   return reasons;
@@ -453,8 +458,12 @@ export async function analyzeReceiptImage(
       || (memo && receiptCategoryFromMemo(memo))
     ),
   );
+  const isCompletePaidPurchaseDocument = Boolean(
+    hasCompleteFields
+    && documentType === "invoice_receipt",
+  );
   const confidence = hasCompleteFields
-    ? isCompleteBankTransferSlip
+    ? isCompleteBankTransferSlip || isCompletePaidPurchaseDocument
       ? Math.max(reportedConfidence, 0.95)
       : reportedConfidence
     : Math.min(reportedConfidence, MAX_INCOMPLETE_RECEIPT_CONFIDENCE);
