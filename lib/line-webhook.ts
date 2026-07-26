@@ -111,6 +111,15 @@ const LOCKED_RECIPIENT_EXPENSE_RULES: LockedRecipientExpenseRule[] = [
     category: "transport",
     description: "ค่าขนส่งไก่",
   },
+  {
+    names: [
+      "สรวิศา เอี่ยมปฐม",
+      "น.ส. สรวิศา เอี่ยมปฐม",
+    ],
+    references: [],
+    category: "labor_cost",
+    description: "ค่าแรง",
+  },
 ];
 
 function normalizedRecipientIdentity(value: string) {
