@@ -226,6 +226,40 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
       finish_reason: "stop",
       message: {
         content: JSON.stringify({
+          merchant: "บจก. เควีเอส เฟรชโปรดักส์",
+          transactionDate: "2026-07-26",
+          amount: 6760,
+          paymentMethod: "โอนเงิน",
+          category: "ไก่สด",
+          confidence: 0.85,
+          documentType: "bank_transfer_slip",
+          memo: "",
+          recipientReference: "xxx-x-x7557-x",
+        }),
+      },
+    }],
+  });
+  const analysis = await withEnv(
+    { OPENAI_API_KEY: "test-openai-key" },
+    () => analyzeReceiptImage(
+      { contentType: "image/jpeg", data: Buffer.from("fake-kvs-transfer-slip") },
+      "2026-07-26T06:07:21.000Z",
+      fetchFn,
+    ),
+  );
+
+  assert.equal(analysis.amount, 6760);
+  assert.equal(analysis.category, "chicken_purchase", "KVS recipient rule locks the category to fresh chicken");
+  assert.equal(analysis.merchant, "ซื้อไก่สด - บจก. เควีเอส เฟรชโปรดักส์");
+  assert.equal(analysis.confidence, 0.95, "complete KVS transfer slip is eligible for automatic recording");
+}
+
+{
+  const fetchFn = async () => Response.json({
+    choices: [{
+      finish_reason: "stop",
+      message: {
+        content: JSON.stringify({
           merchant: "น.ส. สุชาดา ธัญญผล",
           transactionDate: "2026-07-25",
           amount: 350,
@@ -296,7 +330,7 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
       finish_reason: "stop",
       message: {
         content: JSON.stringify({
-          merchant: "นาย ธีรวุฒิ พันธุ์หงษ์",
+          merchant: "นาย ธีระวุฒิ พันธุ์หงษ์",
           transactionDate: "2026-07-24",
           amount: 440,
           paymentMethod: "โอนเงิน",
@@ -320,7 +354,7 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
 
   assert.equal(analysis.amount, 440);
   assert.equal(analysis.category, "transport", "Teerawut recipient rule locks the category to transport");
-  assert.equal(analysis.merchant, "ค่าขนส่งไก่ - นาย ธีรวุฒิ พันธุ์หงษ์");
+  assert.equal(analysis.merchant, "ค่าขนส่งไก่ - นาย ธีระวุฒิ พันธุ์หงษ์");
   assert.equal(analysis.confidence, 0.95, "complete known-recipient transport slip is eligible for automatic recording");
 }
 
