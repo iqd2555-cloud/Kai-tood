@@ -393,6 +393,41 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
 }
 
 {
+  const fetchFn = async () => Response.json({
+    choices: [{
+      finish_reason: "stop",
+      message: {
+        content: JSON.stringify({
+          merchant: "บริษัท เทพรัญญะ (นครสวรรค์) จำกัด",
+          transactionDate: "2026-07-26",
+          amount: 2430,
+          paymentMethod: "ไม่ระบุ",
+          category: "ข้าวเหนียว",
+          confidence: 0.85,
+          documentType: "invoice_receipt",
+          memo: "",
+          recipientReference: "",
+        }),
+      },
+    }],
+  });
+  const analysis = await withEnv(
+    { OPENAI_API_KEY: "test-openai-key" },
+    () => analyzeReceiptImage(
+      { contentType: "image/jpeg", data: Buffer.from("fake-tax-invoice-and-receipt") },
+      "2026-07-26T10:54:00.000Z",
+      fetchFn,
+    ),
+  );
+
+  assert.equal(analysis.amount, 2430);
+  assert.equal(analysis.documentType, "invoice_receipt");
+  assert.equal(analysis.paymentMethod, "ไม่ระบุ", "the system does not invent a payment channel");
+  assert.equal(analysis.category, "ingredient_purchase");
+  assert.equal(analysis.confidence, 0.95, "complete purchase documents are eligible for automatic paid recording");
+}
+
+{
   const result = await withEnv(
     {
       NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
