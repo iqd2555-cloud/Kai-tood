@@ -359,6 +359,40 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
 }
 
 {
+  const fetchFn = async () => Response.json({
+    choices: [{
+      finish_reason: "stop",
+      message: {
+        content: JSON.stringify({
+          merchant: "น.ส. สรวิศา เอี่ยมปฐม",
+          transactionDate: "2026-07-26",
+          amount: 350,
+          paymentMethod: "โอนเงิน",
+          category: "อื่นๆ",
+          confidence: 0.85,
+          documentType: "bank_transfer_slip",
+          memo: "",
+          recipientReference: "xxx-x-x9875-x",
+        }),
+      },
+    }],
+  });
+  const analysis = await withEnv(
+    { OPENAI_API_KEY: "test-openai-key" },
+    () => analyzeReceiptImage(
+      { contentType: "image/jpeg", data: Buffer.from("fake-sorawisa-labor-slip") },
+      "2026-07-26T09:20:00.000Z",
+      fetchFn,
+    ),
+  );
+
+  assert.equal(analysis.amount, 350);
+  assert.equal(analysis.category, "labor_cost", "Sorawisa recipient rule locks the category to labor");
+  assert.equal(analysis.merchant, "ค่าแรง - น.ส. สรวิศา เอี่ยมปฐม");
+  assert.equal(analysis.confidence, 0.95, "complete known-recipient labor slip is eligible for automatic recording");
+}
+
+{
   const result = await withEnv(
     {
       NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
