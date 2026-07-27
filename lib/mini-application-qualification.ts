@@ -1,4 +1,5 @@
-import type { MiniFranchiseApplication } from "@/lib/types";
+import type { MiniFranchiseApplication } from "./types.ts";
+import { evaluateMiniInvestmentBudget } from "./mini-investment-budget.ts";
 
 export type MiniQualification = {
   group: "A" | "B" | "C";
@@ -9,7 +10,7 @@ export type MiniQualification = {
 };
 
 export function qualifyMiniApplication(
-  application: Pick<MiniFranchiseApplication, "status" | "has_location" | "extra_budget_range" | "location_description" | "location_address" | "actual_seller" | "ready_to_open">,
+  application: Pick<MiniFranchiseApplication, "status" | "has_location" | "investment_budget_range" | "location_description" | "location_address" | "actual_seller" | "ready_to_open">,
 ): MiniQualification {
   if (application.status === "area_conflict" || application.status === "rejected") {
     return {
@@ -17,6 +18,17 @@ export function qualifyMiniApplication(
       score: 0,
       label: "กลุ่ม C — ยังไม่ควรโทร",
       reason: application.status === "area_conflict" ? "พื้นที่ซ้ำหรืออยู่ระหว่างตรวจสอบเขตคุ้มครอง" : "ใบสมัครไม่ผ่าน",
+      tone: "border-red-200 bg-red-50 text-red-800",
+    };
+  }
+
+  const investmentBudget = evaluateMiniInvestmentBudget(application.investment_budget_range);
+  if (investmentBudget.belowMinimum) {
+    return {
+      group: "C",
+      score: 0,
+      label: "กลุ่ม C — ไม่ต้องโทรกลับ",
+      reason: investmentBudget.reason,
       tone: "border-red-200 bg-red-50 text-red-800",
     };
   }
@@ -31,15 +43,8 @@ export function qualifyMiniApplication(
     reasons.push("กำลังเจรจาทำเล");
   }
 
-  if (["10,001–20,000 บาท", "มากกว่า 20,000 บาท"].includes(application.extra_budget_range)) {
-    score += 3;
-    reasons.push("มีงบเพิ่มเติม");
-  } else if (application.extra_budget_range === "5,000–10,000 บาท") {
-    score += 2;
-    reasons.push("มีงบระดับเริ่มต้น");
-  } else if (application.extra_budget_range === "ต่ำกว่า 5,000 บาท") {
-    score += 1;
-  }
+  score += investmentBudget.score;
+  reasons.push(investmentBudget.reason);
 
   if (application.location_description.trim() && application.location_address.trim()) {
     score += 2;

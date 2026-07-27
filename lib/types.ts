@@ -238,6 +238,7 @@ export type MiniFranchiseApplication = {
   food_business_experience: string;
   experience_details: string | null;
   can_follow_online_course: boolean;
+  investment_budget_range: string;
   extra_budget_range: string;
   terms_acknowledged: Record<string, boolean>;
   submission_token: string | null;

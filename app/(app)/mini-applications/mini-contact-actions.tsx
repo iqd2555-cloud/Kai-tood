@@ -28,7 +28,9 @@ export function MiniContactActions(props: Props) {
   };
 
   return <div className="mt-4 grid gap-2 rounded-2xl border border-black/10 bg-black/[0.025] p-3 sm:grid-cols-3">
-    <a href={`tel:${phone}`} className="rounded-xl bg-black px-4 py-3 text-center font-black text-white">โทรหาผู้สมัคร</a>
+    {props.group === "C"
+      ? <span aria-disabled="true" className="rounded-xl bg-red-100 px-4 py-3 text-center font-black text-red-800">ไม่ต้องโทรกลับ</span>
+      : <a href={`tel:${phone}`} className="rounded-xl bg-black px-4 py-3 text-center font-black text-white">โทรหาผู้สมัคร</a>}
     <button type="button" onClick={copyMessage} className="rounded-xl bg-[#ffc400] px-4 py-3 font-black text-black">{copied ? "คัดลอกแล้ว" : "คัดลอกข้อความตอบกลับ"}</button>
     <a href={LINE_URL} target="_blank" rel="noreferrer" className="rounded-xl bg-[#06C755] px-4 py-3 text-center font-black text-white">เปิด LINE OA เพื่อตรวจข้อความ</a>
     <div className="rounded-xl bg-white p-3 text-sm font-bold leading-6 text-black/60 sm:col-span-3">
