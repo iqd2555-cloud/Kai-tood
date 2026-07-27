@@ -91,8 +91,14 @@ type LockedRecipientExpenseRule = {
 const LOCKED_RECIPIENT_EXPENSE_RULES: LockedRecipientExpenseRule[] = [
   {
     names: ["ไพรม์สุข", "ไพรมสุข"],
-    references: ["010753600031508"],
+    references: [],
     category: "seasoning_cost",
+  },
+  {
+    names: ["IMBALANCE", "EMBALANCE"],
+    references: [],
+    category: "transport",
+    description: "ค่าขนส่งหนังสือสูตร",
   },
   {
     names: ["เควีเอส เฟรชโปรดักส์", "KVS FRESH PRODUCTS"],
@@ -141,9 +147,14 @@ function lockedRecipientRule(merchant: string, recipientReference: string) {
   const normalizedMerchant = normalizedRecipientIdentity(merchant);
   const normalizedReference = recipientReference.replace(/\D/gu, "");
 
-  return LOCKED_RECIPIENT_EXPENSE_RULES.find((rule) =>
+  const nameRule = LOCKED_RECIPIENT_EXPENSE_RULES.find((rule) =>
     rule.names.some((name) => normalizedMerchant.includes(normalizedRecipientIdentity(name)))
-    || rule.references.some((reference) => normalizedReference.includes(reference.replace(/\D/gu, "")))
+  );
+  if (nameRule) return nameRule;
+  if (!normalizedReference) return null;
+
+  return LOCKED_RECIPIENT_EXPENSE_RULES.find((rule) =>
+    rule.references.some((reference) => normalizedReference.includes(reference.replace(/\D/gu, "")))
   ) ?? null;
 }
 
@@ -258,8 +269,9 @@ function receiptCategory(value: unknown, merchant: string, memo = "", recipientR
   const isKvsChickenSupplier = normalizedMerchant.includes("เควีเอส เฟรชโปรดักส์")
     || normalizedMerchant.includes("kvs fresh products");
 
-  // Owner-defined recipient rules are authoritative. Biller IDs/account references
-  // are checked alongside OCR-tolerant recipient aliases so gradual additions stay deterministic.
+  // Owner-defined recipient rules are authoritative. Recipient names are checked
+  // before Biller IDs/account references because payment processors can reuse a
+  // single biller ID across different merchant display names.
   if (recipientCategory) return { code: recipientCategory, recognized: true };
   // A bank slip's memo describes the reason for payment and takes precedence over
   // company or account names when the recipient has no locked rule.
