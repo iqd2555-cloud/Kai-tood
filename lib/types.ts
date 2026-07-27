@@ -203,6 +203,9 @@ export type FranchiseLead = {
   internal_note: string | null;
   status: LeadStatus;
   source: string;
+  source_submitted_at: string | null;
+  source_payload: Record<string, string> | null;
+  phone_normalized: string;
   created_at: string;
   updated_at: string;
 };

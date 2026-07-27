@@ -8,6 +8,10 @@ import { LeadContactActions } from "./lead-contact-actions";
 
 const statusLabels: Record<LeadStatus, string> = { new: "ใหม่", contacted: "ติดต่อแล้ว", awaiting_info: "รอข้อมูลเพิ่มเติม", interested: "สนใจจริง", appointment_scheduled: "นัดคุยแล้ว", not_ready: "ไม่พร้อมลงทุน", not_qualified: "ไม่ผ่านการคัดกรอง", converted: "ปิดการขายแล้ว" };
 const statuses = Object.keys(statusLabels) as LeadStatus[];
+const sourceLabels: Record<string, string> = {
+  website: "เว็บไซต์",
+  google_form: "Google Form เดิม",
+};
 
 type SearchParams = { status?: string; q?: string };
 
@@ -29,10 +33,12 @@ export default async function LeadsPage({ searchParams }: { searchParams?: Promi
   if (q) query = query.or(`full_name.ilike.%${q}%,phone.ilike.%${q}%,province.ilike.%${q}%`);
   const { data, error } = await query.order("created_at", { ascending: false }).returns<FranchiseLead[]>();
   const leads = data ?? [];
+  const websiteLeadCount = leads.filter((lead) => lead.source === "website").length;
+  const googleFormLeadCount = leads.filter((lead) => lead.source === "google_form").length;
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h1 className="text-3xl font-black">รายชื่อผู้สนใจแฟรนไชส์</h1><p className="mt-1 font-bold text-black/55">ดู ค้นหา อัปเดตสถานะ และ Export รายชื่อ Lead จากเว็บไซต์</p></div><ExportLeadsButton leads={leads} /></div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h1 className="text-3xl font-black">รายชื่อผู้สนใจแฟรนไชส์ชุดมาตรฐาน</h1><p className="mt-1 font-bold text-black/55">รวมใบสมัครจากเว็บไซต์และ Google Form เดิมไว้ในหน้าเดียว</p><div className="mt-3 flex flex-wrap gap-2 text-sm font-black"><span className="rounded-full bg-black/5 px-3 py-1.5">ทั้งหมด {leads.length}</span><span className="rounded-full bg-blue-50 px-3 py-1.5 text-blue-800">เว็บไซต์ {websiteLeadCount}</span><span className="rounded-full bg-green-50 px-3 py-1.5 text-green-800">Google Form {googleFormLeadCount}</span></div></div><ExportLeadsButton leads={leads} /></div>
       <form className="grid gap-3 rounded-[1.5rem] bg-white p-4 shadow-sm sm:grid-cols-[1fr_220px_auto]">
         <input name="q" defaultValue={q} placeholder="ค้นหาชื่อ เบอร์โทร จังหวัด" className="rounded-2xl border border-black/10 px-4 py-3 font-bold" />
         <select name="status" defaultValue={status} className="rounded-2xl border border-black/10 px-4 py-3 font-bold"><option value="">ทุกสถานะ</option>{statuses.map((s) => <option key={s} value={s}>{statusLabels[s]}</option>)}</select>
@@ -42,7 +48,7 @@ export default async function LeadsPage({ searchParams }: { searchParams?: Promi
       <div className="space-y-4">
         {leads.map((lead) => (
           <article key={lead.id} className="rounded-[1.5rem] border border-black/10 bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h2 className="text-xl font-black">{lead.full_name}</h2><p className="font-bold text-black/60">{lead.phone} • {lead.province}{lead.district ? ` / ${lead.district}` : ""}</p><p className="mt-1 text-sm font-bold text-black/45">ส่งเมื่อ {formatDate(lead.created_at)}</p></div><span className="w-fit rounded-full bg-[#E60012] px-3 py-1 text-sm font-black text-white">{statusLabels[lead.status]}</span></div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h2 className="text-xl font-black">{lead.full_name}</h2><p className="font-bold text-black/60">{lead.phone} • {lead.province}{lead.district ? ` / ${lead.district}` : ""}</p><div className="mt-1 flex flex-wrap items-center gap-2 text-sm font-bold text-black/45"><span>ส่งเมื่อ {formatDate(lead.created_at)}</span><span className={`rounded-full px-2.5 py-1 ${lead.source === "google_form" ? "bg-green-50 text-green-800" : "bg-blue-50 text-blue-800"}`}>{sourceLabels[lead.source] ?? lead.source}</span></div></div><span className="w-fit rounded-full bg-[#E60012] px-3 py-1 text-sm font-black text-white">{statusLabels[lead.status]}</span></div>
             <LeadContactActions lead={lead} />
             <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
               <div><b>Line:</b> {lead.line_id || "-"}</div>
@@ -56,6 +62,7 @@ export default async function LeadsPage({ searchParams }: { searchParams?: Promi
               <div><b>ประสบการณ์:</b> {lead.business_experience || lead.experience || "-"}</div>
               <div><b>รายได้คาดหวัง:</b> {lead.expected_daily_income}</div>
               <div><b>ยืนยันความเข้าใจ:</b> {lead.understanding_confirmed ? "ยืนยันแล้ว" : "ยังไม่ยืนยัน"}</div>
+              <div><b>แหล่งที่มา:</b> {sourceLabels[lead.source] ?? lead.source}</div>
             </dl>
             {lead.note && <p className="mt-3 text-sm"><b>หมายเหตุผู้สมัคร:</b> {lead.note}</p>}
             <form action={updateLead} className="mt-4 grid gap-3 border-t border-black/10 pt-4 sm:grid-cols-[220px_1fr_auto]"><input type="hidden" name="id" value={lead.id} /><label className="grid gap-1 text-sm font-black text-black/65"><span>สถานะการติดตาม</span><select name="status" defaultValue={lead.status} className="rounded-2xl border border-black/10 px-4 py-3 font-bold text-black">{statuses.map((s) => <option key={s} value={s}>{statusLabels[s]}</option>)}</select></label><label className="grid gap-1 text-sm font-black text-black/65"><span>บันทึกภายใน</span><input name="internal_note" defaultValue={lead.internal_note ?? ""} placeholder="จดบันทึกการติดตาม เช่น โทรแล้ว / นัดคุย / สนใจแบบซุ้ม" className="rounded-2xl border border-black/10 px-4 py-3 font-bold text-black" /></label><button className="self-end rounded-2xl bg-[#E60012] px-5 py-3 font-black text-white">บันทึกการติดตาม</button></form>

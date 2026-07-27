@@ -15,6 +15,7 @@ const statusLabels: Record<LeadStatus, string> = {
 
 const headers = [
   "วันที่สมัคร",
+  "แหล่งที่มา",
   "ชื่อ-นามสกุล",
   "เบอร์โทร",
   "Line ID",
@@ -48,6 +49,7 @@ function escapeCsvCell(value: string) {
 function exportLeadsToCsv(leads: FranchiseLead[]) {
   const rows = leads.map((lead) => [
     formatDate(lead.created_at),
+    lead.source === "google_form" ? "Google Form เดิม" : "เว็บไซต์",
     displayValue(lead.full_name),
     displayValue(lead.phone),
     displayValue(lead.line_id),

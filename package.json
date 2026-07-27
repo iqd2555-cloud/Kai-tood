@@ -19,7 +19,8 @@
     "test:owner-report-branch-visibility": "node --experimental-strip-types scripts/owner-report-branch-visibility.test.mjs",
     "test:line-webhook": "node --experimental-strip-types scripts/line-webhook.test.mjs",
     "test:line-bill-receipts-migration": "node scripts/line-bill-receipts-migration.test.mjs",
-    "test:mini-qualification": "node --experimental-strip-types scripts/mini-application-qualification.test.mjs"
+    "test:mini-qualification": "node --experimental-strip-types scripts/mini-application-qualification.test.mjs",
+    "test:google-form-standard-lead": "node --experimental-strip-types scripts/google-form-standard-lead.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
