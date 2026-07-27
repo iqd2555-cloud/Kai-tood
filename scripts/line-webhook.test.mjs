@@ -330,6 +330,73 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
       finish_reason: "stop",
       message: {
         content: JSON.stringify({
+          merchant: "IMBALANCE",
+          transactionDate: "2026-07-27",
+          amount: 160,
+          paymentMethod: "โอนเงิน",
+          category: "เครื่องปรุง",
+          confidence: 0.85,
+          documentType: "bank_transfer_slip",
+          memo: "",
+          recipientReference: "Biller ID: 010753600031508",
+        }),
+      },
+    }],
+  });
+  const analysis = await withEnv(
+    { OPENAI_API_KEY: "test-openai-key" },
+    () => analyzeReceiptImage(
+      { contentType: "image/jpeg", data: Buffer.from("fake-imbalance-book-shipping-slip") },
+      "2026-07-27T02:36:00.000Z",
+      fetchFn,
+    ),
+  );
+
+  assert.equal(analysis.amount, 160);
+  assert.equal(analysis.category, "transport", "IMBALANCE recipient rule overrides a shared biller ID");
+  assert.equal(analysis.merchant, "ค่าขนส่งหนังสือสูตร - IMBALANCE");
+  assert.equal(analysis.confidence, 0.95, "complete IMBALANCE slip is eligible for automatic recording");
+}
+
+{
+  const fetchFn = async () => Response.json({
+    choices: [{
+      finish_reason: "stop",
+      message: {
+        content: JSON.stringify({
+          merchant: "EMBALANCE",
+          transactionDate: "2026-07-27",
+          amount: 160,
+          paymentMethod: "โอนเงิน",
+          category: "อื่นๆ",
+          confidence: 0.85,
+          documentType: "bank_transfer_slip",
+          memo: "",
+          recipientReference: "",
+        }),
+      },
+    }],
+  });
+  const analysis = await withEnv(
+    { OPENAI_API_KEY: "test-openai-key" },
+    () => analyzeReceiptImage(
+      { contentType: "image/jpeg", data: Buffer.from("fake-embalance-book-shipping-slip") },
+      "2026-07-27T02:36:00.000Z",
+      fetchFn,
+    ),
+  );
+
+  assert.equal(analysis.category, "transport", "EMBALANCE spelling is recognized as book shipping");
+  assert.equal(analysis.merchant, "ค่าขนส่งหนังสือสูตร - EMBALANCE");
+  assert.equal(analysis.confidence, 0.95);
+}
+
+{
+  const fetchFn = async () => Response.json({
+    choices: [{
+      finish_reason: "stop",
+      message: {
+        content: JSON.stringify({
           merchant: "นาย ธีระวุฒิ พันธุ์หงษ์",
           transactionDate: "2026-07-24",
           amount: 440,
