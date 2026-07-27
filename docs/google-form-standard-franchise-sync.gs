@@ -4,7 +4,7 @@
  * One-time setup:
  * 1. Open the response spreadsheet > Extensions > Apps Script.
  * 2. Paste this file.
- * 3. Run configureGoogleFormSync("the one-time connection code issued by the system").
+ * 3. Run configureGoogleFormSync and enter the one-time connection code.
  *
  * configureGoogleFormSync installs an on-form-submit trigger and backfills all
  * existing rows. New responses are then sent immediately to the owner website.
@@ -20,7 +20,18 @@ const REQUIRED_FORM_HEADERS = [
   "จังหวัด / อำเภอ ที่ต้องการเปิดร้าน",
 ];
 
-function configureGoogleFormSync(secret) {
+function configureGoogleFormSync() {
+  const ui = SpreadsheetApp.getUi();
+  const prompt = ui.prompt(
+    "เชื่อมต่อ Google Form กับระบบแฟรนไชส์",
+    "วางรหัสเชื่อมต่อแบบใช้ครั้งเดียว แล้วกดตกลง",
+    ui.ButtonSet.OK_CANCEL,
+  );
+  if (prompt.getSelectedButton() !== ui.Button.OK) {
+    return { processed: 0, cancelled: true };
+  }
+
+  const secret = prompt.getResponseText().trim();
   if (!secret || String(secret).length < 24) {
     throw new Error("กรุณาใส่รหัสเชื่อมต่อที่มีความยาวอย่างน้อย 24 ตัวอักษร");
   }
