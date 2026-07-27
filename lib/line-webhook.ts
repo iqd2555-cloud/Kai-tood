@@ -182,7 +182,11 @@ type TextExpenseAnalysis = {
   category: string;
 };
 
-type TextIncomeAnalysis = TextExpenseAnalysis;
+type TextIncomeAnalysis = TextExpenseAnalysis & {
+  customerName?: string;
+  quantityKg?: number;
+  unitPrice?: number;
+};
 
 export type LineWebhookResult = {
   ok: boolean;
@@ -367,6 +371,106 @@ function deterministicIncomeCategory(messageText: string, analyzedCategory: unkn
   if (normalized.includes("คอร์ส") || normalized.includes("อบรม")) return "course_sales";
 
   return incomeCategory(analyzedCategory);
+}
+
+function parsePositiveNumber(value: string) {
+  const parsed = Number(value.replace(/,/gu, ""));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function thaiDeliveryDate(text: string, eventAt: string) {
+  const compact = text.replace(/[\s.]+/gu, "");
+  const match = compact.match(
+    /รอบจัดส่ง(\d{1,2})(มค|กพ|มีค|เมย|พค|มิย|กค|สค|กย|ตค|พย|ธค)(\d{2,4})/u,
+  );
+  if (!match) return thailandDate(eventAt);
+
+  const monthByThaiAbbreviation: Record<string, number> = {
+    มค: 1,
+    กพ: 2,
+    มีค: 3,
+    เมย: 4,
+    พค: 5,
+    มิย: 6,
+    กค: 7,
+    สค: 8,
+    กย: 9,
+    ตค: 10,
+    พย: 11,
+    ธค: 12,
+  };
+  const day = Number(match[1]);
+  const month = monthByThaiAbbreviation[match[2]];
+  const rawYear = Number(match[3]);
+  const expandedYear = rawYear < 100 ? 2500 + rawYear : rawYear;
+  const year = expandedYear >= 2400 ? expandedYear - 543 : expandedYear;
+  const normalized = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+  return isActualISODate(normalized) ? normalized : thailandDate(eventAt);
+}
+
+function looksLikeMarinatedChickenDelivery(value: string) {
+  return /รอบจัดส่ง/u.test(value)
+    && /กก\.?/u.test(value)
+    && /@\s*[^\s\d\n]+\s*[\d,.]+\s*[xX×*]\s*[\d,.]+\s*=\s*[\d,.]+\s*บาท/u.test(value);
+}
+
+function structuredMarinatedChickenIncome(text: string, eventAt: string): TextIncomeAnalysis | null {
+  if (!looksLikeMarinatedChickenDelivery(text)) return null;
+
+  const equation = text.match(
+    /@\s*[^\s\d\n]+\s*([\d,.]+)\s*[xX×*]\s*([\d,.]+)\s*=\s*([\d,.]+)\s*บาท/u,
+  );
+  if (!equation) return null;
+
+  const first = parsePositiveNumber(equation[1]);
+  const second = parsePositiveNumber(equation[2]);
+  const total = parsePositiveNumber(equation[3]);
+  if (first === null || second === null || total === null) return null;
+  if (Math.abs(first * second - total) > 0.01) return null;
+
+  const itemWeights = text
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .map((line) => line.match(/^([^\d]+?)\s*([\d,.]+)\s*กก\.?\s*$/u))
+    .filter((match): match is RegExpMatchArray => Boolean(match))
+    .filter((match) => !match[1].includes("รวม"))
+    .map((match) => parsePositiveNumber(match[2]))
+    .filter((value): value is number => value !== null);
+  const orderedQuantityKg = itemWeights.reduce((sum, value) => sum + value, 0);
+  if (!(orderedQuantityKg > 0)) return null;
+
+  let quantityKg: number;
+  let unitPrice: number;
+  if (Math.abs(second - orderedQuantityKg) <= 0.01) {
+    quantityKg = second;
+    unitPrice = first;
+  } else if (Math.abs(first - orderedQuantityKg) <= 0.01) {
+    quantityKg = first;
+    unitPrice = second;
+  } else {
+    return null;
+  }
+
+  const lines = text.split(/\r?\n/u).map((line) => line.trim()).filter(Boolean);
+  const namedCustomer = lines.find((line) => /^คุณ[^\d@]*$/u.test(line));
+  const handle = text.match(/@\s*([^\s\d\n]+)/u)?.[1]?.trim();
+  const customerName = namedCustomer || (handle ? `@${handle}` : "");
+  if (!customerName) return null;
+
+  const quantityLabel = quantityKg.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const unitPriceLabel = unitPrice.toLocaleString("en-US", { maximumFractionDigits: 2 });
+
+  return {
+    transactionDate: thaiDeliveryDate(text, eventAt),
+    amount: total,
+    description: `ขายไก่หมักให้${customerName} ${quantityLabel} กก. × ${unitPriceLabel} บาท/กก.`,
+    paymentMethod: "ไม่ระบุ",
+    category: "marinated_chicken_sales",
+    customerName,
+    quantityKg,
+    unitPrice,
+  };
 }
 
 function receiptReviewReasons(analysis: ReceiptAnalysis) {
@@ -585,7 +689,8 @@ export async function analyzeCashFlowText(
 }
 
 function looksLikeIncomeCommand(value: string) {
-  return /^\s*ขาย/u.test(value) && /\d/.test(value);
+  return (/^\s*ขาย/u.test(value) && /\d/.test(value))
+    || looksLikeMarinatedChickenDelivery(value);
 }
 
 export async function analyzeCashFlowIncomeText(
@@ -922,7 +1027,23 @@ export async function processLineWebhookPayload(payload: LineWebhookPayload, dep
           }
         } else if (looksLikeIncomeCommand(messageText)) {
           const eventAt = eventDate(event.timestamp);
-          const analyzedIncome = await (deps.analyzeTextIncome ?? analyzeCashFlowIncomeText)(messageText, eventAt, fetchFn);
+          const isStructuredDelivery = looksLikeMarinatedChickenDelivery(messageText);
+          const structuredIncome = structuredMarinatedChickenIncome(messageText, eventAt);
+          if (isStructuredDelivery && !structuredIncome) {
+            const { inserted } = await insertBillReceiptEvent(deps.supabase, event, null);
+            if (inserted) {
+              await replyToLine(
+                event.replyToken,
+                "ยังไม่บันทึกรายรับ เพราะยอดกิโลกรัมรายการย่อยไม่ตรงกับสมการท้ายข้อความ กรุณาตรวจสอบแล้วส่งใหม่",
+                deps.channelAccessToken,
+                fetchFn,
+              );
+            }
+            continue;
+          }
+
+          const analyzedIncome = structuredIncome
+            ?? await (deps.analyzeTextIncome ?? analyzeCashFlowIncomeText)(messageText, eventAt, fetchFn);
           const analysis = {
             ...analyzedIncome,
             category: deterministicIncomeCategory(messageText, analyzedIncome.category),
@@ -931,9 +1052,12 @@ export async function processLineWebhookPayload(payload: LineWebhookPayload, dep
           const { inserted } = await insertBillReceiptEvent(deps.supabase, event, null, undefined, cashFlowEntryId);
 
           if (inserted) {
+            const structuredSummary = analysis.customerName && analysis.quantityKg && analysis.unitPrice
+              ? `ลูกค้า ${analysis.customerName}\nปริมาณ ${analysis.quantityKg.toLocaleString("en-US", { maximumFractionDigits: 2 })} กก.\nราคา ${analysis.unitPrice.toLocaleString("en-US", { maximumFractionDigits: 2 })} บาท/กก.`
+              : analysis.description;
             await replyToLine(
               event.replyToken,
-              `บันทึกรายรับเข้า Cash Flow แล้ว\n${analysis.description}\n${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nสถานะ รับแล้ว\nหมวด ${incomeCategoryLabel(analysis.category)}\nเอกสาร ไม่มีเอกสาร`,
+              `บันทึกรายรับเข้า Cash Flow แล้ว\n${structuredSummary}\nยอดรวม ${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nสถานะ รับแล้ว\nหมวด ${incomeCategoryLabel(analysis.category)}\nเอกสาร ไม่มีเอกสาร`,
               deps.channelAccessToken,
               fetchFn,
             );

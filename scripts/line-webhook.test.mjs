@@ -870,6 +870,109 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
 {
   const supabase = createSupabaseMock();
   const fetchFn = createFetchMock();
+  const result = await processLineWebhookPayload(
+    {
+      events: [
+        {
+          type: "message",
+          replyToken: "reply-token-franchise-delivery-income",
+          timestamp: 1785121200000,
+          source: { userId: "line-user-franchise-delivery" },
+          message: {
+            id: "text-franchise-delivery-income-1",
+            type: "text",
+            text: [
+              "รอบจัดส่ง 27 ก ค.69",
+              "",
+              "ดั้งเดิม 30 กก.",
+              "พริก 20 กก.",
+              "ตับ 10 กก.",
+              "หนัง 10 กก.",
+              "คุณแก๊ป",
+              "ตลาดสะพานดำ นครสวรรค์",
+              "โทร 061-4912753",
+              "*ทางร้านจัดส่งเอง",
+              "",
+              "@Gaplaxy 65*70=4,550บาท",
+            ].join("\n"),
+          },
+        },
+      ],
+    },
+    {
+      supabase,
+      channelAccessToken: "channel-token",
+      fetchFn,
+      analyzeTextIncome: async () => {
+        throw new Error("structured delivery orders must not call the OpenAI API");
+      },
+      logger: console,
+    },
+  );
+
+  assert.equal(result.ok, true, "structured franchise delivery is recorded as income");
+  assert.equal(supabase.cashFlowRows.length, 1);
+  assert.equal(supabase.cashFlowRows[0].transaction_date, "2026-07-27");
+  assert.equal(supabase.cashFlowRows[0].type, "income");
+  assert.equal(supabase.cashFlowRows[0].status, "received");
+  assert.equal(supabase.cashFlowRows[0].category, "marinated_chicken_sales");
+  assert.equal(supabase.cashFlowRows[0].amount, 4550);
+  assert.equal(
+    supabase.cashFlowRows[0].description,
+    "ขายไก่หมักให้คุณแก๊ป 70 กก. × 65 บาท/กก.",
+  );
+  assert.match(fetchFn.calls[0].init.body, /ลูกค้า คุณแก๊ป/);
+  assert.match(fetchFn.calls[0].init.body, /ปริมาณ 70 กก\./);
+  assert.match(fetchFn.calls[0].init.body, /ราคา 65 บาท\/กก\./);
+  assert.match(fetchFn.calls[0].init.body, /ยอดรวม 4,550\.00 บาท/);
+  assert.match(fetchFn.calls[0].init.body, /หมวด ขายไก่หมัก/);
+}
+
+{
+  const supabase = createSupabaseMock();
+  const fetchFn = createFetchMock();
+  const result = await processLineWebhookPayload(
+    {
+      events: [
+        {
+          type: "message",
+          replyToken: "reply-token-invalid-franchise-delivery",
+          timestamp: 1785121200000,
+          source: { userId: "line-user-invalid-franchise-delivery" },
+          message: {
+            id: "text-invalid-franchise-delivery-1",
+            type: "text",
+            text: [
+              "รอบจัดส่ง 27 ก.ค. 69",
+              "ดั้งเดิม 30 กก.",
+              "พริก 20 กก.",
+              "คุณแก๊ป",
+              "@Gaplaxy 65*70=4,550บาท",
+            ].join("\n"),
+          },
+        },
+      ],
+    },
+    {
+      supabase,
+      channelAccessToken: "channel-token",
+      fetchFn,
+      analyzeTextIncome: async () => {
+        throw new Error("invalid structured orders must not call the OpenAI API");
+      },
+      logger: console,
+    },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(supabase.cashFlowRows.length, 0, "mismatched item weights are not recorded");
+  assert.match(fetchFn.calls[0].init.body, /ยังไม่บันทึกรายรับ/);
+  assert.match(fetchFn.calls[0].init.body, /ยอดกิโลกรัมรายการย่อยไม่ตรง/);
+}
+
+{
+  const supabase = createSupabaseMock();
+  const fetchFn = createFetchMock();
   const incorrectlyAnalyzedAsCourse = async () => ({
     transactionDate: "2026-07-25",
     amount: 2700,
