@@ -90,7 +90,8 @@ export default async function MiniApplicationsPage({ searchParams }: { searchPar
 
           <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
             <div><b>สถานะทำเล:</b> {app.has_location}</div>
-            <div><b>งบประมาณ:</b> {app.extra_budget_range}</div>
+            <div><b>งบลงทุนรวม:</b> {app.investment_budget_range}</div>
+            <div><b>งบอุปกรณ์และทุนหมุนเวียนเพิ่มเติม:</b> {app.extra_budget_range}</div>
             <div><b>ประเภททำเล:</b> {app.location_type}</div>
             <div><b>ค่าเช่า:</b> {app.monthly_rent || "-"}</div>
             <div><b>พร้อมเปิด:</b> {app.ready_to_open}</div>

@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { MINI_INVESTMENT_BUDGET_OPTIONS } from "@/lib/mini-investment-budget";
 import { getThaiDistricts, getThaiSubdistricts, thaiProvinces } from "@/lib/thai-address";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -11,7 +12,7 @@ const termKeys = ["term_equipment", "term_extra_equipment", "term_chicken_price"
 const schema = z.object({
   full_name: z.string().trim().min(2), age: z.coerce.number().int().min(15).max(100), phone: z.string().trim().regex(/^(0|\+66)[0-9\-\s]{8,14}$/), line_id: z.string().trim().optional(), current_occupation: z.string().trim().min(1), residence_province: z.string().trim().min(1), residence_district: z.string().trim().min(1),
   opening_province: z.string().trim().min(1), opening_district: z.string().trim().min(1), opening_subdistrict: z.string().trim().min(1), location_address: z.string().trim().min(1), location_description: z.string().trim().min(1, "กรุณาระบุสถานที่ จุดสังเกต หรือพิกัดโดยประมาณ").max(500), google_maps_url: z.string().trim().max(500).optional(), location_type: z.string().trim().min(1), monthly_rent: z.string().trim().optional(), planned_opening_period: z.string().trim().min(1), nearby_competitors: z.string().trim().optional(), submission_token: z.string().trim().min(20).max(80),
-  has_location: z.string().trim().min(1), actual_seller: z.string().trim().min(1), ready_to_open: z.string().trim().min(1), food_business_experience: z.string().trim().min(1), experience_details: z.string().trim().optional(), can_follow_online_course: z.literal("true"), extra_budget_range: z.string().trim().min(1), source: z.string().trim().optional(), website: z.string().max(0).optional(), started_at: z.coerce.number().optional(),
+  has_location: z.string().trim().min(1), actual_seller: z.string().trim().min(1), ready_to_open: z.string().trim().min(1), food_business_experience: z.string().trim().min(1), experience_details: z.string().trim().optional(), can_follow_online_course: z.literal("true"), investment_budget_range: z.enum(MINI_INVESTMENT_BUDGET_OPTIONS), extra_budget_range: z.string().trim().min(1), source: z.string().trim().optional(), website: z.string().max(0).optional(), started_at: z.coerce.number().optional(),
 }).passthrough();
 
 export type MiniApplyFormState = { ok: boolean; message: string; applicationId?: string; referenceCode?: string };
@@ -82,6 +83,7 @@ export async function submitMiniApplication(_prev: MiniApplyFormState, formData:
     food_business_experience: parsed.data.food_business_experience,
     experience_details: parsed.data.experience_details || null,
     can_follow_online_course: true,
+    investment_budget_range: parsed.data.investment_budget_range,
     extra_budget_range: parsed.data.extra_budget_range,
     terms_acknowledged: terms,
     submission_token: parsed.data.submission_token,
