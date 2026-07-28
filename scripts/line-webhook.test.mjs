@@ -19,6 +19,38 @@ function createSupabaseMock({ insertError = null, uploadError = null, updateErro
   const uploadedFiles = [];
   const updatedRows = [];
 
+  function selectRows(rows) {
+    let selected = [...rows];
+    const builder = {
+      eq(column, value) {
+        selected = selected.filter((row) => row[column] === value);
+        return builder;
+      },
+      gte(column, value) {
+        selected = selected.filter((row) => row[column] >= value);
+        return builder;
+      },
+      lte(column, value) {
+        selected = selected.filter((row) => row[column] <= value);
+        return builder;
+      },
+      order(column, { ascending = true } = {}) {
+        selected.sort((left, right) => {
+          const comparison = String(left[column] ?? "").localeCompare(String(right[column] ?? ""));
+          return ascending ? comparison : -comparison;
+        });
+        return builder;
+      },
+      limit(count) {
+        return Promise.resolve({ data: selected.slice(0, count), error: null });
+      },
+      maybeSingle() {
+        return Promise.resolve({ data: selected[0] ?? null, error: null });
+      },
+    };
+    return builder;
+  }
+
   return {
     insertedRows,
     cashFlowRows,
@@ -26,6 +58,11 @@ function createSupabaseMock({ insertError = null, uploadError = null, updateErro
     updatedRows,
     from(table) {
       return {
+        select() {
+          if (table === "line_bill_receipts") return selectRows(insertedRows);
+          assert.equal(table, "cash_flow_entries");
+          return selectRows(cashFlowRows);
+        },
         insert(row) {
           if (table === "line_bill_receipts") {
             insertedRows.push(row);
@@ -48,6 +85,11 @@ function createSupabaseMock({ insertError = null, uploadError = null, updateErro
           return {
             eq(column, value) {
               updatedRows.push({ row, column, value });
+              if (!updateError) {
+                for (const existing of insertedRows) {
+                  if (existing[column] === value) Object.assign(existing, row);
+                }
+              }
               return Promise.resolve({ error: updateError });
             },
           };
@@ -1004,6 +1046,107 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
   assert.match(fetchFn.calls[0].init.body, /ราคา 65 บาท\/กก\./);
   assert.match(fetchFn.calls[0].init.body, /ยอดรวม 4,550\.00 บาท/);
   assert.match(fetchFn.calls[0].init.body, /หมวด ขายไก่หมัก/);
+}
+
+{
+  const supabase = createSupabaseMock();
+  const fetchFn = createFetchMock();
+  const dependencies = {
+    supabase,
+    channelAccessToken: "channel-token",
+    fetchFn,
+    analyzeTextIncome: async () => {
+      throw new Error("split structured orders must not call the OpenAI API");
+    },
+    logger: console,
+  };
+  const orderText = [
+    "ไก่ดั้งเดิม  55",
+    "",
+    "ไก่พริก  35",
+    "",
+    "คุณ จินตณี ซิ้วเฉี้ยง ร้านข้าวเหนียว ไก่ทอดตักเอง",
+    "0642933608,0612621388",
+    "",
+    "หน้าร้านล้างรถหยอดเหรียญ MT Car Wash ถนนนวลแก้ว",
+    "84 ถนนนวลแก้วอุทิศ ต.คอหงส์ อ.หาดใหญ่ จ.สงขลา 90110",
+    "",
+    "**ขนส่ง ม่วงทองสุราษฎร์ 221 เท่านั้น",
+  ].join("\n");
+
+  const orderResult = await processLineWebhookPayload(
+    {
+      events: [{
+        type: "message",
+        replyToken: "reply-token-split-order",
+        timestamp: Date.parse("2026-07-28T02:16:00.000Z"),
+        source: { userId: "line-user-split-order" },
+        message: { id: "split-order-details-1", type: "text", text: orderText },
+      }],
+    },
+    dependencies,
+  );
+
+  assert.equal(orderResult.ok, true);
+  assert.equal(supabase.cashFlowRows.length, 0, "order details alone wait for the calculation");
+  assert.equal(supabase.insertedRows[0].processing_status, "message_received");
+  assert.equal(supabase.insertedRows[0].extracted_data.kind, "marinated_chicken_order");
+  assert.match(fetchFn.calls[0].init.body, /รับรายละเอียดออเดอร์ไก่หมักแล้ว/);
+  assert.match(fetchFn.calls[0].init.body, /น้ำหนักรวม 90 กก\./);
+
+  const equationResult = await processLineWebhookPayload(
+    {
+      events: [{
+        type: "message",
+        replyToken: "reply-token-split-equation",
+        timestamp: Date.parse("2026-07-28T02:17:00.000Z"),
+        source: { userId: "line-user-split-order" },
+        message: { id: "split-order-equation-1", type: "text", text: "90*65=5,850บาท" },
+      }],
+    },
+    dependencies,
+  );
+
+  assert.equal(equationResult.ok, true);
+  assert.equal(supabase.cashFlowRows.length, 1, "the next calculation completes the pending order");
+  assert.equal(supabase.cashFlowRows[0].transaction_date, "2026-07-28");
+  assert.equal(supabase.cashFlowRows[0].type, "income");
+  assert.equal(supabase.cashFlowRows[0].status, "received");
+  assert.equal(supabase.cashFlowRows[0].category, "marinated_chicken_sales");
+  assert.equal(supabase.cashFlowRows[0].amount, 5850);
+  assert.equal(supabase.cashFlowRows[0].source_ref_id, "line:split-order-details-1");
+  assert.equal(
+    supabase.cashFlowRows[0].description,
+    "ขายไก่หมักให้คุณ จินตณี ซิ้วเฉี้ยง 90 กก. × 65 บาท/กก.",
+  );
+  assert.equal(supabase.insertedRows[0].processing_status, "processed");
+  assert.equal(supabase.insertedRows[1].processing_status, "processed");
+  assert.match(fetchFn.calls[1].init.body, /ลูกค้า คุณ จินตณี ซิ้วเฉี้ยง/);
+  assert.match(fetchFn.calls[1].init.body, /ปริมาณ 90 กก\./);
+  assert.match(fetchFn.calls[1].init.body, /ราคา 65 บาท\/กก\./);
+  assert.match(fetchFn.calls[1].init.body, /ยอดรวม 5,850\.00 บาท/);
+  assert.match(fetchFn.calls[1].init.body, /หมวด ขายไก่หมัก/);
+}
+
+{
+  const supabase = createSupabaseMock();
+  const fetchFn = createFetchMock();
+  const result = await processLineWebhookPayload(
+    {
+      events: [{
+        type: "message",
+        replyToken: "reply-token-orphan-equation",
+        timestamp: Date.parse("2026-07-28T02:17:00.000Z"),
+        source: { userId: "line-user-without-order" },
+        message: { id: "orphan-order-equation-1", type: "text", text: "90*65=5,850บาท" },
+      }],
+    },
+    { supabase, channelAccessToken: "channel-token", fetchFn, logger: console },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(supabase.cashFlowRows.length, 0, "an equation cannot attach to another user's order");
+  assert.match(fetchFn.calls[0].init.body, /ไม่พบรายละเอียดออเดอร์ก่อนหน้า/);
 }
 
 {

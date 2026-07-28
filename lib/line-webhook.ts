@@ -45,6 +45,7 @@ const RECEIPT_CONFIDENCE_THRESHOLD = 0.9;
 const RECEIPT_PENDING_CONFIDENCE_THRESHOLD = 0.85;
 const MAX_INCOMPLETE_RECEIPT_CONFIDENCE = RECEIPT_CONFIDENCE_THRESHOLD - 0.01;
 const THAILAND_TIME_ZONE = "Asia/Bangkok";
+const SPLIT_ORDER_PAIRING_WINDOW_MS = 30 * 60 * 1000;
 const RECEIPT_CATEGORY_CODE_BY_LABEL: Record<string, string> = {
   "ค่าเช่าที่": "rent_payment",
   "อินเทอร์เน็ต": "internet_payment",
@@ -393,7 +394,7 @@ function parsePositiveNumber(value: string) {
 function thaiDeliveryDate(text: string, eventAt: string) {
   const compact = text.replace(/[\s.]+/gu, "");
   const match = compact.match(
-    /รอบจัดส่ง(\d{1,2})(มค|กพ|มีค|เมย|พค|มิย|กค|สค|กย|ตค|พย|ธค)(\d{2,4})/u,
+    /รอบจัดส่ง(?:วันที่)?(\d{1,2})(มค|กพ|มีค|เมย|พค|มิย|กค|สค|กย|ตค|พย|ธค)(\d{2,4})/u,
   );
   if (!match) return thailandDate(eventAt);
 
@@ -421,34 +422,73 @@ function thaiDeliveryDate(text: string, eventAt: string) {
   return isActualISODate(normalized) ? normalized : thailandDate(eventAt);
 }
 
-function looksLikeMarinatedChickenDelivery(value: string) {
-  return /รอบจัดส่ง/u.test(value)
-    && /กก\.?/u.test(value)
-    && /@\s*[^\s\d\n]+\s*[\d,.]+\s*[xX×*]\s*[\d,.]+\s*=\s*[\d,.]+\s*บาท/u.test(value);
+function marinatedChickenItemWeights(text: string) {
+  const itemPattern =
+    /^(?:ไก่\s*)?(?:ดั้งเดิม|พริก)|^(?:ตับ|เครื่องใน|หนัง(?:ไก่)?|เอ็น(?:ไก่)?)/u;
+
+  return text
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .map((line) => {
+      if (!itemPattern.test(line)) return null;
+      const match = line.match(/([\d,.]+)\s*(?:กก\.?|กิโล(?:กรัม)?)?\s*$/u);
+      return match ? parsePositiveNumber(match[1]) : null;
+    })
+    .filter((value): value is number => value !== null);
 }
 
-function structuredMarinatedChickenIncome(text: string, eventAt: string): TextIncomeAnalysis | null {
-  if (!looksLikeMarinatedChickenDelivery(text)) return null;
-
+function marinatedChickenEquation(text: string) {
   const equation = text.match(
-    /@\s*[^\s\d\n]+\s*([\d,.]+)\s*[xX×*]\s*([\d,.]+)\s*=\s*([\d,.]+)\s*บาท/u,
+    /([\d,.]+)\s*[xX×*]\s*([\d,.]+)\s*=\s*([\d,.]+)\s*(?:บาท)?/u,
   );
   if (!equation) return null;
 
   const first = parsePositiveNumber(equation[1]);
   const second = parsePositiveNumber(equation[2]);
   const total = parsePositiveNumber(equation[3]);
-  if (first === null || second === null || total === null) return null;
-  if (Math.abs(first * second - total) > 0.01) return null;
+  return first === null || second === null || total === null
+    ? null
+    : { first, second, total };
+}
 
-  const itemWeights = text
+function marinatedChickenCustomerName(text: string) {
+  const customerLine = text
     .split(/\r?\n/u)
     .map((line) => line.trim())
-    .map((line) => line.match(/^([^\d]+?)\s*([\d,.]+)\s*กก\.?\s*$/u))
-    .filter((match): match is RegExpMatchArray => Boolean(match))
-    .filter((match) => !match[1].includes("รวม"))
-    .map((match) => parsePositiveNumber(match[2]))
-    .filter((value): value is number => value !== null);
+    .find((line) => /^คุณ\s*[^\d@]/u.test(line));
+  const namedCustomer = customerLine
+    ?.match(/^คุณ\s*(.+?)(?=\s+ร้าน|\s{2,}|$)/u)?.[1]
+    ?.trim();
+  if (namedCustomer) return `${/^คุณ\s/u.test(customerLine ?? "") ? "คุณ " : "คุณ"}${namedCustomer}`;
+
+  const handle = text.match(/@\s*([^\s\d\n]+)/u)?.[1]?.trim();
+  return handle ? `@${handle}` : "";
+}
+
+function looksLikeMarinatedChickenOrderDetails(value: string) {
+  return marinatedChickenItemWeights(value).length > 0
+    && Boolean(marinatedChickenCustomerName(value));
+}
+
+function looksLikeStandaloneMarinatedChickenEquation(value: string) {
+  return /^\s*[\d,.]+\s*[xX×*]\s*[\d,.]+\s*=\s*[\d,.]+\s*(?:บาท)?\s*$/u.test(value);
+}
+
+function looksLikeMarinatedChickenDelivery(value: string) {
+  return looksLikeMarinatedChickenOrderDetails(value)
+    && Boolean(marinatedChickenEquation(value));
+}
+
+function structuredMarinatedChickenIncome(text: string, eventAt: string): TextIncomeAnalysis | null {
+  if (!looksLikeMarinatedChickenDelivery(text)) return null;
+
+  const equation = marinatedChickenEquation(text);
+  if (!equation) return null;
+
+  const { first, second, total } = equation;
+  if (Math.abs(first * second - total) > 0.01) return null;
+
+  const itemWeights = marinatedChickenItemWeights(text);
   const orderedQuantityKg = itemWeights.reduce((sum, value) => sum + value, 0);
   if (!(orderedQuantityKg > 0)) return null;
 
@@ -464,10 +504,7 @@ function structuredMarinatedChickenIncome(text: string, eventAt: string): TextIn
     return null;
   }
 
-  const lines = text.split(/\r?\n/u).map((line) => line.trim()).filter(Boolean);
-  const namedCustomer = lines.find((line) => /^คุณ[^\d@]*$/u.test(line));
-  const handle = text.match(/@\s*([^\s\d\n]+)/u)?.[1]?.trim();
-  const customerName = namedCustomer || (handle ? `@${handle}` : "");
+  const customerName = marinatedChickenCustomerName(text);
   if (!customerName) return null;
 
   const quantityLabel = quantityKg.toLocaleString("en-US", { maximumFractionDigits: 2 });
@@ -818,6 +855,7 @@ async function insertBillReceiptEvent(
   imageStoragePath: string | null,
   analysis?: ReceiptAnalysis,
   cashFlowEntryId?: string | null,
+  textData?: Record<string, unknown>,
 ) {
   const processed = Boolean(analysis && canAutoSaveReceipt(analysis));
   const receiptPayload = {
@@ -827,7 +865,7 @@ async function insertBillReceiptEvent(
     event_at: eventDate(event.timestamp),
     processing_status: processed || cashFlowEntryId ? "processed" : imageStoragePath ? "pending_review" : "message_received",
     image_storage_path: imageStoragePath,
-    extracted_data: analysis ?? null,
+    extracted_data: textData ?? analysis ?? null,
     confidence: analysis?.confidence ?? null,
     cash_flow_entry_id: cashFlowEntryId ?? null,
     processing_error: analysis && !processed ? receiptReviewReasons(analysis).join("; ") || "ข้อมูลยังไม่ครบถ้วน" : null,
@@ -836,7 +874,7 @@ async function insertBillReceiptEvent(
 
   if (error) {
     if (error.code === "23505") {
-      if (analysis) {
+      if (analysis || textData) {
         const { error: updateError } = await supabase
           .from("line_bill_receipts")
           .update(receiptPayload)
@@ -849,6 +887,84 @@ async function insertBillReceiptEvent(
   }
 
   return { inserted: true };
+}
+
+type PendingMarinatedChickenOrder = {
+  messageId: string;
+  eventAt: string;
+  text: string;
+  extractedData: Record<string, unknown>;
+};
+
+async function findPendingMarinatedChickenOrder(
+  supabase: NonNullable<SupabaseClient>,
+  lineUserId: string | undefined,
+  eventAt: string,
+): Promise<PendingMarinatedChickenOrder | null> {
+  if (!lineUserId) return null;
+
+  const eventTime = new Date(eventAt);
+  if (Number.isNaN(eventTime.getTime())) return null;
+  const cutoff = new Date(eventTime.getTime() - SPLIT_ORDER_PAIRING_WINDOW_MS).toISOString();
+  const { data, error } = await supabase
+    .from("line_bill_receipts")
+    .select("message_id,event_at,extracted_data")
+    .eq("line_user_id", lineUserId)
+    .eq("message_type", "text")
+    .eq("processing_status", "message_received")
+    .gte("event_at", cutoff)
+    .lte("event_at", eventAt)
+    .order("event_at", { ascending: false })
+    .limit(10);
+
+  if (error) {
+    throw new Error(`Failed to find pending LINE chicken order: ${error.code ?? "unknown"}`);
+  }
+
+  for (const row of (data ?? []) as Array<{
+    message_id?: unknown;
+    event_at?: unknown;
+    extracted_data?: unknown;
+  }>) {
+    const extractedData = row.extracted_data;
+    if (!extractedData || typeof extractedData !== "object" || Array.isArray(extractedData)) continue;
+    const payload = extractedData as Record<string, unknown>;
+    if (payload.kind !== "marinated_chicken_order" || typeof payload.text !== "string") continue;
+    if (typeof row.message_id !== "string" || typeof row.event_at !== "string") continue;
+
+    return {
+      messageId: row.message_id,
+      eventAt: row.event_at,
+      text: payload.text,
+      extractedData: payload,
+    };
+  }
+
+  return null;
+}
+
+async function markPendingMarinatedChickenOrderProcessed(
+  supabase: NonNullable<SupabaseClient>,
+  pendingOrder: PendingMarinatedChickenOrder,
+  equationMessageId: string,
+  cashFlowEntryId: string | null,
+) {
+  const { error } = await supabase
+    .from("line_bill_receipts")
+    .update({
+      processing_status: "processed",
+      cash_flow_entry_id: cashFlowEntryId,
+      extracted_data: {
+        ...pendingOrder.extractedData,
+        paired_equation_message_id: equationMessageId,
+      },
+      processing_error: null,
+    })
+    .eq("message_id", pendingOrder.messageId);
+
+  if (error) {
+    throw new Error(`Failed to complete pending LINE chicken order: ${error.code ?? "unknown"}`);
+  }
 }
 
 async function insertCashFlowExpense(
@@ -933,8 +1049,9 @@ async function insertTextCashFlowIncome(
   supabase: NonNullable<SupabaseClient>,
   event: LineEvent,
   analysis: TextIncomeAnalysis,
+  sourceMessageId = safeMessageId(event),
 ) {
-  const sourceRefId = `line:${safeMessageId(event)}`;
+  const sourceRefId = `line:${sourceMessageId}`;
   const { data, error } = await supabase.from("cash_flow_entries").insert({
     transaction_date: analysis.transactionDate,
     type: "income",
@@ -1040,6 +1157,131 @@ export async function processLineWebhookPayload(payload: LineWebhookPayload, dep
             await replyToLine(
               event.replyToken,
               `บันทึกเข้า Cash Flow แล้ว\n${analysis.description}\n${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nสถานะ จ่ายแล้ว\nหมวด ${receiptCategoryLabel(analysis.category)}\nเอกสาร ไม่มีเอกสาร`,
+              deps.channelAccessToken,
+              fetchFn,
+            );
+          }
+        } else if (
+          looksLikeMarinatedChickenOrderDetails(messageText)
+          || looksLikeStandaloneMarinatedChickenEquation(messageText)
+        ) {
+          const eventAt = eventDate(event.timestamp);
+          const standaloneEquation = looksLikeStandaloneMarinatedChickenEquation(messageText);
+          const pendingOrder = standaloneEquation
+            ? await findPendingMarinatedChickenOrder(deps.supabase, event.source?.userId, eventAt)
+            : null;
+
+          if (standaloneEquation && !pendingOrder) {
+            const { inserted } = await insertBillReceiptEvent(
+              deps.supabase,
+              event,
+              null,
+              undefined,
+              null,
+              { kind: "marinated_chicken_equation", text: messageText },
+            );
+            if (inserted) {
+              await replyToLine(
+                event.replyToken,
+                "ยังไม่บันทึกรายรับ เพราะไม่พบรายละเอียดออเดอร์ก่อนหน้าจากผู้ส่งคนนี้ภายใน 30 นาที กรุณาส่งรายละเอียดออเดอร์ แล้วตามด้วยสมการยอดเงินอีกครั้ง",
+                deps.channelAccessToken,
+                fetchFn,
+              );
+            }
+            continue;
+          }
+
+          const combinedText = pendingOrder
+            ? `${pendingOrder.text}\n${messageText}`
+            : messageText;
+          const structuredIncome = structuredMarinatedChickenIncome(
+            combinedText,
+            pendingOrder?.eventAt ?? eventAt,
+          );
+
+          if (!marinatedChickenEquation(combinedText)) {
+            const { inserted } = await insertBillReceiptEvent(
+              deps.supabase,
+              event,
+              null,
+              undefined,
+              null,
+              { kind: "marinated_chicken_order", text: messageText },
+            );
+            if (inserted) {
+              const orderedQuantityKg = marinatedChickenItemWeights(messageText)
+                .reduce((sum, value) => sum + value, 0);
+              await replyToLine(
+                event.replyToken,
+                `รับรายละเอียดออเดอร์ไก่หมักแล้ว\nน้ำหนักรวม ${orderedQuantityKg.toLocaleString("en-US", { maximumFractionDigits: 2 })} กก.\nกรุณาส่งสมการยอดเงินต่อ เช่น ${orderedQuantityKg}*65=${(orderedQuantityKg * 65).toLocaleString("en-US")}บาท`,
+                deps.channelAccessToken,
+                fetchFn,
+              );
+            }
+            continue;
+          }
+
+          if (!structuredIncome) {
+            const { inserted } = await insertBillReceiptEvent(
+              deps.supabase,
+              event,
+              null,
+              undefined,
+              null,
+              {
+                kind: standaloneEquation ? "marinated_chicken_equation" : "marinated_chicken_order",
+                text: messageText,
+              },
+            );
+            if (inserted) {
+              await replyToLine(
+                event.replyToken,
+                "ยังไม่บันทึกรายรับ เพราะยอดกิโลกรัมรายการย่อยไม่ตรงกับสมการ หรือยอดคูณและยอดรวมไม่ตรงกัน กรุณาตรวจสอบแล้วส่งสมการใหม่",
+                deps.channelAccessToken,
+                fetchFn,
+              );
+            }
+            continue;
+          }
+
+          const analysis = {
+            ...structuredIncome,
+            // Structured delivery lines describe the franchise customer's shop and
+            // can contain "ข้าวเหนียวไก่ทอด"; the sold product is still marinated chicken.
+            category: "marinated_chicken_sales",
+          };
+          const sourceMessageId = pendingOrder?.messageId ?? safeMessageId(event);
+          const cashFlowEntryId = await insertTextCashFlowIncome(
+            deps.supabase,
+            event,
+            analysis,
+            sourceMessageId,
+          );
+          const { inserted } = await insertBillReceiptEvent(
+            deps.supabase,
+            event,
+            null,
+            undefined,
+            cashFlowEntryId,
+            {
+              kind: standaloneEquation ? "marinated_chicken_equation" : "marinated_chicken_order",
+              text: messageText,
+              paired_order_message_id: pendingOrder?.messageId ?? null,
+            },
+          );
+          if (pendingOrder) {
+            await markPendingMarinatedChickenOrderProcessed(
+              deps.supabase,
+              pendingOrder,
+              safeMessageId(event),
+              cashFlowEntryId,
+            );
+          }
+
+          if (inserted) {
+            await replyToLine(
+              event.replyToken,
+              `บันทึกรายรับเข้า Cash Flow แล้ว\nลูกค้า ${analysis.customerName}\nปริมาณ ${analysis.quantityKg?.toLocaleString("en-US", { maximumFractionDigits: 2 })} กก.\nราคา ${analysis.unitPrice?.toLocaleString("en-US", { maximumFractionDigits: 2 })} บาท/กก.\nยอดรวม ${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nสถานะ รับแล้ว\nหมวด ${incomeCategoryLabel(analysis.category)}\nเอกสาร ไม่มีเอกสาร`,
               deps.channelAccessToken,
               fetchFn,
             );
