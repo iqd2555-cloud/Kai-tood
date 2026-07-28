@@ -261,7 +261,11 @@ function receiptCategoryFromMemo(memo: string) {
   if (normalized.includes("อินเทอร์เน็ต")) return "internet_payment";
   if (normalized.includes("เครื่องปรุง")) return "seasoning_cost";
   if (normalized.includes("ข้าวเหนียว") || normalized.includes("วัตถุดิบ")) return "ingredient_purchase";
-  if (normalized.includes("ไก่สด")) return "chicken_purchase";
+  if (
+    normalized.includes("ไก่สด")
+    || normalized.includes("หนังไก่")
+    || normalized.includes("เครื่องในไก่")
+  ) return "chicken_purchase";
   return null;
 }
 
@@ -286,6 +290,14 @@ function receiptCategory(value: unknown, merchant: string, memo = "", recipientR
   if (text in RECEIPT_CATEGORY_CODE_BY_LABEL) return { code: RECEIPT_CATEGORY_CODE_BY_LABEL[text], recognized: true };
   if (text in RECEIPT_CATEGORY_LABEL_BY_CODE) return { code: text, recognized: true };
   return { code: "misc_expense", recognized: false };
+}
+
+function deterministicTextExpenseCategory(messageText: string, analyzedCategory: unknown) {
+  // The purpose stated in the original LINE message is more reliable than a
+  // model-selected label. Check purpose-specific phrases first: for example,
+  // "ค่าขนส่งไก่สด" is transport, while "จ่ายค่าไก่สด" is a chicken purchase.
+  return receiptCategoryFromMemo(messageText)
+    ?? receiptCategory(analyzedCategory, "").code;
 }
 
 function isActualISODate(value: unknown): value is string {
@@ -654,7 +666,7 @@ export async function analyzeCashFlowText(
       },
       messages: [{
         role: "user",
-        content: `แยกข้อความค่าใช้จ่ายสำหรับ Cash Flow: "${text}". คำว่า "จ่าย" หมายถึงจ่ายเงินจริงแล้ว หากไม่ระบุช่องทางให้ใช้ "ไม่ระบุ" หากไม่ระบุวันที่ให้ใช้ ${thailandDate(eventAt)} หมวดต้องเลือกจากรายการที่กำหนด`,
+        content: `แยกข้อความค่าใช้จ่ายสำหรับ Cash Flow: "${text}". คำว่า "จ่าย" หมายถึงจ่ายเงินจริงแล้ว หากไม่ระบุช่องทางให้ใช้ "ไม่ระบุ" หากไม่ระบุวันที่ให้ใช้ ${thailandDate(eventAt)} เลือกหมวดตามวัตถุประสงค์ที่จ่ายจริง: ค่าเช่าที่=ค่าเช่าร้านหรือพื้นที่, อินเทอร์เน็ต=ค่าบริการอินเทอร์เน็ต, ไก่สด=ซื้อไก่สด/หนังไก่/เครื่องในไก่, ข้าวเหนียว=ซื้อข้าวเหนียวหรือวัตถุดิบ, เครื่องปรุง=ซื้อเครื่องปรุง, ค่าแรง=ค่าแรงหรือค่าจ้าง, น้ำแข็ง=ซื้อน้ำแข็ง, ขนส่ง=ค่าขนส่งหรือค่าส่ง, อื่นๆ=ไม่เข้าเกณฑ์ข้างต้น ห้ามเลือกจากคำว่า "จ่ายค่า" แบบแยกคำ ตัวอย่าง "จ่ายค่าไก่สด 4,020 บาท" ต้องเป็นหมวด "ไก่สด"`,
       }],
     }),
   });
@@ -673,7 +685,10 @@ export async function analyzeCashFlowText(
   const description = String(parsed.description ?? "").trim();
   const paymentMethod = String(parsed.paymentMethod ?? "").trim();
   const transactionDate = normalizeCashFlowDate(parsed.transactionDate, eventAt);
-  const category = receiptCategory(parsed.category, "");
+  const category = receiptCategory(
+    deterministicTextExpenseCategory(text, parsed.category),
+    "",
+  );
 
   if (!(Number.isFinite(amount) && amount > 0 && description && category.recognized)) {
     throw new Error("Cash Flow text does not contain a valid expense");
@@ -1013,7 +1028,11 @@ export async function processLineWebhookPayload(payload: LineWebhookPayload, dep
         const messageText = event.message.text?.trim() ?? "";
         if (looksLikeExpenseCommand(messageText)) {
           const eventAt = eventDate(event.timestamp);
-          const analysis = await (deps.analyzeTextExpense ?? analyzeCashFlowText)(messageText, eventAt, fetchFn);
+          const analyzedExpense = await (deps.analyzeTextExpense ?? analyzeCashFlowText)(messageText, eventAt, fetchFn);
+          const analysis = {
+            ...analyzedExpense,
+            category: deterministicTextExpenseCategory(messageText, analyzedExpense.category),
+          };
           const cashFlowEntryId = await insertTextCashFlowExpense(deps.supabase, event, analysis);
           const { inserted } = await insertBillReceiptEvent(deps.supabase, event, null, undefined, cashFlowEntryId);
 
