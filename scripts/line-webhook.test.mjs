@@ -825,6 +825,84 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
 }
 
 {
+  const cases = [
+    {
+      text: "จ่ายค่าไก่สด 4,020 บาท",
+      incorrectCategory: "rent_payment",
+      expectedCategory: "chicken_purchase",
+      expectedLabel: "ซื้อไก่สด",
+    },
+    {
+      text: "จ่ายค่าขนส่งไก่สด 440 บาท",
+      incorrectCategory: "chicken_purchase",
+      expectedCategory: "transport",
+      expectedLabel: "ค่าขนส่ง",
+    },
+    {
+      text: "จ่ายค่าแรงแพ็คไก่ 2,500 บาท",
+      incorrectCategory: "chicken_purchase",
+      expectedCategory: "labor_cost",
+      expectedLabel: "ค่าแรง",
+    },
+    {
+      text: "จ่ายค่าข้าวเหนียว 1,200 บาท",
+      incorrectCategory: "rent_payment",
+      expectedCategory: "ingredient_purchase",
+      expectedLabel: "ซื้อวัตถุดิบ\\/ข้าวเหนียว",
+    },
+    {
+      text: "จ่ายค่าเครื่องปรุง 900 บาท",
+      incorrectCategory: "misc_expense",
+      expectedCategory: "seasoning_cost",
+      expectedLabel: "ค่าเครื่องปรุง",
+    },
+  ];
+
+  for (const [index, testCase] of cases.entries()) {
+    const supabase = createSupabaseMock();
+    const fetchFn = createFetchMock();
+    const result = await processLineWebhookPayload(
+      {
+        events: [
+          {
+            type: "message",
+            replyToken: `reply-token-expense-category-${index}`,
+            timestamp: 1785257200000,
+            source: { userId: "line-user-expense-category" },
+            message: { id: `text-expense-category-${index}`, type: "text", text: testCase.text },
+          },
+        ],
+      },
+      {
+        supabase,
+        channelAccessToken: "channel-token",
+        fetchFn,
+        analyzeTextExpense: async () => ({
+          transactionDate: "2026-07-28",
+          amount: Number(testCase.text.match(/[\d,]+/)?.[0].replace(/,/g, "")),
+          description: testCase.text.replace(/^\s*จ่าย/u, ""),
+          paymentMethod: "ไม่ระบุ",
+          category: testCase.incorrectCategory,
+        }),
+        logger: console,
+      },
+    );
+
+    assert.equal(result.ok, true, `${testCase.text} is recorded`);
+    assert.equal(
+      supabase.cashFlowRows[0].category,
+      testCase.expectedCategory,
+      `${testCase.text} uses the business-purpose category instead of an incorrect model category`,
+    );
+    assert.match(
+      fetchFn.calls[0].init.body,
+      new RegExp(testCase.expectedLabel),
+      `${testCase.text} replies with the canonical Cash Flow category label`,
+    );
+  }
+}
+
+{
   const supabase = createSupabaseMock();
   const fetchFn = createFetchMock();
   const textIncomeAnalysis = async () => ({
