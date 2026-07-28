@@ -229,7 +229,7 @@ function sendStandardFranchiseRows(rows) {
   const response = UrlFetchApp.fetch(STANDARD_FRANCHISE_SYNC_ENDPOINT, {
     method: "post",
     contentType: "application/json",
-    headers: { "x-google-form-sync-secret": secret },
+    headers: { Authorization: "Bearer " + secret },
     payload: JSON.stringify({ rows: rows }),
     muteHttpExceptions: true,
   });
