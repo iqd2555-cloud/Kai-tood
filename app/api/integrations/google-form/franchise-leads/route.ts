@@ -15,6 +15,15 @@ function hashesMatch(provided: string, expectedHash: string) {
     && timingSafeEqual(providedBuffer, expectedBuffer);
 }
 
+function getProvidedSecret(request: Request) {
+  const authorization = request.headers.get("authorization")?.trim() ?? "";
+  const bearerMatch = authorization.match(/^Bearer\s+(.+)$/i);
+  if (bearerMatch?.[1]) return bearerMatch[1].trim();
+
+  // Backward compatibility for scripts installed before the Bearer auth hotfix.
+  return request.headers.get("x-google-form-sync-secret")?.trim() ?? "";
+}
+
 function isInput(value: unknown): value is GoogleFormStandardLeadInput {
   return typeof value === "object"
     && value !== null
@@ -37,7 +46,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "Google Form sync is not configured" }, { status: 503 });
   }
 
-  const providedSecret = request.headers.get("x-google-form-sync-secret")?.trim() ?? "";
+  const providedSecret = getProvidedSecret(request);
   if (!providedSecret || !hashesMatch(providedSecret, syncConfig.secret_hash)) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }
