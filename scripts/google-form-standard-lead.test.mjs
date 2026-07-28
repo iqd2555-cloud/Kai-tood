@@ -10,6 +10,7 @@ const input = {
   namedValues: {
     "ชื่อ-นามสกุล": ["สมชาย ใจดี"],
     "เบอร์โทรศัพท์ / LINE ID": ["081-234-5678 / somchai.line"],
+    "Email Address": ["SOMCHAI@example.com"],
     "จังหวัด / อำเภอ ที่ต้องการเปิดร้าน": ["นครสวรรค์ / เมืองนครสวรรค์"],
     "ตอนนี้มีทำเลแล้วหรือยัง": ["มีทำเลแล้ว"],
     "ลักษณะทำเลที่ต้องการเปิดร้าน": ["ตลาด"],
@@ -26,6 +27,7 @@ const mapped = mapGoogleFormStandardLead(input);
 assert.equal(mapped.externalId, "sheet:123:2");
 assert.equal(mapped.phoneNormalized, "0812345678");
 assert.equal(mapped.lead.phone, "0812345678");
+assert.equal(mapped.lead.email, "somchai@example.com");
 assert.equal(mapped.lead.line_id, "somchai.line");
 assert.equal(mapped.lead.province, "นครสวรรค์");
 assert.equal(mapped.lead.district, "เมืองนครสวรรค์");
@@ -48,6 +50,7 @@ const lineOnly = mapGoogleFormStandardLead({
 });
 assert.equal(lineOnly.lead.phone, "ไม่ระบุเบอร์โทร");
 assert.equal(lineOnly.lead.line_id, "@line-only");
+assert.equal(lineOnly.lead.email, null);
 assert.equal(lineOnly.lead.province, "เชียงใหม่");
 assert.equal(lineOnly.lead.district, "เมืองเชียงใหม่");
 

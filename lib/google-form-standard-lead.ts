@@ -22,6 +22,7 @@ export type MappedGoogleFormStandardLead = {
   lead: {
     full_name: string;
     phone: string;
+    email: string | null;
     line_id: string | null;
     province: string;
     district: string;
@@ -50,6 +51,7 @@ export type MappedGoogleFormStandardLead = {
 const questions = {
   fullName: ["ชื่อ-นามสกุล", "ชื่อ นามสกุล", "ชื่อและนามสกุล"],
   contact: ["เบอร์โทรศัพท์ / LINE ID", "เบอร์โทรศัพท์/LINE ID", "เบอร์โทร", "โทรศัพท์", "LINE ID"],
+  email: ["อีเมล", "อีเมลแอดเดรส", "ที่อยู่อีเมล", "Email", "Email Address"],
   openingArea: ["จังหวัด / อำเภอ ที่ต้องการเปิดร้าน", "จังหวัด/อำเภอ ที่ต้องการเปิดร้าน", "จังหวัดและอำเภอที่ต้องการเปิดร้าน"],
   hasLocation: ["ตอนนี้มีทำเลแล้วหรือยัง", "มีทำเลแล้วหรือยัง"],
   locationType: ["ลักษณะทำเลที่ต้องการเปิดร้าน", "ประเภททำเล", "ลักษณะทำเล"],
@@ -102,6 +104,11 @@ function parseContact(rawContact: string) {
     phoneNormalized: phone,
     lineId: lineId || null,
   };
+}
+
+function parseEmail(value: string) {
+  const match = value.trim().toLocaleLowerCase("en-US").match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
+  return match?.[0] ?? null;
 }
 
 function cleanAreaPart(value: string) {
@@ -166,6 +173,7 @@ export function mapGoogleFormStandardLead(input: GoogleFormStandardLeadInput): M
   const lead: MappedGoogleFormStandardLead["lead"] = {
     full_name: findAnswer(namedValues, questions.fullName) || "ไม่ระบุชื่อ",
     phone: contact.phone,
+    email: parseEmail(findAnswer(namedValues, questions.email)),
     line_id: contact.lineId,
     province: openingArea.province,
     district: openingArea.district,

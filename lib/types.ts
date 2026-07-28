@@ -184,6 +184,7 @@ export type FranchiseLead = {
   id: string;
   full_name: string;
   phone: string;
+  email: string | null;
   line_id: string | null;
   province: string;
   district: string | null;
@@ -206,6 +207,7 @@ export type FranchiseLead = {
   source_submitted_at: string | null;
   source_payload: Record<string, string> | null;
   phone_normalized: string;
+  email_normalized: string | null;
   created_at: string;
   updated_at: string;
 };

@@ -30,7 +30,7 @@ export default async function LeadsPage({ searchParams }: { searchParams?: Promi
 
   let query = supabase.from("franchise_leads").select("*");
   if (status) query = query.eq("status", status);
-  if (q) query = query.or(`full_name.ilike.%${q}%,phone.ilike.%${q}%,province.ilike.%${q}%`);
+  if (q) query = query.or(`full_name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%,province.ilike.%${q}%`);
   const { data, error } = await query.order("created_at", { ascending: false }).returns<FranchiseLead[]>();
   const leads = data ?? [];
   const websiteLeadCount = leads.filter((lead) => lead.source === "website").length;
@@ -52,6 +52,7 @@ export default async function LeadsPage({ searchParams }: { searchParams?: Promi
             <LeadContactActions lead={lead} />
             <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
               <div><b>Line:</b> {lead.line_id || "-"}</div>
+              <div><b>อีเมล:</b> {lead.email || "-"}</div>
               <div><b>จังหวัด/อำเภอ:</b> {lead.province}{lead.district ? ` / ${lead.district}` : ""}</div>
               <div><b>มีทำเล / พื้นที่:</b> {lead.has_location || lead.available_area || "-"}</div>
               <div><b>ประเภททำเล:</b> {lead.location_type}</div>
