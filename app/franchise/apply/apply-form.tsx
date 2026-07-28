@@ -73,6 +73,7 @@ export function ApplyForm() {
       <Section eyebrow="Step 01" title="ข้อมูลติดต่อ">
         <Field label="ชื่อ-นามสกุล" name="full_name" required />
         <Field label="เบอร์โทร" name="phone" required><input name="phone" required inputMode="tel" className={fieldClass} /></Field>
+        <Field label="อีเมล (ถ้ามี)" name="email"><input name="email" type="email" inputMode="email" className={fieldClass} /></Field>
         <Field label="Line ID" name="line_id" />
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="จังหวัด" name="province" required>

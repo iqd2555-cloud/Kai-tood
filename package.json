@@ -20,7 +20,7 @@
     "test:line-webhook": "node --experimental-strip-types scripts/line-webhook.test.mjs",
     "test:line-bill-receipts-migration": "node scripts/line-bill-receipts-migration.test.mjs",
     "test:mini-qualification": "node --experimental-strip-types scripts/mini-application-qualification.test.mjs",
-    "test:google-form-standard-lead": "node --experimental-strip-types scripts/google-form-standard-lead.test.mjs"
+    "test:google-form-standard-lead": "node --experimental-strip-types scripts/google-form-standard-lead.test.mjs && node --experimental-strip-types scripts/google-form-franchise-sync.test.mjs && node scripts/google-form-sync-contract.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

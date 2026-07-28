@@ -2,11 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   mapGoogleFormStandardLead,
   type GoogleFormStandardLeadInput,
-} from "@/lib/google-form-standard-lead";
+} from "./google-form-standard-lead.ts";
 
 export type GoogleFormSyncResult =
   | { outcome: "created"; leadId: string }
   | { outcome: "merged"; leadId: string }
+  | { outcome: "updated"; leadId: string }
   | { outcome: "duplicate"; leadId: string | null };
 
 function errorMessage(error: unknown) {
@@ -34,11 +35,14 @@ export async function syncGoogleFormStandardLead(
 
   const { data: existingImport, error: existingImportError } = await supabase
     .from("google_form_franchise_imports")
-    .select("id, status, lead_id")
+    .select("id, status, lead_id, payload_hash")
     .eq("external_id", mapped.externalId)
     .maybeSingle();
   if (existingImportError) throw existingImportError;
-  if (existingImport?.status === "complete" || existingImport?.status === "processing") {
+  if (existingImport?.status === "complete" && existingImport.payload_hash === mapped.payloadHash) {
+    return { outcome: "duplicate", leadId: existingImport.lead_id ?? null };
+  }
+  if (existingImport?.status === "processing" && existingImport.payload_hash === mapped.payloadHash) {
     return { outcome: "duplicate", leadId: existingImport.lead_id ?? null };
   }
 
@@ -68,12 +72,40 @@ export async function syncGoogleFormStandardLead(
   }
 
   try {
-    let existingLead: { id: string; line_id: string | null; source_submitted_at: string | null; source_payload: unknown } | null = null;
-    if (mapped.phoneNormalized) {
+    let existingLead: {
+      id: string;
+      source: string;
+      email: string | null;
+      line_id: string | null;
+      source_submitted_at: string | null;
+      source_payload: unknown;
+    } | null = null;
+
+    if (existingImport?.lead_id) {
       const { data, error } = await supabase
         .from("franchise_leads")
-        .select("id, line_id, source_submitted_at, source_payload")
+        .select("id, source, email, line_id, source_submitted_at, source_payload")
+        .eq("id", existingImport.lead_id)
+        .maybeSingle();
+      if (error) throw error;
+      existingLead = data;
+    }
+    if (!existingLead && mapped.phoneNormalized) {
+      const { data, error } = await supabase
+        .from("franchise_leads")
+        .select("id, source, email, line_id, source_submitted_at, source_payload")
         .eq("phone_normalized", mapped.phoneNormalized)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      existingLead = data;
+    }
+    if (!existingLead && mapped.lead.email) {
+      const { data, error } = await supabase
+        .from("franchise_leads")
+        .select("id, source, email, line_id, source_submitted_at, source_payload")
+        .eq("email_normalized", mapped.lead.email)
         .order("created_at", { ascending: true })
         .limit(1)
         .maybeSingle();
@@ -82,14 +114,28 @@ export async function syncGoogleFormStandardLead(
     }
 
     let leadId: string;
-    let outcome: "created" | "merged";
+    let outcome: "created" | "merged" | "updated";
     if (existingLead) {
       leadId = existingLead.id;
-      outcome = "merged";
-      const patch: Record<string, unknown> = {};
+      const isSameSheetRow = existingImport?.lead_id === existingLead.id;
+      outcome = isSameSheetRow ? "updated" : "merged";
+      const patch: Record<string, unknown> = isSameSheetRow && existingLead.source === "google_form"
+        ? {
+            ...mapped.lead,
+            created_at: undefined,
+            source_submitted_at: mapped.submittedAt,
+            source_payload: mapped.lead.source_payload,
+          }
+        : {};
+      delete patch.created_at;
+
+      // A Google Form row may match a website lead. In that case, only fill
+      // missing contact/source metadata and never overwrite the website answers,
+      // owner status, or internal note.
+      if (!existingLead.email && mapped.lead.email) patch.email = mapped.lead.email;
       if (!existingLead.line_id && mapped.lead.line_id) patch.line_id = mapped.lead.line_id;
       if (!existingLead.source_submitted_at && mapped.submittedAt) patch.source_submitted_at = mapped.submittedAt;
-      if (!existingLead.source_payload) patch.source_payload = mapped.lead.source_payload;
+      patch.source_payload = mapped.lead.source_payload;
       if (Object.keys(patch).length > 0) {
         const { error } = await supabase.from("franchise_leads").update(patch).eq("id", leadId);
         if (error) throw error;
@@ -100,14 +146,36 @@ export async function syncGoogleFormStandardLead(
         .insert(mapped.lead)
         .select("id")
         .single();
-      if (error) throw error;
-      leadId = data.id as string;
-      outcome = "created";
+      if (error?.code === "23505" && mapped.phoneNormalized) {
+        const { data: racedLead, error: racedLeadError } = await supabase
+          .from("franchise_leads")
+          .select("id")
+          .eq("phone_normalized", mapped.phoneNormalized)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (racedLeadError) throw racedLeadError;
+        if (racedLead?.id) {
+          leadId = racedLead.id as string;
+          outcome = "merged";
+        } else {
+          throw error;
+        }
+      } else {
+        if (error) throw error;
+        leadId = data.id as string;
+        outcome = "created";
+      }
     }
 
     const { error: completeError } = await supabase
       .from("google_form_franchise_imports")
-      .update({ status: "complete", lead_id: leadId, last_error: null })
+      .update({
+        ...importRow,
+        status: "complete",
+        lead_id: leadId,
+        last_error: null,
+      })
       .eq("id", importId);
     if (completeError) throw completeError;
 

@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "Invalid row payload" }, { status: 400 });
   }
 
-  const summary = { created: 0, merged: 0, duplicate: 0, failed: 0 };
+  const summary = { created: 0, merged: 0, updated: 0, duplicate: 0, failed: 0 };
   for (const row of candidateRows) {
     try {
       const result = await syncGoogleFormStandardLead(supabase, row);

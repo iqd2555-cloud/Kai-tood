@@ -7,6 +7,7 @@ import { createSupabaseServerClient } from "@/lib/supabase-server";
 const leadSchema = z.object({
   full_name: z.string().trim().min(1),
   phone: z.string().trim().min(1),
+  email: z.string().trim().email().or(z.literal("")).optional(),
   line_id: z.string().trim().optional(),
   province: z.string().trim().min(1),
   district: z.string().trim().min(1),
@@ -38,6 +39,7 @@ export async function submitFranchiseLead(_prevState: ApplyFormState, formData: 
   const lead = {
     full_name: parsed.data.full_name,
     phone: parsed.data.phone,
+    email: parsed.data.email || null,
     line_id: parsed.data.line_id || null,
     province: parsed.data.province,
     district: parsed.data.district,
