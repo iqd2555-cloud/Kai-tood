@@ -21,6 +21,9 @@ assert.match(appsScript, /syncStandardFranchiseSheetEdit/);
 assert.match(appsScript, /reconcileStandardFranchiseResponses/);
 assert.match(appsScript, /everyHours\(1\)/);
 assert.match(appsScript, /INTERNAL_SYNC_ID_HEADER/);
+assert.match(appsScript, /Authorization:\s*"Bearer "\s*\+\s*secret/);
 assert.match(route, /updated: 0/);
+assert.match(route, /authorization/);
+assert.match(route, /x-google-form-sync-secret/);
 
 console.log("Google Form sync migration and Apps Script contract tests passed");
