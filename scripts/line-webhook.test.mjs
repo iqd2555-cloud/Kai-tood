@@ -575,6 +575,43 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
 }
 
 {
+  const fetchFn = async () => Response.json({
+    choices: [{
+      finish_reason: "stop",
+      message: {
+        content: JSON.stringify({
+          merchant: "บริษัท ปตท. น้ำมันและการค้าปลีก จำกัด (มหาชน)",
+          transactionDate: "2026-08-04",
+          amount: 500,
+          paymentMethod: "อื่นๆ",
+          category: "ค่าเช่าที่",
+          confidence: 0.95,
+          documentType: "invoice_receipt",
+          memo: "",
+          recipientReference: "",
+        }),
+      },
+    }],
+  });
+  const analysis = await withEnv(
+    { OPENAI_API_KEY: "test-openai-key" },
+    () => analyzeReceiptImage(
+      { contentType: "image/jpeg", data: Buffer.from("fake-or-e20-receipt") },
+      "2026-08-04T02:56:07.137Z",
+      fetchFn,
+    ),
+  );
+
+  assert.equal(analysis.amount, 500);
+  assert.equal(
+    analysis.category,
+    "fuel_cost",
+    "PTT OR fuel receipts override an incorrect rent classification",
+  );
+  assert.equal(analysis.confidence, 0.95);
+}
+
+{
   const result = await withEnv(
     {
       NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
@@ -897,6 +934,12 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
       incorrectCategory: "misc_expense",
       expectedCategory: "seasoning_cost",
       expectedLabel: "ค่าเครื่องปรุง",
+    },
+    {
+      text: "จ่ายค่าน้ำมันเชื้อเพลิง 500 บาท",
+      incorrectCategory: "rent_payment",
+      expectedCategory: "fuel_cost",
+      expectedLabel: "ค่าน้ำมันเชื้อเพลิง",
     },
   ];
 
