@@ -54,6 +54,7 @@ const RECEIPT_CATEGORY_CODE_BY_LABEL: Record<string, string> = {
   "เครื่องปรุง": "seasoning_cost",
   "ค่าแรง": "labor_cost",
   "น้ำแข็ง": "ice_cost",
+  "ค่าน้ำมันเชื้อเพลิง": "fuel_cost",
   "ขนส่ง": "transport",
   "อื่นๆ": "misc_expense",
 };
@@ -78,6 +79,7 @@ const RECEIPT_CATEGORY_LABEL_BY_CODE: Record<string, string> = {
   seasoning_cost: "ค่าเครื่องปรุง",
   labor_cost: "ค่าแรง",
   ice_cost: "ค่าน้ำแข็ง",
+  fuel_cost: "ค่าน้ำมันเชื้อเพลิง",
   transport: "ค่าขนส่ง",
   misc_expense: "ค่าใช้จ่ายจิปาถะ",
 };
@@ -106,6 +108,15 @@ const LOCKED_RECIPIENT_EXPENSE_RULES: LockedRecipientExpenseRule[] = [
     references: [],
     category: "chicken_purchase",
     description: "ซื้อไก่สด",
+  },
+  {
+    names: [
+      "บริษัท ปตท. น้ำมันและการค้าปลีก จำกัด (มหาชน)",
+      "บริษัท ปตท. น้ำมันและการค้าปลีก จำกัด",
+      "PTT OIL AND RETAIL BUSINESS PUBLIC COMPANY LIMITED",
+    ],
+    references: [],
+    category: "fuel_cost",
   },
   {
     names: [
@@ -258,6 +269,16 @@ function receiptCategoryFromMemo(memo: string) {
   if (normalized.includes("ค่าแรง") || normalized.includes("ค่าจ้าง")) return "labor_cost";
   if (normalized.includes("ค่าน้ำแข็ง") || normalized.includes("น้ำแข็ง")) return "ice_cost";
   if (normalized.includes("ค่าขนส่ง") || normalized.includes("ค่าส่ง")) return "transport";
+  if (
+    normalized.includes("ค่าน้ำมันเชื้อเพลิง")
+    || normalized.includes("น้ำมันเชื้อเพลิง")
+    || normalized.includes("เติมน้ำมัน")
+    || normalized.includes("แก๊สโซฮอล์")
+    || normalized.includes("gasohol")
+    || normalized.includes("เบนซิน")
+    || normalized.includes("diesel")
+    || normalized.includes("ดีเซล")
+  ) return "fuel_cost";
   if (normalized.includes("ค่าเช่า")) return "rent_payment";
   if (normalized.includes("อินเทอร์เน็ต")) return "internet_payment";
   if (normalized.includes("เครื่องปรุง")) return "seasoning_cost";
@@ -573,7 +594,7 @@ export async function analyzeReceiptImage(
               category: { type: "string", enum: Object.keys(RECEIPT_CATEGORY_CODE_BY_LABEL) },
               confidence: { type: "number", minimum: 0, maximum: 1 },
               documentType: { type: "string", enum: ["bank_transfer_slip", "invoice_receipt", "other"] },
-              memo: { type: "string", description: "ข้อความบันทึกช่วยจำ/หมายเหตุบนสลิป ถ้าไม่มีให้เป็นข้อความว่าง" },
+              memo: { type: "string", description: "ข้อความบันทึกช่วยจำ/หมายเหตุ หรือรายการสินค้า/บริการสำคัญบนเอกสาร เช่น GASOHOL E20 ถ้าไม่มีให้เป็นข้อความว่าง" },
               recipientReference: { type: "string", description: "Biller ID เลขบัญชีผู้รับ หรือรหัสร้านค้า ถ้าไม่มีให้เป็นข้อความว่าง" },
             },
             required: ["merchant", "transactionDate", "amount", "paymentMethod", "category", "confidence", "documentType", "memo", "recipientReference"],
@@ -586,7 +607,7 @@ export async function analyzeReceiptImage(
         content: [
           {
             type: "text",
-            text: `อ่านเอกสารค่าใช้จ่ายภาษาไทย แยก merchant, transactionDate, amount, paymentMethod, category, confidence, documentType, memo และ recipientReference. สำหรับสลิปโอนเงิน/จ่ายบิล: merchant ต้องเป็นชื่อผู้รับใต้คำว่า "ไปยัง" ห้ามใช้ชื่อบริษัทผู้โอนใต้คำว่า "จาก"; คัดลอก Biller ID เลขบัญชีผู้รับ หรือรหัสร้านค้าลง recipientReference; ถ้ามี "โอนเงินสำเร็จ" หรือ "จ่ายบิลสำเร็จ" ให้ paymentMethod เป็น "โอนเงิน"; คัดลอก "บันทึกช่วยจำ" ลง memo และใช้ memo เป็นหลักในการเลือกหมวด เช่น ค่าแรง/ค่าจ้างต้องเป็น "ค่าแรง" แม้ชื่อผู้โอนมีคำว่าไก่. สำหรับใบเสร็จซื้อไก่ เนื้อไก่ หนังไก่ หรือเครื่องในไก่ให้ category เป็นไก่สด. หากไม่เห็นวันที่ให้ใช้ ${thailandDate(eventAt)} และตั้ง confidence ต่ำกว่า ${RECEIPT_CONFIDENCE_THRESHOLD}`,
+            text: `อ่านเอกสารค่าใช้จ่ายภาษาไทย แยก merchant, transactionDate, amount, paymentMethod, category, confidence, documentType, memo และ recipientReference. สำหรับสลิปโอนเงิน/จ่ายบิล: merchant ต้องเป็นชื่อผู้รับใต้คำว่า "ไปยัง" ห้ามใช้ชื่อบริษัทผู้โอนใต้คำว่า "จาก"; คัดลอก Biller ID เลขบัญชีผู้รับ หรือรหัสร้านค้าลง recipientReference; ถ้ามี "โอนเงินสำเร็จ" หรือ "จ่ายบิลสำเร็จ" ให้ paymentMethod เป็น "โอนเงิน"; คัดลอก "บันทึกช่วยจำ" ลง memo และใช้ memo เป็นหลักในการเลือกหมวด เช่น ค่าแรง/ค่าจ้างต้องเป็น "ค่าแรง" แม้ชื่อผู้โอนมีคำว่าไก่. สำหรับใบเสร็จให้คัดลอกรายการสินค้า/บริการสำคัญลง memo ด้วย. ใบเสร็จที่ระบุ GASOHOL, E20, E85, เบนซิน, ดีเซล, น้ำมันเชื้อเพลิง หรือบริษัท ปตท. น้ำมันและการค้าปลีก ให้ category เป็นค่าน้ำมันเชื้อเพลิง. สำหรับใบเสร็จซื้อไก่ เนื้อไก่ หนังไก่ หรือเครื่องในไก่ให้ category เป็นไก่สด. หากไม่เห็นวันที่ให้ใช้ ${thailandDate(eventAt)} และตั้ง confidence ต่ำกว่า ${RECEIPT_CONFIDENCE_THRESHOLD}`,
           },
           {
             type: "image_url",
@@ -703,7 +724,7 @@ export async function analyzeCashFlowText(
       },
       messages: [{
         role: "user",
-        content: `แยกข้อความค่าใช้จ่ายสำหรับ Cash Flow: "${text}". คำว่า "จ่าย" หมายถึงจ่ายเงินจริงแล้ว หากไม่ระบุช่องทางให้ใช้ "ไม่ระบุ" หากไม่ระบุวันที่ให้ใช้ ${thailandDate(eventAt)} เลือกหมวดตามวัตถุประสงค์ที่จ่ายจริง: ค่าเช่าที่=ค่าเช่าร้านหรือพื้นที่, อินเทอร์เน็ต=ค่าบริการอินเทอร์เน็ต, ไก่สด=ซื้อไก่สด/หนังไก่/เครื่องในไก่, ข้าวเหนียว=ซื้อข้าวเหนียวหรือวัตถุดิบ, เครื่องปรุง=ซื้อเครื่องปรุง, ค่าแรง=ค่าแรงหรือค่าจ้าง, น้ำแข็ง=ซื้อน้ำแข็ง, ขนส่ง=ค่าขนส่งหรือค่าส่ง, อื่นๆ=ไม่เข้าเกณฑ์ข้างต้น ห้ามเลือกจากคำว่า "จ่ายค่า" แบบแยกคำ ตัวอย่าง "จ่ายค่าไก่สด 4,020 บาท" ต้องเป็นหมวด "ไก่สด"`,
+        content: `แยกข้อความค่าใช้จ่ายสำหรับ Cash Flow: "${text}". คำว่า "จ่าย" หมายถึงจ่ายเงินจริงแล้ว หากไม่ระบุช่องทางให้ใช้ "ไม่ระบุ" หากไม่ระบุวันที่ให้ใช้ ${thailandDate(eventAt)} เลือกหมวดตามวัตถุประสงค์ที่จ่ายจริง: ค่าเช่าที่=ค่าเช่าร้านหรือพื้นที่, อินเทอร์เน็ต=ค่าบริการอินเทอร์เน็ต, ไก่สด=ซื้อไก่สด/หนังไก่/เครื่องในไก่, ข้าวเหนียว=ซื้อข้าวเหนียวหรือวัตถุดิบ, เครื่องปรุง=ซื้อเครื่องปรุง, ค่าแรง=ค่าแรงหรือค่าจ้าง, น้ำแข็ง=ซื้อน้ำแข็ง, ค่าน้ำมันเชื้อเพลิง=เติมน้ำมันรถ/แก๊สโซฮอล์/เบนซิน/ดีเซล, ขนส่ง=ค่าขนส่งหรือค่าส่ง, อื่นๆ=ไม่เข้าเกณฑ์ข้างต้น ห้ามเลือกจากคำว่า "จ่ายค่า" แบบแยกคำ ตัวอย่าง "จ่ายค่าไก่สด 4,020 บาท" ต้องเป็นหมวด "ไก่สด"`,
       }],
     }),
   });
