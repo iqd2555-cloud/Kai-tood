@@ -130,6 +130,7 @@ const marinatedChickenIncomeExamples = [
   { senderName: "นายไผ่ชู ย***", senderReference: "xxx-x-xx886-2", amount: 3150 },
   { senderName: "น.ส. โอชิระ ย***", senderReference: "xxx-x-xx450-1", amount: 3150 },
   { senderName: "น.ส. จินตณี", senderReference: "593-0-xxx084", amount: 2925 },
+  { senderName: "นายอนันตพล ส***", senderReference: "XXX-X-XX592-3", amount: 3575 },
 ];
 
 function createSignedRequest(body, secret, signature = sign(body, secret)) {
@@ -281,7 +282,7 @@ for (const [index, example] of marinatedChickenIncomeExamples.entries()) {
 
   assert.equal(analysis.merchant, example.senderName, `${example.senderName} is stored as the payer`);
   assert.equal(analysis.category, "marinated_chicken_sales");
-  assert.equal(analysis.confidence, 0.95, "known customer transfer is eligible for automatic income recording");
+  assert.equal(analysis.confidence, 0.95, "a transfer into the company account is eligible for automatic income recording");
 
   const supabase = createSupabaseMock();
   const lineFetchFn = createFetchMock();

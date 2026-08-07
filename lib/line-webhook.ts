@@ -140,28 +140,12 @@ const LOCKED_RECIPIENT_EXPENSE_RULES: LockedRecipientExpenseRule[] = [
   },
 ];
 
-type KnownMarinatedChickenCustomer = {
-  names: string[];
-  senderReferences: string[];
-};
-
 const COMPANY_RECIPIENT_NAMES = [
   "เหนียวไก่เยอะโคตร อินสไปร์",
   "บจก. เหนียวไก่เยอะโคตร อินสไปร์",
   "บริษัท เหนียวไก่เยอะโคตร อินสไปร์ จำกัด",
 ];
 const COMPANY_RECIPIENT_REFERENCES = ["6909", "9096"];
-const KNOWN_MARINATED_CHICKEN_CUSTOMERS: KnownMarinatedChickenCustomer[] = [
-  { names: ["พงษ์เทพ"], senderReferences: ["3556"] },
-  { names: ["นงนุช"], senderReferences: ["6179"] },
-  { names: ["พัชรี"], senderReferences: ["8946"] },
-  { names: ["วินัย"], senderReferences: ["6647"] },
-  { names: ["วาสนา ชื่นใจ", "วาสนา"], senderReferences: ["1830", "2626"] },
-  { names: ["หิรัญญา"], senderReferences: ["7032"] },
-  { names: ["ไผ่ชู"], senderReferences: ["8862"] },
-  { names: ["โอชิระ"], senderReferences: ["4501"] },
-  { names: ["จินตณี"], senderReferences: [] },
-];
 
 function normalizedRecipientIdentity(value: string) {
   return value.replace(/[^\p{L}\p{N}]/gu, "").toLocaleLowerCase("th-TH");
@@ -188,13 +172,6 @@ function referenceIncludes(value: string, candidates: string[]) {
 function isCompanyCashFlowRecipient(recipientName: string, recipientReference: string) {
   return identityIncludes(recipientName, COMPANY_RECIPIENT_NAMES)
     || referenceIncludes(recipientReference, COMPANY_RECIPIENT_REFERENCES);
-}
-
-function isKnownMarinatedChickenCustomer(senderName: string, senderReference: string) {
-  return KNOWN_MARINATED_CHICKEN_CUSTOMERS.some((customer) =>
-    identityIncludes(senderName, customer.names)
-    || referenceIncludes(senderReference, customer.senderReferences)
-  );
 }
 
 function lockedRecipientRule(merchant: string, recipientReference: string) {
@@ -242,10 +219,7 @@ function isMarinatedChickenIncomeReceipt(analysis: ReceiptAnalysis) {
       analysis.recipientName ?? "",
       analysis.recipientReference ?? "",
     )
-    && isKnownMarinatedChickenCustomer(
-      analysis.senderName ?? analysis.merchant,
-      analysis.senderReference ?? "",
-    );
+    && Boolean((analysis.senderName ?? analysis.merchant).trim());
 }
 
 type TextExpenseAnalysis = {
@@ -663,7 +637,7 @@ export async function analyzeReceiptImage(
         content: [
           {
             type: "text",
-            text: `อ่านเอกสารทางการเงินภาษาไทย แยก merchant, transactionDate, amount, paymentMethod, category, confidence, documentType, memo, recipientReference, senderName, recipientName, senderReference และ transactionReference. สำหรับสลิปโอนเงิน/จ่ายบิล: merchant และ recipientName ต้องเป็นชื่อผู้รับใต้คำว่า "ไปยัง"; senderName ต้องเป็นชื่อผู้โอนใต้คำว่า "จาก"; คัดลอกเลขบัญชีผู้รับลง recipientReference เลขบัญชีผู้โอนลง senderReference และเลขที่รายการ/รหัสอ้างอิงลง transactionReference โดยเก็บส่วนที่อ่านได้แม้มี x หรือ * ปิดบัง. ถ้ามี "โอนเงินสำเร็จ" หรือ "จ่ายบิลสำเร็จ" ให้ paymentMethod เป็น "โอนเงิน". คัดลอก "บันทึกช่วยจำ" ลง memo และใช้ memo เป็นหลักในการเลือกหมวดค่าใช้จ่าย เช่น ค่าแรง/ค่าจ้างต้องเป็น "ค่าแรง". สำหรับใบเสร็จซื้อไก่ เนื้อไก่ หนังไก่ หรือเครื่องในไก่ให้ category เป็นไก่สด. สลิปที่โอนเข้าผู้รับชื่อ บจก. เหนียวไก่เยอะโคตร อินสไปร์ ต้องอ่านชื่อผู้โอนให้ครบที่สุดเพื่อใช้บันทึกรายรับ. หากไม่เห็นวันที่ให้ใช้ ${thailandDate(eventAt)} และตั้ง confidence ต่ำกว่า ${RECEIPT_CONFIDENCE_THRESHOLD}`,
+            text: `อ่านเอกสารทางการเงินภาษาไทย แยก merchant, transactionDate, amount, paymentMethod, category, confidence, documentType, memo, recipientReference, senderName, recipientName, senderReference และ transactionReference. สำหรับสลิปโอนเงิน/จ่ายบิล: merchant และ recipientName ต้องเป็นชื่อผู้รับใต้คำว่า "ไปยัง"; senderName ต้องเป็นชื่อผู้โอนใต้คำว่า "จาก"; คัดลอกเลขบัญชีผู้รับลง recipientReference เลขบัญชีผู้โอนลง senderReference และเลขที่รายการ/รหัสอ้างอิงลง transactionReference โดยเก็บส่วนที่อ่านได้แม้มี x หรือ * ปิดบัง. ถ้ามี "โอนเงินสำเร็จ" หรือ "จ่ายบิลสำเร็จ" ให้ paymentMethod เป็น "โอนเงิน". คัดลอก "บันทึกช่วยจำ" ลง memo และใช้ memo เป็นหลักในการเลือกหมวดค่าใช้จ่าย เช่น ค่าแรง/ค่าจ้างต้องเป็น "ค่าแรง". สำหรับใบเสร็จซื้อไก่ เนื้อไก่ หนังไก่ หรือเครื่องในไก่ให้ category เป็นไก่สด. สลิปโอนเงินสำเร็จที่ผู้รับคือ บจก. เหนียวไก่เยอะโคตร อินสไปร์ เป็นรายรับขายไก่หมักเสมอ ไม่ว่าผู้โอนจะเป็นลูกค้ารายเดิมหรือรายใหม่ และต้องอ่านชื่อผู้โอนให้ครบที่สุด. หากไม่เห็นวันที่ให้ใช้ ${thailandDate(eventAt)} และตั้ง confidence ต่ำกว่า ${RECEIPT_CONFIDENCE_THRESHOLD}`,
           },
           {
             type: "image_url",
@@ -731,7 +705,6 @@ export async function analyzeReceiptImage(
     && amount > 0
     && parsedTransactionDate
     && isCompanyCashFlowRecipient(recipientName || merchant, recipientReference)
-    && isKnownMarinatedChickenCustomer(senderName, senderReference)
   );
   const confidence = isCompleteMarinatedChickenIncome
     ? Math.max(reportedConfidence, 0.95)
