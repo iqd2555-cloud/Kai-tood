@@ -140,8 +140,61 @@ const LOCKED_RECIPIENT_EXPENSE_RULES: LockedRecipientExpenseRule[] = [
   },
 ];
 
+type KnownMarinatedChickenCustomer = {
+  names: string[];
+  senderReferences: string[];
+};
+
+const COMPANY_RECIPIENT_NAMES = [
+  "เหนียวไก่เยอะโคตร อินสไปร์",
+  "บจก. เหนียวไก่เยอะโคตร อินสไปร์",
+  "บริษัท เหนียวไก่เยอะโคตร อินสไปร์ จำกัด",
+];
+const COMPANY_RECIPIENT_REFERENCES = ["6909", "9096"];
+const KNOWN_MARINATED_CHICKEN_CUSTOMERS: KnownMarinatedChickenCustomer[] = [
+  { names: ["พงษ์เทพ"], senderReferences: ["3556"] },
+  { names: ["นงนุช"], senderReferences: ["6179"] },
+  { names: ["พัชรี"], senderReferences: ["8946"] },
+  { names: ["วินัย"], senderReferences: ["6647"] },
+  { names: ["วาสนา ชื่นใจ", "วาสนา"], senderReferences: ["1830", "2626"] },
+  { names: ["หิรัญญา"], senderReferences: ["7032"] },
+  { names: ["ไผ่ชู"], senderReferences: ["8862"] },
+  { names: ["โอชิระ"], senderReferences: ["4501"] },
+  { names: ["จินตณี"], senderReferences: [] },
+];
+
 function normalizedRecipientIdentity(value: string) {
   return value.replace(/[^\p{L}\p{N}]/gu, "").toLocaleLowerCase("th-TH");
+}
+
+function normalizedAccountReference(value: string) {
+  return value.replace(/\D/gu, "");
+}
+
+function identityIncludes(value: string, candidates: string[]) {
+  const normalizedValue = normalizedRecipientIdentity(value);
+  return candidates.some((candidate) =>
+    normalizedValue.includes(normalizedRecipientIdentity(candidate))
+  );
+}
+
+function referenceIncludes(value: string, candidates: string[]) {
+  const normalizedValue = normalizedAccountReference(value);
+  return Boolean(normalizedValue) && candidates.some((candidate) =>
+    normalizedValue.includes(normalizedAccountReference(candidate))
+  );
+}
+
+function isCompanyCashFlowRecipient(recipientName: string, recipientReference: string) {
+  return identityIncludes(recipientName, COMPANY_RECIPIENT_NAMES)
+    || referenceIncludes(recipientReference, COMPANY_RECIPIENT_REFERENCES);
+}
+
+function isKnownMarinatedChickenCustomer(senderName: string, senderReference: string) {
+  return KNOWN_MARINATED_CHICKEN_CUSTOMERS.some((customer) =>
+    identityIncludes(senderName, customer.names)
+    || referenceIncludes(senderReference, customer.senderReferences)
+  );
 }
 
 function lockedRecipientRule(merchant: string, recipientReference: string) {
@@ -173,7 +226,27 @@ type ReceiptAnalysis = {
   documentType?: "bank_transfer_slip" | "invoice_receipt" | "other";
   memo?: string;
   recipientReference?: string;
+  senderName?: string;
+  recipientName?: string;
+  senderReference?: string;
+  transactionReference?: string;
 };
+
+function isMarinatedChickenIncomeReceipt(analysis: ReceiptAnalysis) {
+  return analysis.documentType === "bank_transfer_slip"
+    && analysis.amount > 0
+    && analysis.confidence >= RECEIPT_CONFIDENCE_THRESHOLD
+    && isActualISODate(analysis.transactionDate)
+    && analysis.paymentMethod.includes("โอน")
+    && isCompanyCashFlowRecipient(
+      analysis.recipientName ?? "",
+      analysis.recipientReference ?? "",
+    )
+    && isKnownMarinatedChickenCustomer(
+      analysis.senderName ?? analysis.merchant,
+      analysis.senderReference ?? "",
+    );
+}
 
 type TextExpenseAnalysis = {
   transactionDate: string;
@@ -557,7 +630,7 @@ export async function analyzeReceiptImage(
     body: JSON.stringify({
       model: clean(process.env.OPENAI_RECEIPT_MODEL) || "gpt-4.1-mini",
       temperature: 0,
-      max_completion_tokens: 300,
+      max_completion_tokens: 380,
       response_format: {
         type: "json_schema",
         json_schema: {
@@ -575,8 +648,12 @@ export async function analyzeReceiptImage(
               documentType: { type: "string", enum: ["bank_transfer_slip", "invoice_receipt", "other"] },
               memo: { type: "string", description: "ข้อความบันทึกช่วยจำ/หมายเหตุบนสลิป ถ้าไม่มีให้เป็นข้อความว่าง" },
               recipientReference: { type: "string", description: "Biller ID เลขบัญชีผู้รับ หรือรหัสร้านค้า ถ้าไม่มีให้เป็นข้อความว่าง" },
+              senderName: { type: "string", description: "ชื่อผู้โอนใต้คำว่า จาก ถ้าไม่มีให้เป็นข้อความว่าง" },
+              recipientName: { type: "string", description: "ชื่อผู้รับเงินใต้คำว่า ไปยัง ถ้าไม่มีให้เป็นข้อความว่าง" },
+              senderReference: { type: "string", description: "เลขบัญชีผู้โอนที่สลิปแสดง รวมส่วนที่ปิดบัง ถ้าไม่มีให้เป็นข้อความว่าง" },
+              transactionReference: { type: "string", description: "เลขที่รายการ รหัสอ้างอิง หรือเลขที่อ้างอิงของธุรกรรม ถ้าไม่มีให้เป็นข้อความว่าง" },
             },
-            required: ["merchant", "transactionDate", "amount", "paymentMethod", "category", "confidence", "documentType", "memo", "recipientReference"],
+            required: ["merchant", "transactionDate", "amount", "paymentMethod", "category", "confidence", "documentType", "memo", "recipientReference", "senderName", "recipientName", "senderReference", "transactionReference"],
             additionalProperties: false,
           },
         },
@@ -586,7 +663,7 @@ export async function analyzeReceiptImage(
         content: [
           {
             type: "text",
-            text: `อ่านเอกสารค่าใช้จ่ายภาษาไทย แยก merchant, transactionDate, amount, paymentMethod, category, confidence, documentType, memo และ recipientReference. สำหรับสลิปโอนเงิน/จ่ายบิล: merchant ต้องเป็นชื่อผู้รับใต้คำว่า "ไปยัง" ห้ามใช้ชื่อบริษัทผู้โอนใต้คำว่า "จาก"; คัดลอก Biller ID เลขบัญชีผู้รับ หรือรหัสร้านค้าลง recipientReference; ถ้ามี "โอนเงินสำเร็จ" หรือ "จ่ายบิลสำเร็จ" ให้ paymentMethod เป็น "โอนเงิน"; คัดลอก "บันทึกช่วยจำ" ลง memo และใช้ memo เป็นหลักในการเลือกหมวด เช่น ค่าแรง/ค่าจ้างต้องเป็น "ค่าแรง" แม้ชื่อผู้โอนมีคำว่าไก่. สำหรับใบเสร็จซื้อไก่ เนื้อไก่ หนังไก่ หรือเครื่องในไก่ให้ category เป็นไก่สด. หากไม่เห็นวันที่ให้ใช้ ${thailandDate(eventAt)} และตั้ง confidence ต่ำกว่า ${RECEIPT_CONFIDENCE_THRESHOLD}`,
+            text: `อ่านเอกสารทางการเงินภาษาไทย แยก merchant, transactionDate, amount, paymentMethod, category, confidence, documentType, memo, recipientReference, senderName, recipientName, senderReference และ transactionReference. สำหรับสลิปโอนเงิน/จ่ายบิล: merchant และ recipientName ต้องเป็นชื่อผู้รับใต้คำว่า "ไปยัง"; senderName ต้องเป็นชื่อผู้โอนใต้คำว่า "จาก"; คัดลอกเลขบัญชีผู้รับลง recipientReference เลขบัญชีผู้โอนลง senderReference และเลขที่รายการ/รหัสอ้างอิงลง transactionReference โดยเก็บส่วนที่อ่านได้แม้มี x หรือ * ปิดบัง. ถ้ามี "โอนเงินสำเร็จ" หรือ "จ่ายบิลสำเร็จ" ให้ paymentMethod เป็น "โอนเงิน". คัดลอก "บันทึกช่วยจำ" ลง memo และใช้ memo เป็นหลักในการเลือกหมวดค่าใช้จ่าย เช่น ค่าแรง/ค่าจ้างต้องเป็น "ค่าแรง". สำหรับใบเสร็จซื้อไก่ เนื้อไก่ หนังไก่ หรือเครื่องในไก่ให้ category เป็นไก่สด. สลิปที่โอนเข้าผู้รับชื่อ บจก. เหนียวไก่เยอะโคตร อินสไปร์ ต้องอ่านชื่อผู้โอนให้ครบที่สุดเพื่อใช้บันทึกรายรับ. หากไม่เห็นวันที่ให้ใช้ ${thailandDate(eventAt)} และตั้ง confidence ต่ำกว่า ${RECEIPT_CONFIDENCE_THRESHOLD}`,
           },
           {
             type: "image_url",
@@ -614,6 +691,10 @@ export async function analyzeReceiptImage(
   const transactionDate = normalizeCashFlowDate(parsed.transactionDate, eventAt);
   const memo = String(parsed.memo ?? "").trim();
   const recipientReference = String(parsed.recipientReference ?? "").trim();
+  const senderName = String(parsed.senderName ?? "").trim();
+  const recipientName = String(parsed.recipientName ?? "").trim();
+  const senderReference = String(parsed.senderReference ?? "").trim();
+  const transactionReference = String(parsed.transactionReference ?? "").trim();
   const documentType = String(parsed.documentType ?? "").trim();
   const recipientRule = lockedRecipientRule(merchant, recipientReference);
   const recipientCategory = recipientRule?.category ?? null;
@@ -642,24 +723,40 @@ export async function analyzeReceiptImage(
     hasCompleteFields
     && documentType === "invoice_receipt",
   );
-  const confidence = hasCompleteFields
-    ? isCompleteBankTransferSlip || isCompletePaidPurchaseDocument
-      ? Math.max(reportedConfidence, 0.95)
-      : reportedConfidence
-    : Math.min(reportedConfidence, MAX_INCOMPLETE_RECEIPT_CONFIDENCE);
+  const isCompleteMarinatedChickenIncome = Boolean(
+    documentType === "bank_transfer_slip"
+    && paymentMethod.includes("โอน")
+    && senderName
+    && Number.isFinite(amount)
+    && amount > 0
+    && parsedTransactionDate
+    && isCompanyCashFlowRecipient(recipientName || merchant, recipientReference)
+    && isKnownMarinatedChickenCustomer(senderName, senderReference)
+  );
+  const confidence = isCompleteMarinatedChickenIncome
+    ? Math.max(reportedConfidence, 0.95)
+    : hasCompleteFields
+      ? isCompleteBankTransferSlip || isCompletePaidPurchaseDocument
+        ? Math.max(reportedConfidence, 0.95)
+        : reportedConfidence
+      : Math.min(reportedConfidence, MAX_INCOMPLETE_RECEIPT_CONFIDENCE);
 
   return {
-    merchant: description || "ไม่ทราบชื่อร้าน",
+    merchant: isCompleteMarinatedChickenIncome ? senderName : description || "ไม่ทราบชื่อร้าน",
     transactionDate,
     amount: Number.isFinite(amount) && amount > 0 ? amount : 0,
     paymentMethod: paymentMethod || "ไม่ระบุ",
-    category: category.code,
+    category: isCompleteMarinatedChickenIncome ? "marinated_chicken_sales" : category.code,
     confidence,
     documentType: documentType === "bank_transfer_slip" || documentType === "invoice_receipt"
       ? documentType
       : "other",
     memo,
     recipientReference,
+    senderName,
+    recipientName: recipientName || (documentType === "bank_transfer_slip" ? merchant : ""),
+    senderReference,
+    transactionReference,
   };
 }
 
@@ -857,7 +954,10 @@ async function insertBillReceiptEvent(
   cashFlowEntryId?: string | null,
   textData?: Record<string, unknown>,
 ) {
-  const processed = Boolean(analysis && canAutoSaveReceipt(analysis));
+  const processed = Boolean(
+    analysis
+    && (canAutoSaveReceipt(analysis) || isMarinatedChickenIncomeReceipt(analysis))
+  );
   const receiptPayload = {
     message_id: safeMessageId(event),
     line_user_id: event.source?.userId ?? null,
@@ -1009,6 +1109,53 @@ async function insertCashFlowExpense(
   return (data as { id?: string } | null)?.id ?? null;
 }
 
+function imageIncomeSourceRefId(event: LineEvent, analysis: ReceiptAnalysis) {
+  const transactionReference = normalizedRecipientIdentity(analysis.transactionReference ?? "");
+  return transactionReference
+    ? `bank-slip:${transactionReference}`
+    : `line:${safeMessageId(event)}`;
+}
+
+async function insertImageCashFlowIncome(
+  supabase: NonNullable<SupabaseClient>,
+  event: LineEvent,
+  imageStoragePath: string,
+  analysis: ReceiptAnalysis,
+) {
+  if (!isMarinatedChickenIncomeReceipt(analysis)) return null;
+
+  const senderName = analysis.senderName?.trim() || analysis.merchant;
+  const sourceRefId = imageIncomeSourceRefId(event, analysis);
+  const { data, error } = await supabase.from("cash_flow_entries").insert({
+    transaction_date: analysis.transactionDate,
+    type: "income",
+    status: "received",
+    category: "marinated_chicken_sales",
+    description: `ขายไก่หมัก - ผู้โอน ${senderName}`,
+    amount: analysis.amount,
+    payment_method: "โอนเงิน",
+    source: "other",
+    source_ref_id: sourceRefId,
+    attachment_url: imageStoragePath,
+    document_type: "receipt",
+    has_attachment: true,
+    note: `บันทึกรายรับอัตโนมัติจากสลิป LINE OA (ความมั่นใจ ${Math.round(analysis.confidence * 100)}%)`,
+  }).select("id").maybeSingle();
+
+  if (error?.code === "23505") {
+    const { data: existing, error: lookupError } = await supabase
+      .from("cash_flow_entries")
+      .select("id")
+      .eq("source_ref_id", sourceRefId)
+      .maybeSingle();
+    if (lookupError) throw new Error(`Failed to find existing image income entry: ${lookupError.code ?? "unknown"}`);
+    return (existing as { id?: string } | null)?.id ?? null;
+  }
+
+  if (error) throw new Error(`Failed to create image income entry: ${error.code ?? "unknown"}`);
+  return (data as { id?: string } | null)?.id ?? null;
+}
+
 async function insertTextCashFlowExpense(
   supabase: NonNullable<SupabaseClient>,
   event: LineEvent,
@@ -1124,7 +1271,10 @@ export async function processLineWebhookPayload(payload: LineWebhookPayload, dep
         const eventAt = eventDate(event.timestamp);
         const imageStoragePath = await uploadBillImage(deps.supabase, safeMessageId(event), image, eventAt);
         const analysis = await (deps.analyzeReceipt ?? analyzeReceiptImage)(image, eventAt, fetchFn);
-        const cashFlowEntryId = await insertCashFlowExpense(deps.supabase, event, imageStoragePath, analysis);
+        const incomeReceipt = isMarinatedChickenIncomeReceipt(analysis);
+        const cashFlowEntryId = incomeReceipt
+          ? await insertImageCashFlowIncome(deps.supabase, event, imageStoragePath, analysis)
+          : await insertCashFlowExpense(deps.supabase, event, imageStoragePath, analysis);
         const { inserted } = await insertBillReceiptEvent(deps.supabase, event, imageStoragePath, analysis, cashFlowEntryId);
 
         if (inserted) {
@@ -1132,7 +1282,9 @@ export async function processLineWebhookPayload(payload: LineWebhookPayload, dep
           const savedPending = canCreatePendingCashFlowReceipt(analysis) && Boolean(cashFlowEntryId);
           await replyToLine(
             event.replyToken,
-            saved
+            incomeReceipt
+              ? `บันทึกรายรับเข้า Cash Flow แล้ว\nผู้โอน ${analysis.senderName || analysis.merchant}\n${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nสถานะ รับแล้ว\nหมวด ${incomeCategoryLabel("marinated_chicken_sales")}`
+              : saved
               ? `บันทึกเข้า Cash Flow แล้ว\n${analysis.merchant}\n${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nสถานะ จ่ายแล้ว\nหมวด ${receiptCategoryLabel(analysis.category)}`
               : savedPending
                 ? `บันทึกเข้า Cash Flow แล้ว\n${analysis.merchant}\n${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nสถานะ รอจ่าย\nกรุณาตรวจสอบและระบุวิธีชำระเงิน`

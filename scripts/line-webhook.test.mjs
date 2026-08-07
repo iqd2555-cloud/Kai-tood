@@ -119,6 +119,19 @@ const successfulAnalysis = async () => ({
   confidence: 0.95,
 });
 
+const marinatedChickenIncomeExamples = [
+  { senderName: "นาย พงษ์เทพ พ", senderReference: "xxx-x-x3556-x", amount: 3250 },
+  { senderName: "น.ส. นงนุช จ", senderReference: "xxx-x-x6179-x", amount: 2925 },
+  { senderName: "น.ส. พัชรี แ", senderReference: "xxx-x-x8946-x", amount: 3060 },
+  { senderName: "นาย วินัย เ.", senderReference: "xxx-xxx664-7", amount: 3060 },
+  { senderName: "นาง วาสนา ชื่นใจ", senderReference: "xxx-x-xx183-0", amount: 3060 },
+  { senderName: "นางวาสนา ช***", senderReference: "xxx-x-xx262-6", amount: 3060 },
+  { senderName: "น.ส. หิรัญญา ภ", senderReference: "xxx-x-x7032-x", amount: 3060 },
+  { senderName: "นายไผ่ชู ย***", senderReference: "xxx-x-xx886-2", amount: 3150 },
+  { senderName: "น.ส. โอชิระ ย***", senderReference: "xxx-x-xx450-1", amount: 3150 },
+  { senderName: "น.ส. จินตณี", senderReference: "593-0-xxx084", amount: 2925 },
+];
+
 function createSignedRequest(body, secret, signature = sign(body, secret)) {
   return new Request("https://kai-tood.test/api/line/webhook", {
     method: "POST",
@@ -231,6 +244,76 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
   assert.equal(analysis.confidence, 0.89, "fallback fields cannot pass the 90% auto-save threshold");
   assert.equal(requestBody.response_format.type, "json_schema", "OCR uses schema-constrained structured output");
   assert.equal(requestBody.messages[0].content[1].image_url.detail, "high", "receipt OCR requests high image detail");
+}
+
+for (const [index, example] of marinatedChickenIncomeExamples.entries()) {
+  const transactionReference = `income-slip-reference-${index + 1}`;
+  const ocrFetchFn = async () => Response.json({
+    choices: [{
+      finish_reason: "stop",
+      message: {
+        content: JSON.stringify({
+          merchant: "บจก. เหนียวไก่เยอะโคตร อินสไปร์",
+          transactionDate: "2026-08-05",
+          amount: example.amount,
+          paymentMethod: "โอนเงิน",
+          category: "อื่นๆ",
+          confidence: 0.85,
+          documentType: "bank_transfer_slip",
+          memo: "",
+          recipientReference: "xxx-x-x6909-x",
+          senderName: example.senderName,
+          recipientName: "บจก. เหนียวไก่เยอะโคตร อินสไปร์",
+          senderReference: example.senderReference,
+          transactionReference,
+        }),
+      },
+    }],
+  });
+  const analysis = await withEnv(
+    { OPENAI_API_KEY: "test-openai-key" },
+    () => analyzeReceiptImage(
+      { contentType: "image/jpeg", data: Buffer.from(`fake-income-slip-${index}`) },
+      "2026-08-05T02:09:00.000Z",
+      ocrFetchFn,
+    ),
+  );
+
+  assert.equal(analysis.merchant, example.senderName, `${example.senderName} is stored as the payer`);
+  assert.equal(analysis.category, "marinated_chicken_sales");
+  assert.equal(analysis.confidence, 0.95, "known customer transfer is eligible for automatic income recording");
+
+  const supabase = createSupabaseMock();
+  const lineFetchFn = createFetchMock();
+  const result = await processLineWebhookPayload(
+    {
+      events: [{
+        type: "message",
+        replyToken: `reply-token-income-slip-${index}`,
+        timestamp: Date.parse("2026-08-05T02:09:00.000Z"),
+        source: { userId: "line-user-income-slip" },
+        message: { id: `image-income-slip-${index}`, type: "image" },
+      }],
+    },
+    {
+      supabase,
+      channelAccessToken: "channel-token",
+      fetchFn: lineFetchFn,
+      analyzeReceipt: async () => analysis,
+      logger: console,
+    },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(supabase.cashFlowRows.length, 1);
+  assert.equal(supabase.cashFlowRows[0].type, "income");
+  assert.equal(supabase.cashFlowRows[0].status, "received");
+  assert.equal(supabase.cashFlowRows[0].category, "marinated_chicken_sales");
+  assert.equal(supabase.cashFlowRows[0].amount, example.amount);
+  assert.match(supabase.cashFlowRows[0].description, new RegExp(example.senderName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.equal(supabase.cashFlowRows[0].source_ref_id, `bank-slip:incomeslipreference${index + 1}`);
+  assert.match(lineFetchFn.calls[1].init.body, /บันทึกรายรับเข้า Cash Flow แล้ว/);
+  assert.match(lineFetchFn.calls[1].init.body, /หมวด ขายไก่หมัก/);
 }
 
 {
