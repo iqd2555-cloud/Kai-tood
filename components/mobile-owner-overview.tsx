@@ -12,7 +12,7 @@ const dot: Record<Status, string> = {
 
 export function MobileOwnerOverview({ sections }: { sections: Section[] }) {
   return (
-    <section className="space-y-3 md:hidden" aria-label="สรุปสำหรับเจ้าของร้าน">
+    <section className="space-y-3" aria-label="สรุปสำหรับเจ้าของร้าน">
       {sections.map((section) => {
         const body = (
           <div className="rounded-3xl border border-black/10 bg-white p-4 shadow-sm">
