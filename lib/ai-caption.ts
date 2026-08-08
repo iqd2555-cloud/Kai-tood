@@ -4,6 +4,14 @@ type CaptionInput = {
   workDate?: string | null;
 };
 
+type ResponseContentPart = { type?: string; text?: string };
+type ResponseOutputItem = { content?: ResponseContentPart[] };
+type OpenAIResponse = {
+  output_text?: string;
+  output?: ResponseOutputItem[];
+  error?: { message?: string };
+};
+
 export async function generateContentCaption(input: CaptionInput): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
@@ -38,11 +46,20 @@ export async function generateContentCaption(input: CaptionInput): Promise<strin
     }),
   });
 
-  const json = await response.json();
-  if (!response.ok) throw new Error(json?.error?.message ?? `OpenAI API error ${response.status}`);
-  const text = typeof json.output_text === "string"
-    ? json.output_text
-    : (json.output ?? []).flatMap((item: any) => item?.content ?? []).find((part: any) => part?.type === "output_text")?.text;
+  const json = (await response.json()) as OpenAIResponse;
+  if (!response.ok) throw new Error(json.error?.message ?? `OpenAI API error ${response.status}`);
+
+  let text = typeof json.output_text === "string" ? json.output_text : undefined;
+  if (!text) {
+    for (const item of json.output ?? []) {
+      const part = item.content?.find((candidate) => candidate.type === "output_text" && typeof candidate.text === "string");
+      if (part?.text) {
+        text = part.text;
+        break;
+      }
+    }
+  }
+
   if (!text?.trim()) throw new Error("AI did not return a caption");
   return text.trim();
 }
