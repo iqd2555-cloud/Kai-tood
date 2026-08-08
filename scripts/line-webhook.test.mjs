@@ -119,7 +119,7 @@ const successfulAnalysis = async () => ({
   confidence: 0.95,
 });
 
-const marinatedChickenIncomeExamples = [
+const companyIncomeExamples = [
   { senderName: "นาย พงษ์เทพ พ", senderReference: "xxx-x-x3556-x", amount: 3250 },
   { senderName: "น.ส. นงนุช จ", senderReference: "xxx-x-x6179-x", amount: 2925 },
   { senderName: "น.ส. พัชรี แ", senderReference: "xxx-x-x8946-x", amount: 3060 },
@@ -131,6 +131,16 @@ const marinatedChickenIncomeExamples = [
   { senderName: "น.ส. โอชิระ ย***", senderReference: "xxx-x-xx450-1", amount: 3150 },
   { senderName: "น.ส. จินตณี", senderReference: "593-0-xxx084", amount: 2925 },
   { senderName: "นายอนันตพล ส***", senderReference: "XXX-X-XX592-3", amount: 3575 },
+  {
+    senderName: "นางสาว ณัชชรีย์ ร.",
+    senderReference: "xxx-xxx990-1",
+    recipientReference: "x-9096",
+    amount: 5660,
+    memo: "ค่าไก่สด",
+    transactionReference: "202608081UZv9D1o0x0VTcfJm",
+    expectedCategory: "fresh_chicken_sales",
+    expectedLabel: "ขายไก่สด",
+  },
 ];
 
 function createSignedRequest(body, secret, signature = sign(body, secret)) {
@@ -247,8 +257,10 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
   assert.equal(requestBody.messages[0].content[1].image_url.detail, "high", "receipt OCR requests high image detail");
 }
 
-for (const [index, example] of marinatedChickenIncomeExamples.entries()) {
-  const transactionReference = `income-slip-reference-${index + 1}`;
+for (const [index, example] of companyIncomeExamples.entries()) {
+  const transactionReference = example.transactionReference ?? `income-slip-reference-${index + 1}`;
+  const expectedCategory = example.expectedCategory ?? "marinated_chicken_sales";
+  const expectedLabel = example.expectedLabel ?? "ขายไก่หมัก";
   const ocrFetchFn = async () => Response.json({
     choices: [{
       finish_reason: "stop",
@@ -261,8 +273,8 @@ for (const [index, example] of marinatedChickenIncomeExamples.entries()) {
           category: "อื่นๆ",
           confidence: 0.85,
           documentType: "bank_transfer_slip",
-          memo: "",
-          recipientReference: "xxx-x-x6909-x",
+          memo: example.memo ?? "",
+          recipientReference: example.recipientReference ?? "xxx-x-x6909-x",
           senderName: example.senderName,
           recipientName: "บจก. เหนียวไก่เยอะโคตร อินสไปร์",
           senderReference: example.senderReference,
@@ -281,7 +293,7 @@ for (const [index, example] of marinatedChickenIncomeExamples.entries()) {
   );
 
   assert.equal(analysis.merchant, example.senderName, `${example.senderName} is stored as the payer`);
-  assert.equal(analysis.category, "marinated_chicken_sales");
+  assert.equal(analysis.category, expectedCategory);
   assert.equal(analysis.confidence, 0.95, "a transfer into the company account is eligible for automatic income recording");
 
   const supabase = createSupabaseMock();
@@ -309,12 +321,15 @@ for (const [index, example] of marinatedChickenIncomeExamples.entries()) {
   assert.equal(supabase.cashFlowRows.length, 1);
   assert.equal(supabase.cashFlowRows[0].type, "income");
   assert.equal(supabase.cashFlowRows[0].status, "received");
-  assert.equal(supabase.cashFlowRows[0].category, "marinated_chicken_sales");
+  assert.equal(supabase.cashFlowRows[0].category, expectedCategory);
   assert.equal(supabase.cashFlowRows[0].amount, example.amount);
   assert.match(supabase.cashFlowRows[0].description, new RegExp(example.senderName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.equal(supabase.cashFlowRows[0].source_ref_id, `bank-slip:incomeslipreference${index + 1}`);
+  assert.equal(
+    supabase.cashFlowRows[0].source_ref_id,
+    `bank-slip:${transactionReference.replace(/[^\p{L}\p{N}]/gu, "").toLocaleLowerCase("th-TH")}`,
+  );
   assert.match(lineFetchFn.calls[1].init.body, /บันทึกรายรับเข้า Cash Flow แล้ว/);
-  assert.match(lineFetchFn.calls[1].init.body, /หมวด ขายไก่หมัก/);
+  assert.match(lineFetchFn.calls[1].init.body, new RegExp(`หมวด ${expectedLabel}`));
 }
 
 {

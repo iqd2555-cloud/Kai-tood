@@ -146,6 +146,8 @@ const COMPANY_RECIPIENT_NAMES = [
   "บริษัท เหนียวไก่เยอะโคตร อินสไปร์ จำกัด",
 ];
 const COMPANY_RECIPIENT_REFERENCES = ["6909", "9096"];
+const FRESH_CHICKEN_INCOME_CUSTOMER_NAMES = ["ณัชชรีย์"];
+const FRESH_CHICKEN_INCOME_CUSTOMER_REFERENCES = ["9901"];
 
 function normalizedRecipientIdentity(value: string) {
   return value.replace(/[^\p{L}\p{N}]/gu, "").toLocaleLowerCase("th-TH");
@@ -172,6 +174,12 @@ function referenceIncludes(value: string, candidates: string[]) {
 function isCompanyCashFlowRecipient(recipientName: string, recipientReference: string) {
   return identityIncludes(recipientName, COMPANY_RECIPIENT_NAMES)
     || referenceIncludes(recipientReference, COMPANY_RECIPIENT_REFERENCES);
+}
+
+function companyIncomeCategory(senderName: string, senderReference: string) {
+  const isFreshChickenCustomer = identityIncludes(senderName, FRESH_CHICKEN_INCOME_CUSTOMER_NAMES)
+    || referenceIncludes(senderReference, FRESH_CHICKEN_INCOME_CUSTOMER_REFERENCES);
+  return isFreshChickenCustomer ? "fresh_chicken_sales" : "marinated_chicken_sales";
 }
 
 function lockedRecipientRule(merchant: string, recipientReference: string) {
@@ -209,7 +217,7 @@ type ReceiptAnalysis = {
   transactionReference?: string;
 };
 
-function isMarinatedChickenIncomeReceipt(analysis: ReceiptAnalysis) {
+function isCompanyIncomeReceipt(analysis: ReceiptAnalysis) {
   return analysis.documentType === "bank_transfer_slip"
     && analysis.amount > 0
     && analysis.confidence >= RECEIPT_CONFIDENCE_THRESHOLD
@@ -637,7 +645,7 @@ export async function analyzeReceiptImage(
         content: [
           {
             type: "text",
-            text: `อ่านเอกสารทางการเงินภาษาไทย แยก merchant, transactionDate, amount, paymentMethod, category, confidence, documentType, memo, recipientReference, senderName, recipientName, senderReference และ transactionReference. สำหรับสลิปโอนเงิน/จ่ายบิล: merchant และ recipientName ต้องเป็นชื่อผู้รับใต้คำว่า "ไปยัง"; senderName ต้องเป็นชื่อผู้โอนใต้คำว่า "จาก"; คัดลอกเลขบัญชีผู้รับลง recipientReference เลขบัญชีผู้โอนลง senderReference และเลขที่รายการ/รหัสอ้างอิงลง transactionReference โดยเก็บส่วนที่อ่านได้แม้มี x หรือ * ปิดบัง. ถ้ามี "โอนเงินสำเร็จ" หรือ "จ่ายบิลสำเร็จ" ให้ paymentMethod เป็น "โอนเงิน". คัดลอก "บันทึกช่วยจำ" ลง memo และใช้ memo เป็นหลักในการเลือกหมวดค่าใช้จ่าย เช่น ค่าแรง/ค่าจ้างต้องเป็น "ค่าแรง". สำหรับใบเสร็จซื้อไก่ เนื้อไก่ หนังไก่ หรือเครื่องในไก่ให้ category เป็นไก่สด. สลิปโอนเงินสำเร็จที่ผู้รับคือ บจก. เหนียวไก่เยอะโคตร อินสไปร์ เป็นรายรับขายไก่หมักเสมอ ไม่ว่าผู้โอนจะเป็นลูกค้ารายเดิมหรือรายใหม่ และต้องอ่านชื่อผู้โอนให้ครบที่สุด. หากไม่เห็นวันที่ให้ใช้ ${thailandDate(eventAt)} และตั้ง confidence ต่ำกว่า ${RECEIPT_CONFIDENCE_THRESHOLD}`,
+            text: `อ่านเอกสารทางการเงินภาษาไทย แยก merchant, transactionDate, amount, paymentMethod, category, confidence, documentType, memo, recipientReference, senderName, recipientName, senderReference และ transactionReference. สำหรับสลิปโอนเงิน/จ่ายบิล: merchant และ recipientName ต้องเป็นชื่อผู้รับใต้คำว่า "ไปยัง"; senderName ต้องเป็นชื่อผู้โอนใต้คำว่า "จาก"; คัดลอกเลขบัญชีผู้รับลง recipientReference เลขบัญชีผู้โอนลง senderReference และเลขที่รายการ/รหัสอ้างอิงลง transactionReference โดยเก็บส่วนที่อ่านได้แม้มี x หรือ * ปิดบัง. ถ้ามี "โอนเงินสำเร็จ" หรือ "จ่ายบิลสำเร็จ" ให้ paymentMethod เป็น "โอนเงิน". คัดลอก "บันทึกช่วยจำ" ลง memo และใช้ memo เป็นหลักในการเลือกหมวดค่าใช้จ่าย เช่น ค่าแรง/ค่าจ้างต้องเป็น "ค่าแรง". สำหรับใบเสร็จซื้อไก่ เนื้อไก่ หนังไก่ หรือเครื่องในไก่ให้ category เป็นไก่สด. สลิปโอนเงินสำเร็จที่ผู้รับคือ บจก. เหนียวไก่เยอะโคตร อินสไปร์ เป็นรายรับเสมอ; ผู้โอนชื่อ ณัชชรีย์ หรือบัญชีผู้โอนลงท้าย 990-1 ให้เป็นรายรับขายไก่สด ส่วนผู้โอนอื่นให้เป็นรายรับขายไก่หมัก และต้องอ่านชื่อผู้โอนให้ครบที่สุด. หากไม่เห็นวันที่ให้ใช้ ${thailandDate(eventAt)} และตั้ง confidence ต่ำกว่า ${RECEIPT_CONFIDENCE_THRESHOLD}`,
           },
           {
             type: "image_url",
@@ -697,7 +705,7 @@ export async function analyzeReceiptImage(
     hasCompleteFields
     && documentType === "invoice_receipt",
   );
-  const isCompleteMarinatedChickenIncome = Boolean(
+  const isCompleteCompanyIncome = Boolean(
     documentType === "bank_transfer_slip"
     && paymentMethod.includes("โอน")
     && senderName
@@ -706,7 +714,7 @@ export async function analyzeReceiptImage(
     && parsedTransactionDate
     && isCompanyCashFlowRecipient(recipientName || merchant, recipientReference)
   );
-  const confidence = isCompleteMarinatedChickenIncome
+  const confidence = isCompleteCompanyIncome
     ? Math.max(reportedConfidence, 0.95)
     : hasCompleteFields
       ? isCompleteBankTransferSlip || isCompletePaidPurchaseDocument
@@ -715,11 +723,13 @@ export async function analyzeReceiptImage(
       : Math.min(reportedConfidence, MAX_INCOMPLETE_RECEIPT_CONFIDENCE);
 
   return {
-    merchant: isCompleteMarinatedChickenIncome ? senderName : description || "ไม่ทราบชื่อร้าน",
+    merchant: isCompleteCompanyIncome ? senderName : description || "ไม่ทราบชื่อร้าน",
     transactionDate,
     amount: Number.isFinite(amount) && amount > 0 ? amount : 0,
     paymentMethod: paymentMethod || "ไม่ระบุ",
-    category: isCompleteMarinatedChickenIncome ? "marinated_chicken_sales" : category.code,
+    category: isCompleteCompanyIncome
+      ? companyIncomeCategory(senderName, senderReference)
+      : category.code,
     confidence,
     documentType: documentType === "bank_transfer_slip" || documentType === "invoice_receipt"
       ? documentType
@@ -929,7 +939,7 @@ async function insertBillReceiptEvent(
 ) {
   const processed = Boolean(
     analysis
-    && (canAutoSaveReceipt(analysis) || isMarinatedChickenIncomeReceipt(analysis))
+    && (canAutoSaveReceipt(analysis) || isCompanyIncomeReceipt(analysis))
   );
   const receiptPayload = {
     message_id: safeMessageId(event),
@@ -1095,16 +1105,18 @@ async function insertImageCashFlowIncome(
   imageStoragePath: string,
   analysis: ReceiptAnalysis,
 ) {
-  if (!isMarinatedChickenIncomeReceipt(analysis)) return null;
+  if (!isCompanyIncomeReceipt(analysis)) return null;
 
   const senderName = analysis.senderName?.trim() || analysis.merchant;
+  const category = companyIncomeCategory(senderName, analysis.senderReference ?? "");
+  const productName = category === "fresh_chicken_sales" ? "ไก่สด" : "ไก่หมัก";
   const sourceRefId = imageIncomeSourceRefId(event, analysis);
   const { data, error } = await supabase.from("cash_flow_entries").insert({
     transaction_date: analysis.transactionDate,
     type: "income",
     status: "received",
-    category: "marinated_chicken_sales",
-    description: `ขายไก่หมัก - ผู้โอน ${senderName}`,
+    category,
+    description: `ขาย${productName} - ผู้โอน ${senderName}`,
     amount: analysis.amount,
     payment_method: "โอนเงิน",
     source: "other",
@@ -1244,7 +1256,7 @@ export async function processLineWebhookPayload(payload: LineWebhookPayload, dep
         const eventAt = eventDate(event.timestamp);
         const imageStoragePath = await uploadBillImage(deps.supabase, safeMessageId(event), image, eventAt);
         const analysis = await (deps.analyzeReceipt ?? analyzeReceiptImage)(image, eventAt, fetchFn);
-        const incomeReceipt = isMarinatedChickenIncomeReceipt(analysis);
+        const incomeReceipt = isCompanyIncomeReceipt(analysis);
         const cashFlowEntryId = incomeReceipt
           ? await insertImageCashFlowIncome(deps.supabase, event, imageStoragePath, analysis)
           : await insertCashFlowExpense(deps.supabase, event, imageStoragePath, analysis);
@@ -1256,7 +1268,7 @@ export async function processLineWebhookPayload(payload: LineWebhookPayload, dep
           await replyToLine(
             event.replyToken,
             incomeReceipt
-              ? `บันทึกรายรับเข้า Cash Flow แล้ว\nผู้โอน ${analysis.senderName || analysis.merchant}\n${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nสถานะ รับแล้ว\nหมวด ${incomeCategoryLabel("marinated_chicken_sales")}`
+              ? `บันทึกรายรับเข้า Cash Flow แล้ว\nผู้โอน ${analysis.senderName || analysis.merchant}\n${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nสถานะ รับแล้ว\nหมวด ${incomeCategoryLabel(companyIncomeCategory(analysis.senderName || analysis.merchant, analysis.senderReference ?? ""))}`
               : saved
               ? `บันทึกเข้า Cash Flow แล้ว\n${analysis.merchant}\n${analysis.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })} บาท\nสถานะ จ่ายแล้ว\nหมวด ${receiptCategoryLabel(analysis.category)}`
               : savedPending
