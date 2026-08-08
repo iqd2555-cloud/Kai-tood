@@ -13,7 +13,7 @@ export function AppNav({ profile }: { profile: Profile }) {
   const marinationOnlyStaff = isMarinationOnlyStaff(profile);
   const canUseDailyInput = canAccessDailyInput(profile);
   const canUseMyReport = canAccessMyReport(profile);
-  const homeHref = marinationOnlyStaff ? "/marination" : "/dashboard";
+  const homeHref = isOwner ? "/owner-overview" : marinationOnlyStaff ? "/marination" : "/dashboard";
   const ownerIdentity = profile.email || profile.full_name || "ไม่พบชื่อผู้ใช้";
   return (
     <header className="glass-dark sticky top-0 z-20 text-white">
@@ -35,7 +35,8 @@ export function AppNav({ profile }: { profile: Profile }) {
         </div>
         <nav className="flex flex-wrap items-center justify-end gap-2 text-sm font-bold">
           {!isOwner && canUseDailyInput && <Link className="focus-ring glass-button rounded-full px-3 py-2" href="/daily">กรอกข้อมูล</Link>}
-          {isOwner && <Link className="focus-ring glass-button rounded-full px-3 py-2" href="/owner-dashboard">สรุปภาพรวม</Link>}
+          {isOwner && <Link className="focus-ring rounded-full border border-white/30 bg-white px-3 py-2 text-black shadow-lg" href="/owner-overview">ภาพรวม</Link>}
+          {isOwner && <Link className="focus-ring glass-button rounded-full px-3 py-2" href="/owner-dashboard">รายละเอียดยอดขาย</Link>}
           {!marinationOnlyStaff && (isOwner || staffOrderInputEnabled) && <Link className="focus-ring rounded-full border border-white/15 bg-[#E60012]/90 px-3 py-2 text-white shadow-lg shadow-[#E60012]/20 backdrop-blur-md" href="/counter-orders">นับออเดอร์</Link>}
           {canAccessMarination && <Link className="focus-ring glass-button rounded-full px-3 py-2" href="/marination">โรงหมักไก่</Link>}
           {isOwner && <Link className="focus-ring rounded-full border border-white/30 bg-[#FFD43B]/90 px-3 py-2 text-black shadow-lg shadow-[#FFD43B]/20 backdrop-blur-md" href="/cash-flow">Cash Flow</Link>}
