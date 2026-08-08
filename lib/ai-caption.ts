@@ -5,11 +5,13 @@ type CaptionInput = {
 };
 
 type ResponseContentPart = { type?: string; text?: string };
-type ResponseOutputItem = { content?: ResponseContentPart[] };
+type ResponseOutputItem = { type?: string; content?: ResponseContentPart[] };
 type OpenAIResponse = {
   output_text?: string;
   output?: ResponseOutputItem[];
   error?: { message?: string };
+  status?: string;
+  incomplete_details?: { reason?: string } | null;
 };
 
 export async function generateContentCaption(input: CaptionInput): Promise<string> {
@@ -41,25 +43,31 @@ export async function generateContentCaption(input: CaptionInput): Promise<strin
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model: "gpt-5-mini",
+      reasoning: { effort: "minimal" },
       input: [{ role: "user", content }],
-      max_output_tokens: 500,
+      max_output_tokens: 1200,
     }),
   });
 
   const json = (await response.json()) as OpenAIResponse;
   if (!response.ok) throw new Error(json.error?.message ?? `OpenAI API error ${response.status}`);
 
-  let text = typeof json.output_text === "string" ? json.output_text : undefined;
+  let text = typeof json.output_text === "string" ? json.output_text.trim() : "";
   if (!text) {
     for (const item of json.output ?? []) {
-      const part = item.content?.find((candidate) => candidate.type === "output_text" && typeof candidate.text === "string");
-      if (part?.text) {
-        text = part.text;
-        break;
+      for (const part of item.content ?? []) {
+        if (part.type === "output_text" && typeof part.text === "string" && part.text.trim()) {
+          text = part.text.trim();
+          break;
+        }
       }
+      if (text) break;
     }
   }
 
-  if (!text?.trim()) throw new Error("AI did not return a caption");
-  return text.trim();
+  if (!text) {
+    const reason = json.incomplete_details?.reason;
+    throw new Error(reason ? `AI did not return a caption (${reason})` : `AI did not return a caption (status: ${json.status ?? "unknown"})`);
+  }
+  return text;
 }
