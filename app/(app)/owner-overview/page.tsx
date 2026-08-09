@@ -47,6 +47,23 @@ function branchSignal(value: number, average: number) {
   if (delta >= 10) return { suffix: ` • สูงกว่าค่าเฉลี่ย ${Math.round(delta)}%`, status: "good" as const };
   return { suffix: " • ใกล้ค่าเฉลี่ย", status: "good" as const };
 }
+function marinationUsageAverage(movements: MarinationStockMovement[], fromDate: string, toDate: string) {
+  const byDate = new Map<string, number>();
+  for (const movement of movements) {
+    if (movement.movement_type !== "used" || movement.movement_date < fromDate || movement.movement_date > toDate) continue;
+    byDate.set(movement.movement_date, (byDate.get(movement.movement_date) ?? 0) + Number(movement.quantity_kg ?? 0));
+  }
+  const activeDays = [...byDate.values()].filter((kg) => kg > 0);
+  return activeDays.length ? activeDays.reduce((sum, kg) => sum + kg, 0) / activeDays.length : 0;
+}
+function stockCoverage(stockKg: number, averageUsedKg: number) {
+  if (stockKg <= 0) return { value: "ต้องเติมสต็อก", status: "alert" as const };
+  if (averageUsedKg <= 0) return { value: "ยังไม่มีข้อมูลใช้หมักพอ", status: "neutral" as const };
+  const days = stockKg / averageUsedKg;
+  if (days < 2) return { value: `เสี่ยง • พอ ${days.toLocaleString("th-TH", { maximumFractionDigits: 1 })} วัน`, status: "alert" as const };
+  if (days < 4) return { value: `เฝ้าระวัง • พอ ${days.toLocaleString("th-TH", { maximumFractionDigits: 1 })} วัน`, status: "watch" as const };
+  return { value: `ปลอดภัย • พอ ${days.toLocaleString("th-TH", { maximumFractionDigits: 1 })} วัน`, status: "good" as const };
+}
 
 export default async function OwnerOverviewPage() {
   const profile = await getCurrentProfile();
@@ -96,7 +113,10 @@ export default async function OwnerOverviewPage() {
   const chickenQuantityKg = classifiedChickenRows.reduce((sum, row) => sum + quantityFromChickenEntry(row), 0);
   const chickenEstimatedProfit = chickenRevenue - chickenQuantityKg * MARINATED_PRODUCT_COST_PER_KG - classifiedChickenRows.length * SHIPPING_AVERAGE_TOTAL_PER_ORDER;
   const chickenUnclassifiedCount = chickenRows.length - classifiedChickenRows.length;
-  const marinationTotalStockKg = buildMarinationSummaries(partsData ?? [], movementsData ?? [], today, resetData?.[0]?.reset_date ?? null).totals.systemBalance;
+  const marinationMovements = movementsData ?? [];
+  const marinationTotalStockKg = buildMarinationSummaries(partsData ?? [], marinationMovements, today, resetData?.[0]?.reset_date ?? null).totals.systemBalance;
+  const marinationAverageUsedKg = marinationUsageAverage(marinationMovements, sevenDaysAgoISO, today);
+  const coverage = stockCoverage(marinationTotalStockKg, marinationAverageUsedKg);
   const attendanceProblems = Number(peopleSummary?.late_count ?? 0) + Number(peopleSummary?.absent_count ?? 0) + Number(peopleSummary?.leave_count ?? 0);
   const kpiIncomplete = Number(peopleSummary?.kpi_incomplete_count ?? 0);
 
@@ -106,7 +126,8 @@ export default async function OwnerOverviewPage() {
   const newStandardToday = standards.filter((app) => isToday(app.created_at, today, tomorrowISO)).length;
   const contactWorthyMini = minis.filter((app) => qualifyMiniApplication(app).score >= 7 && !["rejected", "area_conflict", "paid", "delivered", "opened"].includes(app.status)).length;
   const contactWorthyStandard = standards.filter((lead) => qualifyFranchiseLead(lead).score >= 7 && !["not_qualified", "not_ready", "converted"].includes(lead.status)).length;
-  const actionCount = attendanceProblems + kpiIncomplete + chickenUnclassifiedCount + contactWorthyMini + contactWorthyStandard + branchProblemCount;
+  const stockRisk = coverage.status === "alert" ? 1 : 0;
+  const actionCount = attendanceProblems + kpiIncomplete + chickenUnclassifiedCount + contactWorthyMini + contactWorthyStandard + branchProblemCount + stockRisk;
 
   const sections = [
     { icon: actionCount ? "🚨" : "✅", title: "ต้องดูวันนี้", href: "/owner-overview", metrics: [{ label: "รายการที่ควรตรวจ", value: actionCount ? `${actionCount} จุด` : "ปกติ", status: actionCount ? "alert" as const : "good" as const }, { label: "ภาพรวม", value: actionCount ? "มีเรื่องต้องติดตาม" : "ยังไม่พบสัญญาณผิดปกติ", status: actionCount ? "watch" as const : "good" as const }] },
@@ -114,7 +135,11 @@ export default async function OwnerOverviewPage() {
     { icon: "🍗", title: "ไก่หมัก", href: "/cash-flow?category=marinated_chicken_sales", metrics: [{ label: "รายได้ขายไก่หมัก", value: moneyFormatter.format(chickenRevenue), status: "good" as const }, { label: "ปริมาณที่ระบุกลุ่มแล้ว", value: `${chickenQuantityKg.toLocaleString("th-TH", { maximumFractionDigits: 3 })} กก.`, status: chickenUnclassifiedCount ? "watch" as const : "good" as const }, { label: "กำไรหลังค่าขนส่งประมาณ", value: moneyFormatter.format(chickenEstimatedProfit), status: chickenUnclassifiedCount ? "watch" as const : "good" as const }, { label: "รอระบุกลุ่ม", value: `${chickenUnclassifiedCount} รายการ`, status: chickenUnclassifiedCount ? "alert" as const : "good" as const }]},
     { icon: "🏪", title: "ร้าน", href: "/owner-dashboard", metrics: branchMetrics.length ? branchMetrics : [{ label: "ยอดขายสาขา", value: "ยังไม่มีรายงาน", status: "watch" as const }, { label: "ปัญหา", value: `${branchProblemCount}`, status: branchProblemCount ? "alert" as const : "good" as const }] },
     { icon: "👥", title: "คน", href: "/reports", metrics: [{ label: "มาสาย / ขาด / ลา", value: attendanceValue(peopleSummary), status: !peopleSummary ? "neutral" as const : attendanceProblems ? "alert" as const : "good" as const }, { label: "KPI / งานค้าง", value: kpiValue(peopleSummary), status: !peopleSummary ? "neutral" as const : kpiIncomplete ? "alert" as const : "good" as const }] },
-    { icon: "🏭", title: "โรงหมัก", href: "/marination", metrics: [{ label: "สต็อกไก่รวมทุกชิ้นส่วน", value: `${marinationTotalStockKg.toLocaleString("th-TH", { maximumFractionDigits: 3 })} กก.`, status: marinationTotalStockKg > 0 ? "good" as const : "watch" as const }, { label: "สถานะสต็อก", value: marinationTotalStockKg <= 0 ? "ต้องตรวจสต็อก" : "มีสต็อก", status: marinationTotalStockKg <= 0 ? "alert" as const : "good" as const }] },
+    { icon: "🏭", title: "โรงหมัก", href: "/marination", metrics: [
+      { label: "สต็อกไก่รวมทุกชิ้นส่วน", value: `${marinationTotalStockKg.toLocaleString("th-TH", { maximumFractionDigits: 1 })} กก.`, status: coverage.status },
+      { label: "ใช้หมักเฉลี่ย/วัน • 7 วันล่าสุด", value: marinationAverageUsedKg > 0 ? `${marinationAverageUsedKg.toLocaleString("th-TH", { maximumFractionDigits: 1 })} กก.` : "ยังไม่มีข้อมูล", status: marinationAverageUsedKg > 0 ? "good" as const : "neutral" as const },
+      { label: "ความเพียงพอของสต็อก", value: coverage.value, status: coverage.status },
+    ] },
     { icon: "🐔", title: "แฟรนไชส์", href: "/leads", metrics: [
       { label: "สมัครใหม่วันนี้ • ชุดปกติ", value: `${newStandardToday} คน`, status: newStandardToday ? "good" as const : "neutral" as const },
       { label: "สมัครใหม่วันนี้ • MINI", value: `${newMiniToday} คน`, status: newMiniToday ? "good" as const : "neutral" as const },
