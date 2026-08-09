@@ -39,6 +39,14 @@ function kpiValue(summary: PeopleSummary | null) {
 function isToday(createdAt: string, today: string, tomorrowISO: string) {
   return createdAt >= `${today}T00:00:00+07:00` && createdAt < `${tomorrowISO}T00:00:00+07:00`;
 }
+function branchSignal(value: number, average: number) {
+  if (average <= 0) return { suffix: "", status: "good" as const };
+  const delta = ((value - average) / average) * 100;
+  if (delta <= -15) return { suffix: ` • ต่ำกว่าค่าเฉลี่ย ${Math.abs(Math.round(delta))}%`, status: "alert" as const };
+  if (delta <= -5) return { suffix: ` • ต่ำกว่าค่าเฉลี่ย ${Math.abs(Math.round(delta))}%`, status: "watch" as const };
+  if (delta >= 10) return { suffix: ` • สูงกว่าค่าเฉลี่ย ${Math.round(delta)}%`, status: "good" as const };
+  return { suffix: " • ใกล้ค่าเฉลี่ย", status: "good" as const };
+}
 
 export default async function OwnerOverviewPage() {
   const profile = await getCurrentProfile();
@@ -48,11 +56,14 @@ export default async function OwnerOverviewPage() {
   const today = todayISO();
   const tomorrow = new Date(`${today}T00:00:00+07:00`); tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowISO = tomorrow.toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+  const sevenDaysAgo = new Date(`${today}T00:00:00+07:00`); sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+  const sevenDaysAgoISO = sevenDaysAgo.toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
   const kpi = createKpiSupabaseAdminClient();
   const peopleSummaryPromise: Promise<PeopleSummary | null> = kpi ? Promise.resolve(kpi.rpc("owner_people_daily_summary", { p_work_date: today })).then(({ data, error }) => error ? null : (data ?? null) as PeopleSummary | null, () => null) : Promise.resolve(null);
 
-  const [{ data: sales }, { data: notes }, { data: chickenIncome }, { data: partsData }, { data: movementsData }, { data: resetData }, { data: miniApps }, { data: standardApps }, peopleSummary] = await Promise.all([
+  const [{ data: sales }, { data: sales7d }, { data: notes }, { data: chickenIncome }, { data: partsData }, { data: movementsData }, { data: resetData }, { data: miniApps }, { data: standardApps }, peopleSummary] = await Promise.all([
     supabase.from("daily_report_rollups").select("branch_name,branch_code,total_sales").eq("report_date", today).returns<Rollup[]>(),
+    supabase.from("daily_report_rollups").select("branch_name,branch_code,total_sales").gte("report_date", sevenDaysAgoISO).lte("report_date", today).returns<Rollup[]>(),
     supabase.from("daily_reports").select("note").eq("report_date", today).not("note", "is", null).returns<Note[]>(),
     supabase.from("cash_flow_entries").select("amount,note,description").eq("transaction_date", today).eq("type", "income").eq("status", "received").eq("category", "marinated_chicken_sales").returns<ChickenIncome[]>(),
     supabase.from("chicken_parts").select("id,name,sort_order,is_active").eq("is_active", true).order("sort_order", { ascending: true }).returns<ChickenPart[]>(),
@@ -65,7 +76,21 @@ export default async function OwnerOverviewPage() {
 
   const totalSales = (sales ?? []).reduce((sum, row) => sum + Number(row.total_sales ?? 0), 0);
   const branchProblemCount = (notes ?? []).filter((row) => row.note?.trim()).length;
-  const branchMetrics = (sales ?? []).slice(0, 4).map((row) => ({ label: row.branch_name || row.branch_code || "สาขา", value: moneyFormatter.format(Number(row.total_sales ?? 0)), status: "good" as const }));
+  const averages = new Map<string, { total: number; count: number }>();
+  for (const row of sales7d ?? []) {
+    const key = row.branch_code || row.branch_name || "";
+    if (!key) continue;
+    const current = averages.get(key) ?? { total: 0, count: 0 };
+    current.total += Number(row.total_sales ?? 0); current.count += 1; averages.set(key, current);
+  }
+  const branchMetrics = (sales ?? []).slice(0, 4).map((row) => {
+    const key = row.branch_code || row.branch_name || "";
+    const value = Number(row.total_sales ?? 0);
+    const history = averages.get(key);
+    const average = history?.count ? history.total / history.count : 0;
+    const signal = branchSignal(value, average);
+    return { label: `${row.branch_name || row.branch_code || "สาขา"}${signal.suffix}`, value: moneyFormatter.format(value), status: signal.status };
+  });
   const chickenRows = chickenIncome ?? [], chickenRevenue = chickenRows.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
   const classifiedChickenRows = chickenRows.filter((row) => quantityFromChickenEntry(row) > 0);
   const chickenQuantityKg = classifiedChickenRows.reduce((sum, row) => sum + quantityFromChickenEntry(row), 0);
@@ -81,13 +106,15 @@ export default async function OwnerOverviewPage() {
   const newStandardToday = standards.filter((app) => isToday(app.created_at, today, tomorrowISO)).length;
   const contactWorthyMini = minis.filter((app) => qualifyMiniApplication(app).score >= 7 && !["rejected", "area_conflict", "paid", "delivered", "opened"].includes(app.status)).length;
   const contactWorthyStandard = standards.filter((lead) => qualifyFranchiseLead(lead).score >= 7 && !["not_qualified", "not_ready", "converted"].includes(lead.status)).length;
+  const actionCount = attendanceProblems + kpiIncomplete + chickenUnclassifiedCount + contactWorthyMini + contactWorthyStandard + branchProblemCount;
 
   const sections = [
+    { icon: actionCount ? "🚨" : "✅", title: "ต้องดูวันนี้", href: "/owner-overview", metrics: [{ label: "รายการที่ควรตรวจ", value: actionCount ? `${actionCount} จุด` : "ปกติ", status: actionCount ? "alert" as const : "good" as const }, { label: "ภาพรวม", value: actionCount ? "มีเรื่องต้องติดตาม" : "ยังไม่พบสัญญาณผิดปกติ", status: actionCount ? "watch" as const : "good" as const }] },
     { icon: "💰", title: "วันนี้", href: "/cash-flow", metrics: [{ label: "ยอดขายหน้าร้าน", value: moneyFormatter.format(totalSales), status: "good" as const }, { label: "เงินเข้า", value: "เปิดดู", status: "neutral" as const }, { label: "เงินออก", value: "เปิดดู", status: "neutral" as const }, { label: "กำไรหน้าร้านประมาณ", value: moneyFormatter.format(totalSales * 0.35), status: "good" as const }]},
     { icon: "🍗", title: "ไก่หมัก", href: "/cash-flow?category=marinated_chicken_sales", metrics: [{ label: "รายได้ขายไก่หมัก", value: moneyFormatter.format(chickenRevenue), status: "good" as const }, { label: "ปริมาณที่ระบุกลุ่มแล้ว", value: `${chickenQuantityKg.toLocaleString("th-TH", { maximumFractionDigits: 3 })} กก.`, status: chickenUnclassifiedCount ? "watch" as const : "good" as const }, { label: "กำไรหลังค่าขนส่งประมาณ", value: moneyFormatter.format(chickenEstimatedProfit), status: chickenUnclassifiedCount ? "watch" as const : "good" as const }, { label: "รอระบุกลุ่ม", value: `${chickenUnclassifiedCount} รายการ`, status: chickenUnclassifiedCount ? "alert" as const : "good" as const }]},
     { icon: "🏪", title: "ร้าน", href: "/owner-dashboard", metrics: branchMetrics.length ? branchMetrics : [{ label: "ยอดขายสาขา", value: "ยังไม่มีรายงาน", status: "watch" as const }, { label: "ปัญหา", value: `${branchProblemCount}`, status: branchProblemCount ? "alert" as const : "good" as const }] },
     { icon: "👥", title: "คน", href: "/reports", metrics: [{ label: "มาสาย / ขาด / ลา", value: attendanceValue(peopleSummary), status: !peopleSummary ? "neutral" as const : attendanceProblems ? "alert" as const : "good" as const }, { label: "KPI / งานค้าง", value: kpiValue(peopleSummary), status: !peopleSummary ? "neutral" as const : kpiIncomplete ? "alert" as const : "good" as const }] },
-    { icon: "🏭", title: "โรงหมัก", href: "/marination", metrics: [{ label: "สต็อกไก่รวมทุกชิ้นส่วน", value: `${marinationTotalStockKg.toLocaleString("th-TH", { maximumFractionDigits: 3 })} กก.`, status: marinationTotalStockKg > 0 ? "good" as const : "watch" as const }, { label: "ผลิต / ส่ง", value: "เปิดดู", status: "neutral" as const }] },
+    { icon: "🏭", title: "โรงหมัก", href: "/marination", metrics: [{ label: "สต็อกไก่รวมทุกชิ้นส่วน", value: `${marinationTotalStockKg.toLocaleString("th-TH", { maximumFractionDigits: 3 })} กก.`, status: marinationTotalStockKg > 0 ? "good" as const : "watch" as const }, { label: "สถานะสต็อก", value: marinationTotalStockKg <= 0 ? "ต้องตรวจสต็อก" : "มีสต็อก", status: marinationTotalStockKg <= 0 ? "alert" as const : "good" as const }] },
     { icon: "🐔", title: "แฟรนไชส์", href: "/leads", metrics: [
       { label: "สมัครใหม่วันนี้ • ชุดปกติ", value: `${newStandardToday} คน`, status: newStandardToday ? "good" as const : "neutral" as const },
       { label: "สมัครใหม่วันนี้ • MINI", value: `${newMiniToday} คน`, status: newMiniToday ? "good" as const : "neutral" as const },
