@@ -6,6 +6,17 @@ import { MobileOwnerOverview } from "@/components/mobile-owner-overview";
 
 type Rollup = { branch_name: string | null; branch_code: string | null; total_sales: number | string | null };
 type Note = { note: string | null };
+type ChickenIncome = { amount: number | string | null; note: string | null; description: string | null };
+
+const MARINATED_PRODUCT_COST_PER_KG = 2290 / 62.65;
+
+function quantityFromChickenEntry(row: ChickenIncome) {
+  const text = `${row.note ?? ""} ${row.description ?? ""}`;
+  const match = text.match(/ปริมาณ\s*([\d,.]+)\s*กก\./u);
+  if (!match) return 0;
+  const value = Number(match[1].replace(/,/gu, ""));
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
 
 export default async function OwnerOverviewPage() {
   const profile = await getCurrentProfile();
@@ -14,9 +25,16 @@ export default async function OwnerOverviewPage() {
   if (!supabase) redirect("/login?setup=supabase");
 
   const today = todayISO();
-  const [{ data: sales }, { data: notes }] = await Promise.all([
+  const [{ data: sales }, { data: notes }, { data: chickenIncome }] = await Promise.all([
     supabase.from("daily_report_rollups").select("branch_name,branch_code,total_sales").eq("report_date", today).returns<Rollup[]>(),
     supabase.from("daily_reports").select("note").eq("report_date", today).not("note", "is", null).returns<Note[]>(),
+    supabase.from("cash_flow_entries")
+      .select("amount,note,description")
+      .eq("transaction_date", today)
+      .eq("type", "income")
+      .eq("status", "received")
+      .eq("category", "marinated_chicken_sales")
+      .returns<ChickenIncome[]>(),
   ]);
 
   const totalSales = (sales ?? []).reduce((sum, row) => sum + Number(row.total_sales ?? 0), 0);
@@ -27,16 +45,34 @@ export default async function OwnerOverviewPage() {
     status: "good" as const,
   }));
 
+  const chickenRows = chickenIncome ?? [];
+  const chickenRevenue = chickenRows.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+  const chickenQuantityKg = chickenRows.reduce((sum, row) => sum + quantityFromChickenEntry(row), 0);
+  const chickenCost = chickenQuantityKg * MARINATED_PRODUCT_COST_PER_KG;
+  const chickenGrossProfit = chickenRevenue - chickenCost;
+  const chickenUnclassifiedCount = chickenRows.filter((row) => quantityFromChickenEntry(row) <= 0).length;
+
   const sections = [
     {
       icon: "💰",
       title: "วันนี้",
       href: "/cash-flow",
       metrics: [
-        { label: "ยอดขาย", value: moneyFormatter.format(totalSales), status: "good" as const },
+        { label: "ยอดขายหน้าร้าน", value: moneyFormatter.format(totalSales), status: "good" as const },
         { label: "เงินเข้า", value: "เปิดดู", status: "neutral" as const },
         { label: "เงินออก", value: "เปิดดู", status: "neutral" as const },
-        { label: "กำไรประมาณ", value: moneyFormatter.format(totalSales * 0.35), status: "good" as const },
+        { label: "กำไรหน้าร้านประมาณ", value: moneyFormatter.format(totalSales * 0.35), status: "good" as const },
+      ],
+    },
+    {
+      icon: "🍗",
+      title: "ไก่หมัก",
+      href: "/cash-flow?category=marinated_chicken_sales",
+      metrics: [
+        { label: "รายได้ขายไก่หมัก", value: moneyFormatter.format(chickenRevenue), status: "good" as const },
+        { label: "ปริมาณที่ระบุกลุ่มแล้ว", value: `${chickenQuantityKg.toLocaleString("th-TH", { maximumFractionDigits: 3 })} กก.`, status: chickenUnclassifiedCount ? "watch" as const : "good" as const },
+        { label: "กำไรขั้นต้นก่อนค่าส่ง", value: moneyFormatter.format(chickenGrossProfit), status: chickenUnclassifiedCount ? "watch" as const : "good" as const },
+        { label: "รอระบุกลุ่ม", value: `${chickenUnclassifiedCount} รายการ`, status: chickenUnclassifiedCount ? "alert" as const : "good" as const },
       ],
     },
     {
