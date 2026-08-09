@@ -12,22 +12,22 @@ const dot: Record<Status, string> = {
 
 export function MobileOwnerOverview({ sections }: { sections: Section[] }) {
   return (
-    <section className="space-y-3" aria-label="สรุปสำหรับเจ้าของร้าน">
+    <section className="space-y-4" aria-label="สรุปสำหรับเจ้าของร้าน">
       {sections.map((section) => {
         const body = (
-          <div className="rounded-3xl border border-black/10 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center gap-2">
-              <span className="text-2xl" aria-hidden>{section.icon}</span>
-              <h2 className="text-lg font-black text-black">{section.title}</h2>
+          <div className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm sm:p-6">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="text-3xl leading-none" aria-hidden>{section.icon}</span>
+              <h2 className="text-xl font-black leading-tight text-black sm:text-2xl">{section.title}</h2>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               {section.metrics.map((metric) => (
-                <div key={metric.label} className="rounded-2xl bg-zinc-50 px-3 py-2.5">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-black/55">
-                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dot[metric.status ?? "neutral"]}`} />
+                <div key={metric.label} className="min-h-[88px] rounded-2xl bg-zinc-50 px-4 py-3.5 sm:min-h-[96px] sm:px-5 sm:py-4">
+                  <div className="flex items-start gap-2 text-sm font-bold leading-snug text-black/60 sm:text-base">
+                    <span className={`mt-1 h-3 w-3 shrink-0 rounded-full ${dot[metric.status ?? "neutral"]}`} />
                     <span>{metric.label}</span>
                   </div>
-                  <p className="mt-1 truncate text-lg font-black text-black">{metric.value}</p>
+                  <p className="mt-2 break-words text-xl font-black leading-tight text-black sm:text-2xl">{metric.value}</p>
                 </div>
               ))}
             </div>
