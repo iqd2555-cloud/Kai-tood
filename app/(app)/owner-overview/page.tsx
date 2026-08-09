@@ -70,5 +70,5 @@ export default async function OwnerOverviewPage() {
     { icon: "🐔", title: "แฟรนไชส์", href: "/leads", metrics: [{ label: "ผู้สมัครใหม่", value: "เปิดดู", status: "neutral" as const }, { label: "รอพิจารณา / ชำระ", value: "เปิดดู", status: "neutral" as const }] },
   ];
 
-  return <main className="mx-auto max-w-md space-y-3 pb-8"><div className="px-1"><p className="text-xs font-bold text-black/50">OWNER • วันนี้</p><h1 className="text-2xl font-black">ภาพรวมร้าน</h1></div><MobileOwnerOverview sections={sections} /><div className="hidden md:block rounded-3xl bg-white p-6 text-center font-bold">หน้านี้ออกแบบสำหรับเปิดดูบนมือถือ</div></main>;
+  return <main className="mx-auto w-full max-w-2xl space-y-4 px-3 pb-10 sm:px-5"><div className="px-1 pt-1"><p className="text-sm font-bold text-black/50">OWNER • วันนี้</p><h1 className="text-3xl font-black leading-tight">ภาพรวมร้าน</h1></div><MobileOwnerOverview sections={sections} /></main>;
 }
