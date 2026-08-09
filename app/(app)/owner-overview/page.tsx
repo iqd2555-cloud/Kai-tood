@@ -3,6 +3,7 @@ import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { todayISO, moneyFormatter } from "@/lib/format";
 import { MobileOwnerOverview } from "@/components/mobile-owner-overview";
+import { buildMarinationSummaries, type ChickenPart, type MarinationStockMovement, type MarinationStockReset } from "@/lib/marination";
 
 type Rollup = { branch_name: string | null; branch_code: string | null; total_sales: number | string | null };
 type Note = { note: string | null };
@@ -32,10 +33,13 @@ export default async function OwnerOverviewPage() {
   if (!supabase) redirect("/login?setup=supabase");
 
   const today = todayISO();
-  const [{ data: sales }, { data: notes }, { data: chickenIncome }] = await Promise.all([
+  const [{ data: sales }, { data: notes }, { data: chickenIncome }, { data: partsData }, { data: movementsData }, { data: resetData }] = await Promise.all([
     supabase.from("daily_report_rollups").select("branch_name,branch_code,total_sales").eq("report_date", today).returns<Rollup[]>(),
     supabase.from("daily_reports").select("note").eq("report_date", today).not("note", "is", null).returns<Note[]>(),
     supabase.from("cash_flow_entries").select("amount,note,description").eq("transaction_date", today).eq("type", "income").eq("status", "received").eq("category", "marinated_chicken_sales").returns<ChickenIncome[]>(),
+    supabase.from("chicken_parts").select("id,name,sort_order,is_active").eq("is_active", true).order("sort_order", { ascending: true }).returns<ChickenPart[]>(),
+    supabase.from("marination_stock_movements").select("id,movement_date,chicken_part_id,movement_type,quantity_kg,note,created_by,created_at,updated_at,is_voided,voided_at,voided_by,void_reason").eq("is_voided", false).lte("movement_date", today).order("movement_date", { ascending: true }).order("created_at", { ascending: true }).order("id", { ascending: true }).returns<MarinationStockMovement[]>(),
+    supabase.from("marination_stock_resets").select("id,reset_date,branch_id,note,created_at,created_by,is_active").eq("is_active", true).lte("reset_date", today).order("reset_date", { ascending: false }).order("created_at", { ascending: false }).limit(1).returns<MarinationStockReset[]>(),
   ]);
 
   const totalSales = (sales ?? []).reduce((sum, row) => sum + Number(row.total_sales ?? 0), 0);
@@ -50,6 +54,9 @@ export default async function OwnerOverviewPage() {
   const chickenShippingCost = classifiedChickenRows.length * SHIPPING_AVERAGE_TOTAL_PER_ORDER;
   const chickenEstimatedProfit = chickenRevenue - chickenCost - chickenShippingCost;
   const chickenUnclassifiedCount = chickenRows.length - classifiedChickenRows.length;
+
+  const marination = buildMarinationSummaries(partsData ?? [], movementsData ?? [], today, resetData?.[0]?.reset_date ?? null);
+  const marinationTotalStockKg = marination.totals.systemBalance;
 
   const sections = [
     { icon: "💰", title: "วันนี้", href: "/cash-flow", metrics: [
@@ -66,7 +73,7 @@ export default async function OwnerOverviewPage() {
     ]},
     { icon: "🏪", title: "ร้าน", href: "/owner-dashboard", metrics: branchMetrics.length ? branchMetrics : [{ label: "ยอดขายสาขา", value: "ยังไม่มีรายงาน", status: "watch" as const }, { label: "ปัญหา", value: `${branchProblemCount}`, status: branchProblemCount ? "alert" as const : "good" as const }] },
     { icon: "👥", title: "คน", href: "/reports", metrics: [{ label: "มาสาย / ขาด", value: "เปิดดู", status: "neutral" as const }, { label: "KPI / งานค้าง", value: "เปิดดู", status: "neutral" as const }] },
-    { icon: "🏭", title: "โรงหมัก", href: "/marination", metrics: [{ label: "สต็อก", value: "เปิดดู", status: "neutral" as const }, { label: "ผลิต / ส่ง", value: "เปิดดู", status: "neutral" as const }] },
+    { icon: "🏭", title: "โรงหมัก", href: "/marination", metrics: [{ label: "สต็อกไก่รวมทุกชิ้นส่วน", value: `${marinationTotalStockKg.toLocaleString("th-TH", { maximumFractionDigits: 3 })} กก.`, status: marinationTotalStockKg > 0 ? "good" as const : "watch" as const }, { label: "ผลิต / ส่ง", value: "เปิดดู", status: "neutral" as const }] },
     { icon: "🐔", title: "แฟรนไชส์", href: "/leads", metrics: [{ label: "ผู้สมัครใหม่", value: "เปิดดู", status: "neutral" as const }, { label: "รอพิจารณา / ชำระ", value: "เปิดดู", status: "neutral" as const }] },
   ];
 
