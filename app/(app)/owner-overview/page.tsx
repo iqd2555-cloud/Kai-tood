@@ -9,6 +9,9 @@ type Note = { note: string | null };
 type ChickenIncome = { amount: number | string | null; note: string | null; description: string | null };
 
 const MARINATED_PRODUCT_COST_PER_KG = 2290 / 62.65;
+const SHIPPING_FIXED_COST_PER_ORDER = 40;
+const SHIPPING_AVERAGE_DESTINATION_PER_ORDER = 175;
+const SHIPPING_AVERAGE_TOTAL_PER_ORDER = SHIPPING_FIXED_COST_PER_ORDER + SHIPPING_AVERAGE_DESTINATION_PER_ORDER;
 
 function quantityFromChickenEntry(row: ChickenIncome) {
   const text = `${row.note ?? ""} ${row.description ?? ""}`;
@@ -28,96 +31,40 @@ export default async function OwnerOverviewPage() {
   const [{ data: sales }, { data: notes }, { data: chickenIncome }] = await Promise.all([
     supabase.from("daily_report_rollups").select("branch_name,branch_code,total_sales").eq("report_date", today).returns<Rollup[]>(),
     supabase.from("daily_reports").select("note").eq("report_date", today).not("note", "is", null).returns<Note[]>(),
-    supabase.from("cash_flow_entries")
-      .select("amount,note,description")
-      .eq("transaction_date", today)
-      .eq("type", "income")
-      .eq("status", "received")
-      .eq("category", "marinated_chicken_sales")
-      .returns<ChickenIncome[]>(),
+    supabase.from("cash_flow_entries").select("amount,note,description").eq("transaction_date", today).eq("type", "income").eq("status", "received").eq("category", "marinated_chicken_sales").returns<ChickenIncome[]>(),
   ]);
 
   const totalSales = (sales ?? []).reduce((sum, row) => sum + Number(row.total_sales ?? 0), 0);
   const branchProblemCount = (notes ?? []).filter((row) => row.note?.trim()).length;
-  const branchMetrics = (sales ?? []).slice(0, 4).map((row) => ({
-    label: row.branch_name || row.branch_code || "สาขา",
-    value: moneyFormatter.format(Number(row.total_sales ?? 0)),
-    status: "good" as const,
-  }));
+  const branchMetrics = (sales ?? []).slice(0, 4).map((row) => ({ label: row.branch_name || row.branch_code || "สาขา", value: moneyFormatter.format(Number(row.total_sales ?? 0)), status: "good" as const }));
 
   const chickenRows = chickenIncome ?? [];
   const chickenRevenue = chickenRows.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
-  const chickenQuantityKg = chickenRows.reduce((sum, row) => sum + quantityFromChickenEntry(row), 0);
+  const classifiedChickenRows = chickenRows.filter((row) => quantityFromChickenEntry(row) > 0);
+  const chickenQuantityKg = classifiedChickenRows.reduce((sum, row) => sum + quantityFromChickenEntry(row), 0);
   const chickenCost = chickenQuantityKg * MARINATED_PRODUCT_COST_PER_KG;
-  const chickenGrossProfit = chickenRevenue - chickenCost;
-  const chickenUnclassifiedCount = chickenRows.filter((row) => quantityFromChickenEntry(row) <= 0).length;
+  const chickenShippingCost = classifiedChickenRows.length * SHIPPING_AVERAGE_TOTAL_PER_ORDER;
+  const chickenEstimatedProfit = chickenRevenue - chickenCost - chickenShippingCost;
+  const chickenUnclassifiedCount = chickenRows.length - classifiedChickenRows.length;
 
   const sections = [
-    {
-      icon: "💰",
-      title: "วันนี้",
-      href: "/cash-flow",
-      metrics: [
-        { label: "ยอดขายหน้าร้าน", value: moneyFormatter.format(totalSales), status: "good" as const },
-        { label: "เงินเข้า", value: "เปิดดู", status: "neutral" as const },
-        { label: "เงินออก", value: "เปิดดู", status: "neutral" as const },
-        { label: "กำไรหน้าร้านประมาณ", value: moneyFormatter.format(totalSales * 0.35), status: "good" as const },
-      ],
-    },
-    {
-      icon: "🍗",
-      title: "ไก่หมัก",
-      href: "/cash-flow?category=marinated_chicken_sales",
-      metrics: [
-        { label: "รายได้ขายไก่หมัก", value: moneyFormatter.format(chickenRevenue), status: "good" as const },
-        { label: "ปริมาณที่ระบุกลุ่มแล้ว", value: `${chickenQuantityKg.toLocaleString("th-TH", { maximumFractionDigits: 3 })} กก.`, status: chickenUnclassifiedCount ? "watch" as const : "good" as const },
-        { label: "กำไรขั้นต้นก่อนค่าส่ง", value: moneyFormatter.format(chickenGrossProfit), status: chickenUnclassifiedCount ? "watch" as const : "good" as const },
-        { label: "รอระบุกลุ่ม", value: `${chickenUnclassifiedCount} รายการ`, status: chickenUnclassifiedCount ? "alert" as const : "good" as const },
-      ],
-    },
-    {
-      icon: "🏪",
-      title: "ร้าน",
-      href: "/owner-dashboard",
-      metrics: branchMetrics.length ? branchMetrics : [{ label: "ยอดขายสาขา", value: "ยังไม่มีรายงาน", status: "watch" as const }, { label: "ปัญหา", value: `${branchProblemCount}`, status: branchProblemCount ? "alert" as const : "good" as const }],
-    },
-    {
-      icon: "👥",
-      title: "คน",
-      href: "/reports",
-      metrics: [
-        { label: "มาสาย / ขาด", value: "เปิดดู", status: "neutral" as const },
-        { label: "KPI / งานค้าง", value: "เปิดดู", status: "neutral" as const },
-      ],
-    },
-    {
-      icon: "🏭",
-      title: "โรงหมัก",
-      href: "/marination",
-      metrics: [
-        { label: "สต็อก", value: "เปิดดู", status: "neutral" as const },
-        { label: "ผลิต / ส่ง", value: "เปิดดู", status: "neutral" as const },
-      ],
-    },
-    {
-      icon: "🐔",
-      title: "แฟรนไชส์",
-      href: "/leads",
-      metrics: [
-        { label: "ผู้สมัครใหม่", value: "เปิดดู", status: "neutral" as const },
-        { label: "รอพิจารณา / ชำระ", value: "เปิดดู", status: "neutral" as const },
-      ],
-    },
+    { icon: "💰", title: "วันนี้", href: "/cash-flow", metrics: [
+      { label: "ยอดขายหน้าร้าน", value: moneyFormatter.format(totalSales), status: "good" as const },
+      { label: "เงินเข้า", value: "เปิดดู", status: "neutral" as const },
+      { label: "เงินออก", value: "เปิดดู", status: "neutral" as const },
+      { label: "กำไรหน้าร้านประมาณ", value: moneyFormatter.format(totalSales * 0.35), status: "good" as const },
+    ]},
+    { icon: "🍗", title: "ไก่หมัก", href: "/cash-flow?category=marinated_chicken_sales", metrics: [
+      { label: "รายได้ขายไก่หมัก", value: moneyFormatter.format(chickenRevenue), status: "good" as const },
+      { label: "ปริมาณที่ระบุกลุ่มแล้ว", value: `${chickenQuantityKg.toLocaleString("th-TH", { maximumFractionDigits: 3 })} กก.`, status: chickenUnclassifiedCount ? "watch" as const : "good" as const },
+      { label: "กำไรหลังค่าขนส่งประมาณ", value: moneyFormatter.format(chickenEstimatedProfit), status: chickenUnclassifiedCount ? "watch" as const : "good" as const },
+      { label: "รอระบุกลุ่ม", value: `${chickenUnclassifiedCount} รายการ`, status: chickenUnclassifiedCount ? "alert" as const : "good" as const },
+    ]},
+    { icon: "🏪", title: "ร้าน", href: "/owner-dashboard", metrics: branchMetrics.length ? branchMetrics : [{ label: "ยอดขายสาขา", value: "ยังไม่มีรายงาน", status: "watch" as const }, { label: "ปัญหา", value: `${branchProblemCount}`, status: branchProblemCount ? "alert" as const : "good" as const }] },
+    { icon: "👥", title: "คน", href: "/reports", metrics: [{ label: "มาสาย / ขาด", value: "เปิดดู", status: "neutral" as const }, { label: "KPI / งานค้าง", value: "เปิดดู", status: "neutral" as const }] },
+    { icon: "🏭", title: "โรงหมัก", href: "/marination", metrics: [{ label: "สต็อก", value: "เปิดดู", status: "neutral" as const }, { label: "ผลิต / ส่ง", value: "เปิดดู", status: "neutral" as const }] },
+    { icon: "🐔", title: "แฟรนไชส์", href: "/leads", metrics: [{ label: "ผู้สมัครใหม่", value: "เปิดดู", status: "neutral" as const }, { label: "รอพิจารณา / ชำระ", value: "เปิดดู", status: "neutral" as const }] },
   ];
 
-  return (
-    <main className="mx-auto max-w-md space-y-3 pb-8">
-      <div className="px-1">
-        <p className="text-xs font-bold text-black/50">OWNER • วันนี้</p>
-        <h1 className="text-2xl font-black">ภาพรวมร้าน</h1>
-      </div>
-      <MobileOwnerOverview sections={sections} />
-      <div className="hidden md:block rounded-3xl bg-white p-6 text-center font-bold">หน้านี้ออกแบบสำหรับเปิดดูบนมือถือ</div>
-    </main>
-  );
+  return <main className="mx-auto max-w-md space-y-3 pb-8"><div className="px-1"><p className="text-xs font-bold text-black/50">OWNER • วันนี้</p><h1 className="text-2xl font-black">ภาพรวมร้าน</h1></div><MobileOwnerOverview sections={sections} /><div className="hidden md:block rounded-3xl bg-white p-6 text-center font-bold">หน้านี้ออกแบบสำหรับเปิดดูบนมือถือ</div></main>;
 }
