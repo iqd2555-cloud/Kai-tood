@@ -53,8 +53,8 @@ export default async function OwnerOverviewPage() {
 
   const today = todayISO();
   const kpi = createKpiSupabaseAdminClient();
-  const peopleSummaryPromise = kpi
-    ? kpi.rpc("owner_people_daily_summary", { p_work_date: today }).then(({ data }) => (data ?? null) as PeopleSummary | null).catch(() => null)
+  const peopleSummaryPromise: Promise<PeopleSummary | null> = kpi
+    ? Promise.resolve(kpi.rpc("owner_people_daily_summary", { p_work_date: today })).then(({ data, error }) => error ? null : (data ?? null) as PeopleSummary | null, () => null)
     : Promise.resolve(null);
 
   const [{ data: sales }, { data: notes }, { data: chickenIncome }, { data: partsData }, { data: movementsData }, { data: resetData }, peopleSummary] = await Promise.all([
