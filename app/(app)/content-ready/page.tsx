@@ -97,9 +97,11 @@ async function setDecision(formData: FormData) {
   const decision = String(formData.get("decision") ?? "").trim();
   const kpi = createKpiSupabaseAdminClient();
   if (!kpi || !id || !["approve", "reject"].includes(decision)) redirect("/content-ready?decision=failed");
-  const { data: row } = await kpi.from("content_automation_queue").select("caption_text,quote_text,source_type,visual_status").eq("id", id).eq("owner_status", "approved").maybeSingle();
+  const { data: row } = await kpi.from("content_automation_queue").select("caption_text,quote_text,source_type,visual_status,rendered_path").eq("id", id).eq("owner_status", "approved").maybeSingle();
   if (!row) redirect("/content-ready?decision=failed");
-  if (decision === "approve" && (!row.caption_text || (row.source_type === "image" && !row.quote_text))) redirect("/content-ready?decision=incomplete");
+  if (decision === "approve" && (!row.caption_text || (row.source_type === "image" && (!row.quote_text || row.visual_status !== "ready" || !row.rendered_path)))) {
+    redirect("/content-ready?decision=incomplete");
+  }
   const { error } = await kpi.from("content_automation_queue").update({ publish_status: decision === "approve" ? "approved" : "rejected", updated_at: new Date().toISOString() }).eq("id", id);
   if (error) redirect("/content-ready?decision=failed");
   revalidatePath("/content-ready");
@@ -131,7 +133,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
       const { data: signed } = await kpi.storage.from(media.storage_bucket ?? "employee-footage").createSignedUrl(media.storage_path, 3600);
       url = signed?.signedUrl ?? null;
     }
-    if (row.rendered_path) {
+    if (row.visual_status === "ready" && row.rendered_path) {
       const { data: rendered } = await kpi.storage.from(row.rendered_bucket ?? "content-ready").createSignedUrl(row.rendered_path, 3600);
       renderedUrl = rendered?.signedUrl ?? null;
     }
@@ -148,35 +150,38 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
 
     {ai === "success" ? <div className="rounded-2xl bg-green-50 p-3 font-bold text-green-800">AI สร้างบทความและคำคมเรียบร้อย</div> : null}
     {ai === "failed" ? <div className="rounded-2xl bg-red-50 p-3 font-bold text-red-800">AI สร้างคอนเทนต์ไม่สำเร็จ • ยังไม่มีการโพสต์</div> : null}
-    {save === "success" ? <div className="rounded-2xl bg-green-50 p-3 font-bold text-green-800">บันทึกข้อความที่แก้แล้ว</div> : null}
+    {save === "success" ? <div className="rounded-2xl bg-green-50 p-3 font-bold text-green-800">บันทึกข้อความที่แก้แล้ว • ต้องสร้างไฟล์รูปใหม่ก่อนอนุมัติ</div> : null}
     {save === "quote-long" ? <div className="rounded-2xl bg-amber-50 p-3 font-bold text-amber-800">คำคมยาวเกิน 15 คำ กรุณาย่อก่อนบันทึก</div> : null}
     {decision === "approve" ? <div className="rounded-2xl bg-green-50 p-3 font-bold text-green-800">อนุมัติแล้ว • เข้าคิวรอระบบโพสต์</div> : null}
     {decision === "reject" ? <div className="rounded-2xl bg-neutral-100 p-3 font-bold">ตัดรายการออกจากคิวโพสต์แล้ว</div> : null}
-    {decision === "incomplete" ? <div className="rounded-2xl bg-amber-50 p-3 font-bold text-amber-800">ยังอนุมัติไม่ได้ • ต้องมีบทความและคำคมก่อน</div> : null}
+    {decision === "incomplete" ? <div className="rounded-2xl bg-amber-50 p-3 font-bold text-amber-800">ยังอนุมัติไม่ได้ • รูปต้องสร้างเป็นไฟล์พร้อมโพสต์ก่อน</div> : null}
 
     {cards.length === 0 ? <div className="rounded-3xl border bg-white p-8 text-center font-bold text-black/50">ไม่มี Content รอตรวจ</div> : null}
-    {cards.map((item) => <article key={item.id} className="overflow-hidden rounded-3xl border bg-white shadow-sm">
-      <div className="bg-black">{item.url ? item.source_type === "video" ? <video src={item.url} controls playsInline className="max-h-[70vh] w-full object-contain" /> : <img src={item.url} alt="Content ต้นฉบับ" className="max-h-[70vh] w-full object-contain" /> : null}</div>
-      <div className="space-y-4 p-4">
-        <div className="flex items-center justify-between text-xs font-bold text-black/50"><span>{item.source_type === "video" ? "🎬 คลิป" : "📷 รูป"}</span><span>{item.caption_status === "ready" ? "AI พร้อม" : item.caption_status === "failed" ? "AI ไม่สำเร็จ" : "รอ AI"}</span></div>
-        {item.source_type === "image" && item.url && item.quote_text ? <ImageQuotePreview imageUrl={item.renderedUrl || item.url} quote={item.renderedUrl ? "" : item.quote_text} /> : null}
+    {cards.map((item) => {
+      const imageReady = item.source_type !== "image" || (item.visual_status === "ready" && Boolean(item.renderedUrl));
+      return <article key={item.id} className="overflow-hidden rounded-3xl border bg-white shadow-sm">
+        <div className="bg-black">{item.url ? item.source_type === "video" ? <video src={item.url} controls playsInline className="max-h-[70vh] w-full object-contain" /> : <img src={item.url} alt="Content ต้นฉบับ" className="max-h-[70vh] w-full object-contain" /> : null}</div>
+        <div className="space-y-4 p-4">
+          <div className="flex items-center justify-between text-xs font-bold text-black/50"><span>{item.source_type === "video" ? "🎬 คลิป" : "📷 รูป"}</span><span>{item.caption_status === "ready" ? "AI พร้อม" : item.caption_status === "failed" ? "AI ไม่สำเร็จ" : "รอ AI"}</span></div>
+          {item.source_type === "image" && item.url && item.quote_text ? <ImageQuotePreview queueId={item.id} imageUrl={item.renderedUrl || item.url} quote={item.quote_text} rendered={Boolean(item.renderedUrl)} /> : null}
 
-        <form action={saveDraft} className="space-y-3">
-          <input type="hidden" name="id" value={item.id} />
-          <label className="block text-sm font-black">บทความ / Caption</label>
-          <textarea name="caption" defaultValue={item.caption_text ?? ""} rows={6} required placeholder="ให้ AI สร้างหรือพิมพ์ข้อความ" className="w-full rounded-2xl border border-black/10 bg-black/[.03] p-4 text-[15px] leading-7 outline-none focus:border-black" />
-          {item.source_type === "image" ? <><label className="block text-sm font-black">คำคมบนรูป <span className="font-normal text-black/45">ไม่เกิน 15 คำ</span></label><textarea name="quote" defaultValue={item.quote_text ?? ""} rows={2} required placeholder="คำคมสั้นที่สัมพันธ์กับภาพจริง" className="w-full rounded-2xl border border-black/10 bg-black/[.03] p-4 text-[15px] outline-none focus:border-black" /></> : <input type="hidden" name="quote" value={item.quote_text ?? "วิดีโอจากการทำงานจริง"} />}
-          <button className="w-full rounded-2xl border border-black/15 bg-white px-4 py-3 font-black">บันทึกข้อความที่แก้</button>
-        </form>
+          <form action={saveDraft} className="space-y-3">
+            <input type="hidden" name="id" value={item.id} />
+            <label className="block text-sm font-black">บทความ / Caption</label>
+            <textarea name="caption" defaultValue={item.caption_text ?? ""} rows={6} required placeholder="ให้ AI สร้างหรือพิมพ์ข้อความ" className="w-full rounded-2xl border border-black/10 bg-black/[.03] p-4 text-[15px] leading-7 outline-none focus:border-black" />
+            {item.source_type === "image" ? <><label className="block text-sm font-black">คำคมบนรูป <span className="font-normal text-black/45">ไม่เกิน 15 คำ</span></label><textarea name="quote" defaultValue={item.quote_text ?? ""} rows={2} required placeholder="คำคมสั้นที่สัมพันธ์กับภาพจริง" className="w-full rounded-2xl border border-black/10 bg-black/[.03] p-4 text-[15px] outline-none focus:border-black" /></> : <input type="hidden" name="quote" value={item.quote_text ?? "วิดีโอจากการทำงานจริง"} />}
+            <button className="w-full rounded-2xl border border-black/15 bg-white px-4 py-3 font-black">บันทึกข้อความที่แก้</button>
+          </form>
 
-        <form action={generateOne}><input type="hidden" name="id" value={item.id} /><button className="w-full rounded-2xl bg-red-600 px-4 py-3 font-black text-white">{item.caption_text ? "ให้ AI เขียนบทความ + คำคมใหม่" : "สร้างบทความ + คำคมด้วย AI"}</button></form>
+          <form action={generateOne}><input type="hidden" name="id" value={item.id} /><button className="w-full rounded-2xl bg-red-600 px-4 py-3 font-black text-white">{item.caption_text ? "ให้ AI เขียนบทความ + คำคมใหม่" : "สร้างบทความ + คำคมด้วย AI"}</button></form>
 
-        <div className="grid grid-cols-2 gap-2">
-          <form action={setDecision}><input type="hidden" name="id" value={item.id} /><input type="hidden" name="decision" value="reject" /><button className="w-full rounded-2xl border border-black/15 bg-white px-3 py-3 font-black">ไม่ใช้</button></form>
-          <form action={setDecision}><input type="hidden" name="id" value={item.id} /><input type="hidden" name="decision" value="approve" /><button disabled={!item.caption_text || (item.source_type === "image" && !item.quote_text)} className="w-full rounded-2xl bg-black px-3 py-3 font-black text-white disabled:cursor-not-allowed disabled:bg-black/25">✓ อนุมัติเตรียมโพสต์</button></form>
+          <div className="grid grid-cols-2 gap-2">
+            <form action={setDecision}><input type="hidden" name="id" value={item.id} /><input type="hidden" name="decision" value="reject" /><button className="w-full rounded-2xl border border-black/15 bg-white px-3 py-3 font-black">ไม่ใช้</button></form>
+            <form action={setDecision}><input type="hidden" name="id" value={item.id} /><input type="hidden" name="decision" value="approve" /><button disabled={!item.caption_text || (item.source_type === "image" && (!item.quote_text || !imageReady))} className="w-full rounded-2xl bg-black px-3 py-3 font-black text-white disabled:cursor-not-allowed disabled:bg-black/25">✓ อนุมัติเตรียมโพสต์</button></form>
+          </div>
+          <p className="text-center text-xs text-black/45">ขั้นนี้ยังไม่โพสต์ Facebook/Instagram จริง</p>
         </div>
-        <p className="text-center text-xs text-black/45">ขั้นนี้ยังไม่โพสต์ Facebook/Instagram จริง</p>
-      </div>
-    </article>)}
+      </article>;
+    })}
   </main>;
 }
