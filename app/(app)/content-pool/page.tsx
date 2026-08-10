@@ -121,7 +121,7 @@ export default async function ContentPoolPage({ searchParams }: { searchParams?:
       url = data?.signedUrl ?? null;
     }
     const similarity = media?.duplicate_similarity == null ? null : Number(media.duplicate_similarity);
-    const suspectDuplicate = item.source_type === "image" && media?.duplicate_status === "unique" && similarity !== null && similarity >= 0.65 && similarity < 0.78 && Boolean(media.duplicate_of_media_id) && !media?.id?.startsWith("owner-reviewed-");
+    const suspectDuplicate = item.source_type === "image" && media?.duplicate_status === "suspected" && Boolean(media.duplicate_of_media_id);
     let originalUrl: string | null = null;
     if (suspectDuplicate && media?.duplicate_of_media_id) {
       const { data: original } = await kpi.from("work_submission_media").select("storage_bucket,storage_path").eq("id", media.duplicate_of_media_id).maybeSingle();
