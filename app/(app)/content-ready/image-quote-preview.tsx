@@ -1,44 +1,30 @@
 "use client";
-
-import { useState } from "react";
-
-type Props={queueId:string;imageUrl:string;quote:string;rendered?:boolean};
-const DISPLAY='"Kanit","Noto Sans Thai",sans-serif';
-const ACCENT='"Sriracha","Kanit","Noto Sans Thai",sans-serif';
-function seg(t:string){try{const s=new Intl.Segmenter("th",{granularity:"word"});return Array.from(s.segment(t),p=>p.segment).filter(Boolean)}catch{return t.split(/\s+/)}}
-function wrap(ctx:CanvasRenderingContext2D,t:string,w:number){const a=seg(t),out:string[]=[];let l="";for(const u of a){const n=l?l+u:u;if(ctx.measureText(n).width<=w||!l)l=n;else{out.push(l.trim());l=u}}if(l.trim())out.push(l.trim());return out}
-async function img(url:string){const i=new Image();i.crossOrigin="anonymous";i.decoding="async";i.src=url;await i.decode();return i}
-async function fonts(){if(typeof document!=="undefined"&&"fonts" in document){await Promise.allSettled([document.fonts.load('900 72px "Kanit"'),document.fonts.load('400 72px "Sriracha"'),document.fonts.ready])}}
-
-/* OWNER VISUAL STANDARD — LOCKED
-  1) Reference language: premium Thai street-business motivational editorial poster.
-  2) Headline font MUST be heavy Thai display (Kanit 900). Accent handwriting MUST be Sriracha only.
-  3) NEVER use Tahoma/Arial/UI font as visible poster typography; Noto is fallback only.
-  4) Typography hierarchy is mandatory: oversized quote mark -> large emotional headline -> highlighted key phrase -> small support line.
-  5) Palette locked: warm white + golden yellow + red accent + black editorial contrast.
-  6) NEVER draw a flat opaque caption bar/card behind the headline.
-  7) Use gradient/vignette integrated into the photo; preserve the real subject and avoid covering the focal object.
-  8) Graphic vocabulary: quotation marks, hand-drawn underline/brush strokes, restrained editorial rules. No generic template decoration.
-  9) Quote is motivational for street vendors and must connect to the real scene; it is NOT a literal inventory of objects in the photo.
- 10) AI may change words for each photo but MUST NOT invent a new visual style. This component is the renderer of record.
+import{useState}from"react";
+type Props={queueId:string;imageUrl:string;quote:string;rendered?:boolean};const D='"Kanit","Noto Sans Thai",sans-serif',A='"Sriracha","Kanit","Noto Sans Thai",sans-serif';
+function seg(t:string){try{const s=new Intl.Segmenter("th",{granularity:"word"});return Array.from(s.segment(t),p=>p.segment).filter(Boolean)}catch{return t.split(/\s+/)}}function wrap(c:CanvasRenderingContext2D,t:string,w:number){const a=seg(t),o:string[]=[];let l="";for(const u of a){const n=l?l+u:u;if(c.measureText(n).width<=w||!l)l=n;else{o.push(l.trim());l=u}}if(l.trim())o.push(l.trim());return o}async function img(u:string){const i=new Image();i.crossOrigin="anonymous";i.src=u;await i.decode();return i}async function fonts(){if(typeof document!=="undefined"&&"fonts"in document)await Promise.allSettled([document.fonts.load('900 90px "Kanit"'),document.fonts.load('400 60px "Sriracha"'),document.fonts.ready])}
+/* OWNER POSTER LAW — DO NOT DILUTE
+Reference = premium Thai motivational social poster, not a caption overlay.
+Composition must feel intentionally art-directed: asymmetry, scale contrast, negative space, layered editorial devices.
+Headline: Kanit 900 only; handwritten accent: Sriracha only. No UI-looking typography.
+Use 3-level headline hierarchy: white setup / oversized yellow core phrase / white-or-yellow close. Never make all lines same size.
+Allowed devices: giant quote mark, rough brush plate, check-circle/icon bullets, hand underline, thin editorial rules, corner marks.
+Forbidden: plain black caption band, tiny centered text, uniform paragraph-on-photo, generic template, random decoration.
+Photo remains documentary-real. Dark treatment is localized to text side and must blend into image.
+Palette locked: #fffaf0 #ffc400 #e51b23 #111 plus optional green check accent.
+Quote content = encouragement for street vendors tied to scene; never merely describe visible objects.
 */
-export function ImageQuotePreview({queueId,imageUrl,quote,rendered=false}:Props){
- const[working,setWorking]=useState(false),[error,setError]=useState("");
- async function renderAndSave(){if(!quote.trim()||working)return;setWorking(true);setError("");try{await fonts();const image=await img(imageUrl);const scale=Math.min(1,2160/Math.max(image.naturalWidth,image.naturalHeight));const w=Math.round(image.naturalWidth*scale),h=Math.round(image.naturalHeight*scale);const c=document.createElement("canvas");c.width=w;c.height=h;const x=c.getContext("2d");if(!x)throw new Error("ไม่สามารถสร้างไฟล์รูปได้");x.drawImage(image,0,0,w,h);
- // Editorial photo treatment: left reading field fades naturally into the real image.
- const g=x.createLinearGradient(0,0,w*.68,0);g.addColorStop(0,"rgba(5,5,5,.96)");g.addColorStop(.50,"rgba(5,5,5,.74)");g.addColorStop(.82,"rgba(5,5,5,.30)");g.addColorStop(1,"rgba(5,5,5,0)");x.fillStyle=g;x.fillRect(0,0,w*.72,h);
- const vg=x.createLinearGradient(0,0,0,h);vg.addColorStop(0,"rgba(0,0,0,.18)");vg.addColorStop(.55,"rgba(0,0,0,0)");vg.addColorStop(1,"rgba(0,0,0,.18)");x.fillStyle=vg;x.fillRect(0,0,w,h);
- const left=w*.065,maxW=w*.47;x.textAlign="left";x.textBaseline="top";
- // Big quotation mark: signature element.
- x.shadowColor="rgba(0,0,0,.35)";x.shadowBlur=w*.004;x.font=`900 ${Math.round(w*.145)}px ${DISPLAY}`;x.fillStyle="#ffc400";x.fillText("“",left,h*.055);
- // Quote: intentionally larger than previous version. Maximum four lines.
- let fs=Math.round(w*.078),lines:string[]=[];while(fs>=Math.round(w*.052)){x.font=`900 ${fs}px ${DISPLAY}`;lines=wrap(x,quote.trim(),maxW);if(lines.length<=4)break;fs-=2}let y=h*.205;const lh=fs*1.12;const hi=Math.max(1,lines.length-2);
- lines.forEach((line,i)=>{const emphasis=i>=hi;x.font=`900 ${Math.round(fs*(emphasis?1.10:1))}px ${DISPLAY}`;x.fillStyle=emphasis?"#ffc400":"#fffaf0";x.fillText(line,left,y,maxW);y+=lh*(emphasis?1.10:1)});
- // Red hand-drawn double underline, never a rectangular banner.
- y+=fs*.12;x.shadowBlur=0;x.strokeStyle="#e51b23";x.lineCap="round";x.lineWidth=Math.max(5,w*.006);for(let k=0;k<2;k++){x.beginPath();x.moveTo(left,y+k*w*.009);x.quadraticCurveTo(left+maxW*.48,y-fs*.08+k*w*.008,left+maxW*.90,y+k*w*.004);x.stroke()}
- // Human supporting thought in handwritten accent, clearly secondary.
- y+=fs*.62;x.font=`400 ${Math.max(22,Math.round(w*.034))}px ${ACCENT}`;x.fillStyle="#fffaf0";const support=wrap(x,"พ่อค้าแม่ค้าไม่มีคำว่าง่าย แต่ทุกวันที่ไม่ยอมแพ้ กำลังพาเราไปข้างหน้า",maxW);support.slice(0,2).forEach(l=>{x.fillText(l,left,y,maxW);y+=w*.047});
- // Bottom brush signature balances the composition.
- const by=h*.915;x.save();x.translate(left,by);x.rotate(-.012);x.fillStyle="#ffc400";x.fillRect(0,0,w*.32,Math.max(10,h*.009));x.fillStyle="#e51b23";x.fillRect(w*.20,h*.012,w*.17,Math.max(5,h*.004));x.restore();
- const blob=await new Promise<Blob>((res,rej)=>c.toBlob(v=>v?res(v):rej(new Error("สร้างไฟล์ JPEG ไม่สำเร็จ")),"image/jpeg",.95));const body=new FormData();body.append("queue_id",queueId);body.append("file",new File([blob],"post-ready.jpg",{type:"image/jpeg"}));const r=await fetch("/api/content-ready/render",{method:"POST",body});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(typeof j.error==="string"?j.error:"บันทึกรูปไม่สำเร็จ");window.location.reload()}catch(e){setError(e instanceof Error?e.message:"สร้างรูปไม่สำเร็จ");setWorking(false)}}
- return <div className="space-y-2"><div className="relative overflow-hidden rounded-2xl bg-black"><img src={imageUrl} crossOrigin="anonymous" alt="ภาพสำหรับโพสต์" className="max-h-[70vh] w-full object-contain"/>{!rendered&&quote?<div className="pointer-events-none absolute inset-0"><div className="absolute inset-y-0 left-0 w-[72%] bg-gradient-to-r from-black via-black/75 to-transparent"/><div className="absolute left-[6.5%] top-[7%] w-[47%] text-left"><div className="font-poster text-7xl font-black leading-none text-amber-400">“</div><div className="font-poster mt-5 text-[clamp(26px,6vw,48px)] font-black leading-[1.08] text-[#fffaf0]">{quote}</div><div className="mt-4 h-1.5 w-[88%] -rotate-1 rounded-full bg-red-600"/><div className="font-poster-accent mt-5 text-base leading-snug text-[#fffaf0]">พ่อค้าแม่ค้าไม่มีคำว่าง่าย<br/>แต่ทุกวันที่ไม่ยอมแพ้ กำลังพาเราไปข้างหน้า</div></div></div>:null}</div>{!rendered?<button type="button" onClick={renderAndSave} disabled={working||!quote.trim()} className="w-full rounded-2xl bg-amber-400 px-4 py-3 font-black text-black disabled:opacity-50">{working?"กำลังสร้างไฟล์รูป...":"สร้างไฟล์รูปพร้อมโพสต์"}</button>:<div className="rounded-2xl bg-green-50 px-4 py-3 text-center text-sm font-black text-green-800">✓ ไฟล์รูปพร้อมโพสต์แล้ว</div>}{error?<div className="rounded-xl bg-red-50 px-3 py-2 text-sm font-bold text-red-700">{error}</div>:null}</div>}
+export function ImageQuotePreview({queueId,imageUrl,quote,rendered=false}:Props){const[working,setWorking]=useState(false),[error,setError]=useState("");async function renderAndSave(){if(!quote.trim()||working)return;setWorking(true);setError("");try{await fonts();const im=await img(imageUrl),sc=Math.min(1,2160/Math.max(im.naturalWidth,im.naturalHeight)),w=Math.round(im.naturalWidth*sc),h=Math.round(im.naturalHeight*sc),cv=document.createElement("canvas");cv.width=w;cv.height=h;const c=cv.getContext("2d");if(!c)throw Error("ไม่สามารถสร้างไฟล์รูปได้");c.drawImage(im,0,0,w,h);
+const g=c.createLinearGradient(0,0,w*.72,0);g.addColorStop(0,"rgba(3,3,3,.98)");g.addColorStop(.42,"rgba(3,3,3,.84)");g.addColorStop(.72,"rgba(3,3,3,.42)");g.addColorStop(1,"rgba(3,3,3,0)");c.fillStyle=g;c.fillRect(0,0,w*.74,h);const l=w*.06,mw=w*.48;c.textAlign="left";c.textBaseline="top";
+// signature quotation
+c.font=`900 ${w*.15}px ${D}`;c.fillStyle="#ffc400";c.fillText("“",l,h*.045);
+// Build deliberately varied headline blocks from wrapped quote.
+let fs=Math.round(w*.069),ls:string[]=[];while(fs>w*.047){c.font=`900 ${fs}px ${D}`;ls=wrap(c,quote.trim(),mw);if(ls.length<=5)break;fs-=2}let y=h*.19;ls.forEach((line,i)=>{const core=i>=Math.max(1,ls.length-2),sz=Math.round(fs*(core?1.22:1));c.font=`900 ${sz}px ${D}`;c.fillStyle=core?"#ffc400":"#fffaf0";c.fillText(line,l,y,mw);y+=sz*1.03});
+// energetic red underline
+y+=fs*.12;c.strokeStyle="#e51b23";c.lineWidth=Math.max(6,w*.007);c.lineCap="round";c.beginPath();c.moveTo(l,y);c.quadraticCurveTo(l+mw*.48,y-fs*.11,l+mw*.92,y);c.stroke();
+// white brush plate creates the editorial contrast seen in the approved reference.
+const py=y+fs*.48,pw=mw*.88,ph=Math.max(h*.085,fs*1.45);c.save();c.translate(l,py);c.rotate(-.018);c.fillStyle="rgba(255,250,240,.96)";c.fillRect(0,ph*.08,pw,ph*.78);for(let k=0;k<7;k++){c.fillRect((k%2)*w*.008,k<3?0:ph*.82,pw-w*.012*(k%3),Math.max(2,h*.004))}c.restore();c.font=`900 ${Math.round(w*.036)}px ${D}`;c.fillStyle="#171717";c.fillText("พ่อค้าแม่ค้าข้างถนน",l+w*.025,py+ph*.20,pw-w*.05);c.font=`900 ${Math.round(w*.041)}px ${D}`;c.fillStyle="#e51b23";c.fillText("ไม่มีคำว่าง่าย",l+w*.025,py+ph*.52,pw-w*.05);
+// three compact principle rows — visual storytelling, not filler paragraph.
+let ry=py+ph+h*.035;const rows=[["✓","ตื่นก่อนใคร"],["✓","ลงมือทำทุกวัน"],["✓","ไม่ยอมแพ้ในวันที่เหนื่อย"]];for(const[r,t]of rows){c.font=`900 ${Math.round(w*.039)}px ${D}`;c.fillStyle="#43b95c";c.fillText(r,l,ry);c.fillStyle="#ffc400";c.fillText(t,l+w*.07,ry,mw-w*.07);ry+=w*.071;c.strokeStyle="rgba(255,255,255,.30)";c.lineWidth=1;c.beginPath();c.moveTo(l+w*.07,ry-w*.015);c.lineTo(l+mw*.86,ry-w*.015);c.stroke()}
+// bottom framed closing thought
+const by=Math.min(h*.82,ry+h*.03);c.strokeStyle="#fffaf0";c.lineWidth=Math.max(2,w*.002);c.beginPath();c.moveTo(l,by);c.lineTo(l,by+h*.115);c.moveTo(l,by);c.lineTo(l+mw*.08,by);c.moveTo(l+mw*.92,by+h*.115);c.lineTo(l+mw*.92,by+h*.035);c.stroke();c.font=`400 ${Math.round(w*.036)}px ${A}`;c.fillStyle="#fffaf0";c.fillText("ขายดีอาจชั่วคราว",l+w*.055,by+h*.018,mw*.78);c.font=`900 ${Math.round(w*.046)}px ${D}`;c.fillStyle="#ffc400";c.fillText("แต่ความสม่ำเสมอพาเราไปไกล",l+w*.055,by+h*.062,mw*.84);
+const blob=await new Promise<Blob>((r,j)=>cv.toBlob(v=>v?r(v):j(Error("สร้างไฟล์ JPEG ไม่สำเร็จ")),"image/jpeg",.95)),body=new FormData();body.append("queue_id",queueId);body.append("file",new File([blob],"post-ready.jpg",{type:"image/jpeg"}));const res=await fetch("/api/content-ready/render",{method:"POST",body}),json=await res.json().catch(()=>({}));if(!res.ok)throw Error(typeof json.error==="string"?json.error:"บันทึกรูปไม่สำเร็จ");window.location.reload()}catch(e){setError(e instanceof Error?e.message:"สร้างรูปไม่สำเร็จ");setWorking(false)}}return <div className="space-y-2"><div className="relative overflow-hidden rounded-2xl bg-black"><img src={imageUrl} crossOrigin="anonymous" alt="ภาพสำหรับโพสต์" className="max-h-[70vh] w-full object-contain"/>{!rendered&&quote?<div className="pointer-events-none absolute inset-0"><div className="absolute inset-y-0 left-0 w-[74%] bg-gradient-to-r from-black via-black/80 to-transparent"/><div className="absolute left-[6%] top-[6%] w-[48%] text-left"><div className="font-poster text-7xl font-black leading-none text-amber-400">“</div><div className="font-poster mt-4 text-[clamp(25px,6vw,46px)] font-black leading-[1.02] text-[#fffaf0]">{quote}</div><div className="mt-3 h-1.5 w-[90%] -rotate-1 bg-red-600"/><div className="mt-5 -rotate-1 bg-[#fffaf0] px-3 py-2 font-poster text-sm font-black text-black">พ่อค้าแม่ค้าข้างถนน <span className="text-red-600">ไม่มีคำว่าง่าย</span></div><div className="font-poster mt-5 space-y-2 text-sm font-black"><div className="text-amber-400">✓ ตื่นก่อนใคร</div><div className="text-amber-400">✓ ลงมือทำทุกวัน</div><div className="text-amber-400">✓ ไม่ยอมแพ้ในวันที่เหนื่อย</div></div></div></div>:null}</div>{!rendered?<button type="button" onClick={renderAndSave} disabled={working||!quote.trim()} className="w-full rounded-2xl bg-amber-400 px-4 py-3 font-black text-black disabled:opacity-50">{working?"กำลังสร้างไฟล์รูป...":"สร้างไฟล์รูปพร้อมโพสต์"}</button>:<div className="rounded-2xl bg-green-50 px-4 py-3 text-center text-sm font-black text-green-800">✓ ไฟล์รูปพร้อมโพสต์แล้ว</div>}{error?<div className="rounded-xl bg-red-50 px-3 py-2 text-sm font-bold text-red-700">{error}</div>:null}</div>}
