@@ -15,9 +15,12 @@ async function buildDraft(kpi: NonNullable<ReturnType<typeof createKpiSupabaseAd
 }
 
 async function generateOne(formData:FormData){"use server"; const profile=await getCurrentProfile(); if(!isOwner(profile))redirect("/dashboard"); const id=String(formData.get("id")??""); const kpi=createKpiSupabaseAdminClient(); if(!kpi||!id)redirect("/content-ready?ai=failed");
+  let ok=false;
   try{ const {data,error}=await kpi.from("content_automation_queue").select("id,source_type,source_work_date,caption_status,caption_text,quote_text,visual_status,rendered_bucket,rendered_path,publish_status,work_submission_media(storage_bucket,storage_path)").eq("id",id).eq("owner_status","approved").maybeSingle(); if(error||!data)throw error??new Error("ไม่พบรายการ");
-    const draft=await buildDraft(kpi,data as Row); const {error:updateError}=await kpi.from("content_automation_queue").update({caption_text:draft.caption,quote_text:draft.quote,caption_status:"ready",visual_status:"ready_to_render",rendered_bucket:null,rendered_path:null,ai_model:"gpt-5-mini",ai_generated_at:new Date().toISOString(),ai_error:null,updated_at:new Date().toISOString()}).eq("id",id); if(updateError)throw updateError; revalidatePath("/content-ready"); redirect("/content-ready?ai=success");
-  }catch(e){console.error("generate draft failed",e); redirect("/content-ready?ai=failed");}}
+    const draft=await buildDraft(kpi,data as Row); const {error:updateError}=await kpi.from("content_automation_queue").update({caption_text:draft.caption,quote_text:draft.quote,caption_status:"ready",visual_status:"ready_to_render",rendered_bucket:null,rendered_path:null,ai_model:"gpt-5-mini",ai_generated_at:new Date().toISOString(),ai_error:null,updated_at:new Date().toISOString()}).eq("id",id); if(updateError)throw updateError; revalidatePath("/content-ready"); ok=true;
+  }catch(e){console.error("generate draft failed",e);}
+  redirect(ok?"/content-ready?ai=success":"/content-ready?ai=failed");
+}
 
 async function saveDraft(formData:FormData){"use server"; const profile=await getCurrentProfile(); if(!isOwner(profile))redirect("/dashboard"); const id=String(formData.get("id")??""); const caption=String(formData.get("caption")??"").trim(); const quote=String(formData.get("quote")??"").trim(); const kpi=createKpiSupabaseAdminClient(); if(!kpi||!id||!caption||!quote)redirect("/content-ready?save=failed"); if(quote.split(/\s+/).filter(Boolean).length>15)redirect("/content-ready?save=quote-long");
   const {error}=await kpi.from("content_automation_queue").update({caption_text:caption,quote_text:quote,caption_status:"ready",visual_status:"ready_to_render",rendered_bucket:null,rendered_path:null,owner_caption_edited:true,owner_quote_edited:true,updated_at:new Date().toISOString()}).eq("id",id).eq("owner_status","approved"); if(error)redirect("/content-ready?save=failed"); revalidatePath("/content-ready"); redirect("/content-ready?save=success");}
