@@ -1,4 +1,12 @@
--- Keep fuel expenses out of labor/transport even when OCR or text analysis misclassifies them.
+-- Ensure the dedicated fuel category exists and keep fuel expenses out of labor/transport
+-- even when OCR or text analysis misclassifies them.
+insert into public.cash_flow_categories (name, type, code, is_active)
+values ('ค่าน้ำมันเชื้อเพลิง', 'expense', 'fuel_cost', true)
+on conflict (code) do update
+set name = excluded.name,
+    type = excluded.type,
+    is_active = true;
+
 create or replace function public.normalize_fuel_expense_category()
 returns trigger
 language plpgsql
