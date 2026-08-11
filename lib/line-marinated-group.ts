@@ -84,17 +84,30 @@ export async function handleMarinatedChickenGroupRequest(request: Request) {
     if (!row.cash_flow_entry_id || !row.message_id) continue;
     const { data: entry } = await supabase
       .from("cash_flow_entries")
-      .select("id,category,amount,description,note")
+      .select("id,category,amount,description,note,marinated_group")
       .eq("id", row.cash_flow_entry_id)
       .maybeSingle();
-    if (entry?.category === "marinated_chicken_sales") {
+    if (entry?.category === "marinated_chicken_sales" && !entry.marinated_group) {
       target = { message_id: row.message_id, cash_flow_entry_id: row.cash_flow_entry_id, extracted_data: row.extracted_data };
       break;
     }
   }
 
   if (!target) {
-    await reply(event.replyToken, "ยังไม่พบสลิปขายไก่หมักจากผู้ส่งคนนี้ใน 30 นาทีที่ผ่านมา กรุณาส่งสลิปก่อน แล้วส่งคำว่า กลุ่ม A, กลุ่ม B หรือ กลุ่ม C ตามมา", accessToken);
+    const expiresAt = new Date(eventAt.getTime() + PAIRING_WINDOW_MS).toISOString();
+    const { error: pendingError } = await supabase.from("line_marinated_group_pending").insert({
+      line_user_id: lineUserId,
+      group_code: group,
+      event_at: eventAt.toISOString(),
+      expires_at: expiresAt,
+    });
+    if (pendingError) throw new Error(`Failed to save pending marinated chicken group: ${pendingError.code ?? "unknown"}`);
+
+    await reply(
+      event.replyToken,
+      `รับข้อมูลกลุ่ม ${group} แล้ว\nกำลังรอจับคู่กับสลิปขายไก่หมักล่าสุด\nเมื่อสลิปบันทึกเข้า Cash Flow เสร็จ ระบบจะผูกกลุ่มและคำนวณน้ำหนักให้อัตโนมัติ`,
+      accessToken,
+    );
     return { handled: true };
   }
 
@@ -116,6 +129,9 @@ export async function handleMarinatedChickenGroupRequest(request: Request) {
   const noteBase = String(entry.note ?? "").replace(/\s*\|\s*กลุ่ม\s+[ABC].*$/u, "").trim();
 
   const { error: updateError } = await supabase.from("cash_flow_entries").update({
+    marinated_group: group,
+    unit_price_per_kg: unitPrice,
+    quantity_kg: roundedQuantity,
     description: `${String(entry.description ?? "ขายไก่หมัก").replace(/\s*\|\s*กลุ่ม\s+[ABC].*$/u, "").trim()} | ${metadata}`,
     note: `${noteBase}${noteBase ? " | " : ""}${metadata}${suspicious ? " | รอตรวจสอบน้ำหนัก" : ""}`,
   }).eq("id", target.cash_flow_entry_id);
