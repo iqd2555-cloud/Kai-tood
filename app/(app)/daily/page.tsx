@@ -70,7 +70,28 @@ export default async function DailyPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 daily-input-page">
+      <style>{`
+        @media (max-width: 640px) {
+          .daily-input-page form > section:nth-of-type(7) > div.space-y-3 > label {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr) 92px 48px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow: visible !important;
+            gap: 8px !important;
+          }
+          .daily-input-page form > section:nth-of-type(7) > div.space-y-3 > label > input[type="number"] {
+            width: 92px !important;
+            min-width: 0 !important;
+            display: block !important;
+          }
+          .daily-input-page form > section:nth-of-type(7) > div.space-y-3 > label > span:last-child {
+            width: 48px !important;
+            min-width: 0 !important;
+          }
+        }
+      `}</style>
       {process.env.NODE_ENV === "development" && (
         <div className="rounded-full bg-[#E60012]/20 px-4 py-2 text-sm font-black text-black">
           Debug: DailyInputPage
