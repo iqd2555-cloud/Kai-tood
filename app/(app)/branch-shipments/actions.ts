@@ -1,0 +1,9 @@
+"use server";
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
+const codes=["original","spicy","skin","offal","chopped","drumstick"] as const;
+function quantities(formData:FormData){return Object.fromEntries(codes.map((code)=>[code,Number(formData.get(code)??0)]));}
+export async function createShipment(formData:FormData){const supabase=await createSupabaseServerClient();if(!supabase)return;const saleDate=String(formData.get("sale_date")??"");const branchId=String(formData.get("branch_id")??"");const note=String(formData.get("note")??"");const {data,error}=await supabase.rpc("create_branch_chicken_shipment",{p_sale_date:saleDate,p_branch_id:branchId,p_note:note||null,p_quantities:quantities(formData)});if(error)throw new Error(error.message);revalidatePath("/branch-shipments");redirect(`/branch-shipments/${data}`);}
+export async function confirmTransport(formData:FormData){const supabase=await createSupabaseServerClient();if(!supabase)return;const id=String(formData.get("shipment_id")??"");const {error}=await supabase.rpc("confirm_branch_chicken_transport",{p_shipment_id:id,p_quantities:quantities(formData)});if(error)throw new Error(error.message);revalidatePath(`/branch-shipments/${id}`);redirect(`/branch-shipments/${id}`);}
+export async function confirmReceipt(formData:FormData){const supabase=await createSupabaseServerClient();if(!supabase)return;const id=String(formData.get("shipment_id")??"");const {error}=await supabase.rpc("confirm_branch_chicken_receipt",{p_shipment_id:id,p_quantities:quantities(formData)});if(error)throw new Error(error.message);revalidatePath(`/branch-shipments/${id}`);revalidatePath("/branch-shipments");redirect(`/branch-shipments/${id}`);}
