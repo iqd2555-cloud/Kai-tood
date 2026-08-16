@@ -1,7 +1,7 @@
 import { numberFormatter } from "./format.ts";
 import { replayMarinationLedger, replayMarinationLedgerForDate, sortMarinationLedgerMovements, type RawMarinationLedgerMovement, type ReplayRow } from "./marination/replay-ledger.ts";
 
-export type MarinationMovementType = "received" | "used" | "counted" | "adjustment";
+export type MarinationMovementType = "received" | "used" | "fresh_sale" | "counted" | "adjustment";
 
 export type ChickenPart = {
   id: string;
@@ -48,6 +48,7 @@ export type MarinationPartStockSummary = {
   openingKg: number;
   receivedKg: number;
   usedKg: number;
+  soldFreshKg: number;
   adjustmentKg: number;
   systemRemainingKg: number;
   latestPhysicalCountKg: number | null;
@@ -59,6 +60,7 @@ export type MarinationPartSummary = Omit<MarinationPartStockSummary, "latestNote
   part: ChickenPart;
   received: number;
   used: number;
+  soldFresh: number;
   adjustment: number;
   systemBalance: number;
   latestCounted: number | null;
@@ -72,6 +74,7 @@ export type MarinationTotals = {
   opening: number;
   received: number;
   used: number;
+  soldFresh: number;
   adjustment: number;
   systemBalance: number;
   latestCounted: number;
@@ -81,6 +84,7 @@ export type MarinationTotals = {
 export const movementTypeLabels: Record<MarinationMovementType, string> = {
   received: "รับเข้า",
   used: "ใช้หมัก",
+  fresh_sale: "ขายไก่สด",
   counted: "ตรวจนับจริง",
   adjustment: "ปรับยอด",
 };
@@ -93,11 +97,9 @@ export function buildAdjustmentNoteForMarination(userNote: string, targetBalance
 
 export function buildMarinationSummaries(parts: ChickenPart[], movements: MarinationStockMovement[], selectedDate: string, stockResetDate: string | null = null) {
   // Daily closed-ledger rule: opening balance for the selected date is the
-  // system closing balance from the previous business day. Rebuild it by
-  // replaying every movement in business-date order: received = +kg, used =
-  // -kg, adjustment = set system balance to the target kg, counted = display
-  // only. This keeps target-balance adjustments from being counted as an
-  // additional positive movement.
+  // system closing balance from the previous business day. Receive adds stock;
+  // use and fresh-sale reduce stock; adjustment sets the authoritative closing
+  // balance; counted is display-only.
   const summaries = parts.map<MarinationPartSummary>((part) => {
     const partMovements = movements.filter((movement) => movement.chicken_part_id === part.id);
     const selectedDateMovements = partMovements.filter((movement) => movement.movement_date === selectedDate);
@@ -105,6 +107,7 @@ export function buildMarinationSummaries(parts: ChickenPart[], movements: Marina
     const opening = replay.openingKg;
     const received = replay.receivedKg;
     const used = replay.usedKg;
+    const soldFresh = replay.soldFreshKg;
     const systemBalance = replay.systemRemainingKg;
     const adjustment = replay.adjustmentDeltaKg;
     const latestCount = selectedDateMovements.find((movement) => movement.movement_type === "counted");
@@ -121,6 +124,7 @@ export function buildMarinationSummaries(parts: ChickenPart[], movements: Marina
       openingKg: opening,
       receivedKg: received,
       usedKg: used,
+      soldFreshKg: soldFresh,
       adjustmentKg: adjustment,
       systemRemainingKg: systemBalance,
       latestPhysicalCountKg: latestCounted,
@@ -130,6 +134,7 @@ export function buildMarinationSummaries(parts: ChickenPart[], movements: Marina
       latestRecorder: latestMovement?.created_by ?? "-",
       received,
       used,
+      soldFresh,
       adjustment,
       systemBalance,
       latestCounted,
@@ -141,12 +146,13 @@ export function buildMarinationSummaries(parts: ChickenPart[], movements: Marina
     total.opening += row.openingKg;
     total.received += row.received;
     total.used += row.used;
+    total.soldFresh += row.soldFresh;
     total.adjustment += row.adjustment;
     total.systemBalance += row.systemBalance;
     total.latestCounted += row.latestCounted ?? 0;
     total.variance += row.variance ?? 0;
     return total;
-  }, { opening: 0, received: 0, used: 0, adjustment: 0, systemBalance: 0, latestCounted: 0, variance: 0 });
+  }, { opening: 0, received: 0, used: 0, soldFresh: 0, adjustment: 0, systemBalance: 0, latestCounted: 0, variance: 0 });
 
   return { summaries, totals };
 }
