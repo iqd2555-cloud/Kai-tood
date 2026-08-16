@@ -1,4 +1,4 @@
-export type NormalizedMovementKind = "receive" | "use" | "set_balance" | "stock_check" | "unknown";
+export type NormalizedMovementKind = "receive" | "use" | "fresh_sale" | "set_balance" | "stock_check" | "unknown";
 
 export type MarinationLedgerMovement = {
   id: string;
@@ -35,6 +35,7 @@ export type ReplayResult = {
   openingKg: number;
   receivedKg: number;
   usedKg: number;
+  soldFreshKg: number;
   adjustmentDeltaKg: number;
   systemRemainingKg: number;
   rowsBeforeSelectedDate: ReplayRow[];
@@ -102,6 +103,11 @@ export function replayMarinationLedgerForDate(movements: RawMarinationLedgerMove
       balance += signedEffect;
       balanceAfter = balance;
       reason = "ใช้หมัก นับเป็นลบ";
+    } else if (normalizedKind === "fresh_sale") {
+      signedEffect = -quantityKg;
+      balance += signedEffect;
+      balanceAfter = balance;
+      reason = "ขายไก่สด นับเป็นลบจากสต๊อกไก่สด";
     } else if (normalizedKind === "set_balance") {
       balance = quantityKg;
       signedEffect = balance - balanceBefore;
@@ -135,10 +141,11 @@ export function replayMarinationLedgerForDate(movements: RawMarinationLedgerMove
   const openingKg = rowsBeforeSelectedDate.length > 0 ? rowsBeforeSelectedDate[rowsBeforeSelectedDate.length - 1].balanceAfter : 0;
   const receivedKg = rowsOnSelectedDate.filter((row) => row.normalizedKind === "receive").reduce((sum, row) => sum + row.quantityKg, 0);
   const usedKg = rowsOnSelectedDate.filter((row) => row.normalizedKind === "use").reduce((sum, row) => sum + row.quantityKg, 0);
+  const soldFreshKg = rowsOnSelectedDate.filter((row) => row.normalizedKind === "fresh_sale").reduce((sum, row) => sum + row.quantityKg, 0);
   const systemRemainingKg = rowsOnSelectedDate.length > 0 ? rowsOnSelectedDate[rowsOnSelectedDate.length - 1].balanceAfter : openingKg;
-  const adjustmentDeltaKg = systemRemainingKg - openingKg - receivedKg + usedKg;
+  const adjustmentDeltaKg = systemRemainingKg - openingKg - receivedKg + usedKg + soldFreshKg;
 
-  return { selectedDate, stockResetDate: effectiveResetDate, partId: replayPartId, openingKg, receivedKg, usedKg, adjustmentDeltaKg, systemRemainingKg, rowsBeforeSelectedDate, rowsOnSelectedDate, ignoredRows, warnings: Array.from(new Set(warnings)) };
+  return { selectedDate, stockResetDate: effectiveResetDate, partId: replayPartId, openingKg, receivedKg, usedKg, soldFreshKg, adjustmentDeltaKg, systemRemainingKg, rowsBeforeSelectedDate, rowsOnSelectedDate, ignoredRows, warnings: Array.from(new Set(warnings)) };
 }
 
 export function replayMarinationLedger(movements: RawMarinationLedgerMovement[], initialBalance = 0, stockResetDate: string | null = null) {
@@ -153,7 +160,7 @@ export function replayMarinationLedger(movements: RawMarinationLedgerMovement[],
     const isResetSnapshotDayNonSnapshotMovement = Boolean(resetSnapshotMovement && movement.movementDate === stockResetDate && movement !== resetSnapshotMovement);
     if (isResetSnapshotDayNonSnapshotMovement) return state;
     if (kind === "receive") state.balance += quantity;
-    if (kind === "use") state.balance -= quantity;
+    if (kind === "use" || kind === "fresh_sale") state.balance -= quantity;
     if (kind === "set_balance" && effectiveSetBalanceMovements.has(movement)) state.balance = quantity;
     if (kind === "set_balance" && effectiveSetBalanceMovements.has(movement)) state.adjustmentEffectKg += state.balance - previousBalance;
     return state;
@@ -161,10 +168,6 @@ export function replayMarinationLedger(movements: RawMarinationLedgerMovement[],
 }
 
 export function sortMarinationLedgerMovements<T extends RawMarinationLedgerMovement | MarinationLedgerMovement>(movements: T[]) {
-  // A same-day adjustment is an authoritative closing snapshot. Replay all
-  // ordinary movements first, then apply the latest effective set_balance as
-  // the final balance for that business date. This guarantees that entering a
-  // target of 50 kg closes at 50 kg and carries 50 kg into the next day.
   return movements.slice().sort((a, b) =>
     getMovementDate(a).localeCompare(getMovementDate(b)) ||
     getMovementKindSortOrder(a) - getMovementKindSortOrder(b) ||
@@ -177,6 +180,7 @@ export function normalizeMovementKind(movementType: string | null | undefined): 
   const normalized = (movementType ?? "").trim().toLowerCase();
   if (["received", "receive", "in"].includes(normalized)) return "receive";
   if (["used", "use", "out"].includes(normalized)) return "use";
+  if (["fresh_sale", "sold_fresh", "fresh-sale"].includes(normalized)) return "fresh_sale";
   if (["adjustment", "set_balance", "set-balance"].includes(normalized)) return "set_balance";
   if (["counted", "stock_check", "stock-check"].includes(normalized)) return "stock_check";
   return "unknown";
@@ -197,26 +201,18 @@ function normalizeMovement(movement: RawMarinationLedgerMovement): MarinationLed
 
 function getEffectiveDailySetBalanceMovements(movements: MarinationLedgerMovement[]) {
   const latestByPartAndDate = new Map<string, MarinationLedgerMovement>();
-
   for (const movement of movements) {
     if (normalizeMovementKind(movement.movementType) !== "set_balance") continue;
-
     const key = `${movement.partId}::${movement.movementDate}`;
     const current = latestByPartAndDate.get(key);
-    if (!current || compareSetBalanceRecency(movement, current) > 0) {
-      latestByPartAndDate.set(key, movement);
-    }
+    if (!current || compareSetBalanceRecency(movement, current) > 0) latestByPartAndDate.set(key, movement);
   }
-
   return new Set(latestByPartAndDate.values());
 }
 
 function findEffectiveResetSnapshotMovement(movements: MarinationLedgerMovement[], effectiveSetBalanceMovements: Set<MarinationLedgerMovement>, resetDate: string, partId: string) {
   return movements.find((movement) =>
-    movement.movementDate === resetDate &&
-    movement.partId === partId &&
-    normalizeMovementKind(movement.movementType) === "set_balance" &&
-    effectiveSetBalanceMovements.has(movement)
+    movement.movementDate === resetDate && movement.partId === partId && normalizeMovementKind(movement.movementType) === "set_balance" && effectiveSetBalanceMovements.has(movement)
   ) ?? null;
 }
 
@@ -232,7 +228,7 @@ function getBucket(movementDate: string, selectedDate: string, kind: NormalizedM
 }
 
 function isSystemLedgerKind(kind: NormalizedMovementKind) {
-  return kind === "receive" || kind === "use" || kind === "set_balance";
+  return kind === "receive" || kind === "use" || kind === "fresh_sale" || kind === "set_balance";
 }
 
 function getMovementDate(movement: RawMarinationLedgerMovement | MarinationLedgerMovement) {
@@ -247,11 +243,6 @@ function getCreatedAt(movement: RawMarinationLedgerMovement | MarinationLedgerMo
 }
 function getMovementKindSortOrder(movement: RawMarinationLedgerMovement | MarinationLedgerMovement) {
   const movementType = "movementType" in movement && movement.movementType !== undefined ? movement.movementType : "movement_type" in movement ? movement.movement_type : "";
-  const kind = normalizeMovementKind(movementType);
-  // Receive/use/check records are replayed in entry order. The effective
-  // set_balance is deliberately last so it becomes the authoritative daily
-  // closing snapshot; superseded same-day adjustments remain ignored.
-  if (kind === "set_balance") return 1;
-  return 0;
+  return normalizeMovementKind(movementType) === "set_balance" ? 1 : 0;
 }
 function getId(movement: RawMarinationLedgerMovement | MarinationLedgerMovement) { return String(movement.id ?? ""); }
