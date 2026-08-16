@@ -20,7 +20,7 @@ type VoidMovementInput = {
   reason: string;
 };
 
-const STAFF_ALLOWED_MOVEMENT_TYPES = new Set<MarinationMovementType>(["received", "used", "counted"]);
+const STAFF_ALLOWED_MOVEMENT_TYPES = new Set<MarinationMovementType>(["received", "used", "fresh_sale", "counted"]);
 const OWNER_ONLY_MOVEMENT_TYPES = new Set<MarinationMovementType>(["adjustment"]);
 
 function isValidMovementType(value: string): value is MarinationMovementType {
@@ -51,7 +51,8 @@ export async function saveMarinationMovement(input: SaveMovementInput) {
   }
 
   let finalNote = note;
-  const needsLedgerRead = movementType === "received" || movementType === "used" || (movementType === "adjustment" && !movementId);
+  const stockOutMovement = movementType === "used" || movementType === "fresh_sale";
+  const needsLedgerRead = movementType === "received" || stockOutMovement || (movementType === "adjustment" && !movementId);
   if (needsLedgerRead) {
     const [{ data: previousMovements, error: readError }, { data: resetRows, error: resetError }] = await Promise.all([
       supabase
@@ -77,28 +78,26 @@ export async function saveMarinationMovement(input: SaveMovementInput) {
     if (readError) return { ok: false, message: `ตรวจสอบยอดคงเหลือไม่สำเร็จ: ${readError.message}` };
     if (resetError) return { ok: false, message: `ตรวจสอบวันตั้งต้นสต๊อกไม่สำเร็จ: ${resetError.message}` };
 
-    // When editing an existing use row, calculate available stock without the
-    // old version of that same row so changing 5 -> 10 kg is validated against
-    // the true balance before this movement.
     const balanceMovements = (previousMovements ?? []).filter((movement) => movement.id !== movementId);
     const activeResetDate = resetRows?.[0]?.reset_date ?? null;
     const currentSystemBalance = calculateMarinationSystemBalance(balanceMovements, activeResetDate);
-    const dayIsClosed = !movementId && (movementType === "received" || movementType === "used") && balanceMovements.some(
+    const dayIsClosed = !movementId && (movementType === "received" || stockOutMovement) && balanceMovements.some(
       (movement) => movement.movement_date === input.movementDate && movement.movement_type === "adjustment",
     );
 
     if (dayIsClosed) {
       return {
         ok: false,
-        message: "วันนี้มีการปรับยอดปิดจริงแล้ว จึงเพิ่มรายการรับเข้าหรือใช้หมักภายหลังไม่ได้ กรุณาให้ Owner ยกเลิกรายการปรับยอดเดิม บันทึกรายการที่ตกหล่น แล้วปรับยอดปิดใหม่",
+        message: "วันนี้มีการปรับยอดปิดจริงแล้ว จึงเพิ่มรายการรับเข้า ใช้หมัก หรือขายไก่สดภายหลังไม่ได้ กรุณาให้ Owner ยกเลิกรายการปรับยอดเดิม บันทึกรายการที่ตกหล่น แล้วปรับยอดปิดใหม่",
       };
     }
 
-    if (movementType === "used" && input.quantityKg > currentSystemBalance + 0.000001) {
+    if (stockOutMovement && input.quantityKg > currentSystemBalance + 0.000001) {
       const available = currentSystemBalance.toLocaleString("th-TH", { maximumFractionDigits: 2 });
+      const action = movementType === "fresh_sale" ? "ขายไก่สด" : "ใช้หมัก";
       return {
         ok: false,
-        message: `บันทึกใช้หมักไม่ได้: คงเหลือตามระบบ ${available} กก. แต่นำไปใช้ ${input.quantityKg.toLocaleString("th-TH", { maximumFractionDigits: 2 })} กก. กรุณาตรวจสอบรายการรับเข้า หรือให้ Owner ปรับยอดก่อน`,
+        message: `บันทึก${action}ไม่ได้: คงเหลือตามระบบ ${available} กก. แต่รายการนี้ ${input.quantityKg.toLocaleString("th-TH", { maximumFractionDigits: 2 })} กก. กรุณาตรวจสอบรายการรับเข้า หรือให้ Owner ปรับยอดก่อน`,
       };
     }
 
@@ -122,9 +121,10 @@ export async function saveMarinationMovement(input: SaveMovementInput) {
 
   if (error) return { ok: false, message: `${movementId ? "บันทึกการแก้ไข" : "บันทึก"}ไม่สำเร็จ: ${error.message}` };
   revalidatePath("/marination");
-  return { ok: true, message: movementId ? "บันทึกการแก้ไขรายการเดิมสำเร็จ" : "บันทึกข้อมูลโรงหมักไก่สำเร็จ" };
+  revalidatePath("/owner-overview");
+  const successLabel = movementType === "fresh_sale" ? "บันทึกขายไก่สดและตัดสต๊อกสำเร็จ" : movementId ? "บันทึกการแก้ไขรายการเดิมสำเร็จ" : "บันทึกข้อมูลโรงหมักไก่สำเร็จ";
+  return { ok: true, message: successLabel };
 }
-
 
 export async function voidMarinationMovement(input: VoidMovementInput) {
   const movementId = input.movementId?.trim();
@@ -162,5 +162,6 @@ export async function voidMarinationMovement(input: VoidMovementInput) {
 
   if (error) return { ok: false, message: `ยกเลิกรายการไม่สำเร็จ: ${error.message}` };
   revalidatePath("/marination");
+  revalidatePath("/owner-overview");
   return { ok: true, message: "ยกเลิกรายการผิดสำเร็จ รายการนี้จะไม่ถูกนำไปคำนวณสต๊อกแล้ว" };
 }
