@@ -1,6 +1,6 @@
 import { replayMarinationLedgerForDate, type ChickenPart, type LedgerReplayRow, type MarinationStockMovement } from "../marination.ts";
 
-export type MarinationMovementAuditBucket = "opening" | "today_receive" | "today_use" | "today_adjustment" | "ignored";
+export type MarinationMovementAuditBucket = "opening" | "today_receive" | "today_use" | "today_fresh_sale" | "today_adjustment" | "ignored";
 
 export type MarinationMovementAuditRow = {
   id: string;
@@ -23,16 +23,19 @@ export type MarinationPartCalculationAudit = {
   openingKg: number;
   receivedKg: number;
   usedKg: number;
+  soldFreshKg: number;
   adjustmentKg: number;
   systemRemainingKg: number;
   formulaText: string;
   totalReceiveBeforeDate: number;
   totalUseBeforeDate: number;
+  totalFreshSaleBeforeDate: number;
   adjustmentEffectsBeforeDate: number;
   stockCheckIgnoredBeforeDate: number;
   openingRows: MarinationMovementAuditRow[];
   todayReceiveRows: MarinationMovementAuditRow[];
   todayUseRows: MarinationMovementAuditRow[];
+  todayFreshSaleRows: MarinationMovementAuditRow[];
   todayAdjustmentRows: MarinationMovementAuditRow[];
   ignoredRows: MarinationMovementAuditRow[];
   warnings: string[];
@@ -53,10 +56,12 @@ export function buildMarinationCalculationAudit({ selectedDate, part, movements,
   const ignoredRows = replay.ignoredRows.map((row) => toAuditRow(row, part.name, "ignored"));
   const todayReceiveRows = todayRows.filter((row) => row.bucket === "today_receive");
   const todayUseRows = todayRows.filter((row) => row.bucket === "today_use");
+  const todayFreshSaleRows = todayRows.filter((row) => row.bucket === "today_fresh_sale");
   const todayAdjustmentRows = todayRows.filter((row) => row.bucket === "today_adjustment");
 
   const totalReceiveBeforeDate = sumReplayQuantity(replay.rowsBeforeSelectedDate.filter((row) => row.normalizedKind === "receive"));
   const totalUseBeforeDate = sumReplayQuantity(replay.rowsBeforeSelectedDate.filter((row) => row.normalizedKind === "use"));
+  const totalFreshSaleBeforeDate = sumReplayQuantity(replay.rowsBeforeSelectedDate.filter((row) => row.normalizedKind === "fresh_sale"));
   const adjustmentEffectsBeforeDate = sumReplaySigned(replay.rowsBeforeSelectedDate.filter((row) => row.normalizedKind === "set_balance"));
   const stockCheckIgnoredBeforeDate = sumReplayQuantity(replay.ignoredRows.filter((row) => row.movementDate < selectedDate && row.normalizedKind === "stock_check"));
 
@@ -66,16 +71,19 @@ export function buildMarinationCalculationAudit({ selectedDate, part, movements,
     openingKg: replay.openingKg,
     receivedKg: replay.receivedKg,
     usedKg: replay.usedKg,
+    soldFreshKg: replay.soldFreshKg,
     adjustmentKg: replay.adjustmentDeltaKg,
     systemRemainingKg: replay.systemRemainingKg,
-    formulaText: `${replay.openingKg} + ${replay.receivedKg} - ${replay.usedKg} + ${replay.adjustmentDeltaKg} = ${replay.systemRemainingKg}`,
+    formulaText: `${replay.openingKg} + ${replay.receivedKg} - ${replay.usedKg} - ${replay.soldFreshKg} + ${replay.adjustmentDeltaKg} = ${replay.systemRemainingKg}`,
     totalReceiveBeforeDate,
     totalUseBeforeDate,
+    totalFreshSaleBeforeDate,
     adjustmentEffectsBeforeDate,
     stockCheckIgnoredBeforeDate,
     openingRows,
     todayReceiveRows,
     todayUseRows,
+    todayFreshSaleRows,
     todayAdjustmentRows,
     ignoredRows,
     warnings: Array.from(new Set(warnings)),
@@ -90,6 +98,7 @@ function toAuditRow(row: LedgerReplayRow, partName: string, bucket: MarinationMo
 function getTodayBucket(normalizedKind: string): MarinationMovementAuditBucket {
   if (normalizedKind === "receive") return "today_receive";
   if (normalizedKind === "use") return "today_use";
+  if (normalizedKind === "fresh_sale") return "today_fresh_sale";
   if (normalizedKind === "set_balance") return "today_adjustment";
   return "ignored";
 }
