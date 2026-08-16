@@ -1,12 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
-  <title id="title">เหนียวไก่เยอะโคตร app icon</title>
-  <desc id="desc">Brand app icon using the restaurant logo.</desc>
-  <rect width="512" height="512" rx="116" fill="#111111"/>
-  <path d="M126 344c0-72 58-130 130-130s130 58 130 130v26H126v-26Z" fill="#FFC400"/>
-  <path d="M166 217c30-60 73-91 90-91s60 31 90 91c-28-13-58-20-90-20s-62 7-90 20Z" fill="#FFFFFF"/>
-  <circle cx="203" cy="317" r="15" fill="#111111"/>
-  <circle cx="256" cy="300" r="15" fill="#111111"/>
-  <circle cx="309" cy="317" r="15" fill="#111111"/>
-  <path d="M146 374h220" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round"/>
-  <path d="M188 408h136" stroke="#FFC400" stroke-width="22" stroke-linecap="round"/>
+<title id="title">เหนียวไก่ app icon</title><desc id="desc">Modern black white and red rooster brand icon.</desc>
+<rect width="512" height="512" rx="116" fill="#111111"/>
+<path d="M250 123c18-35 48-54 76-55-4 14-3 26 3 37 21-17 45-21 66-13-9 13-15 28-16 44-38-12-82-16-129-13Z" fill="#ED1C24"/>
+<path d="M173 207c28-42 72-66 123-62 65 5 116 55 123 119 8 77-51 143-128 143-66 0-121-50-128-115 20 34 55 56 96 56 61 0 111-50 111-111 0-18-4-35-12-50-19-9-40-14-62-14-47 0-90 22-123 34Z" fill="#FFFFFF"/>
+<path d="M295 181c48 0 87 39 87 87 0 48-39 87-87 87-31 0-58-16-74-41 17 9 36 14 56 14 59 0 107-43 116-99-15-29-51-48-98-48Z" fill="#111111"/>
+<path d="M165 213l-67 28 70 20c-5-17-6-32-3-48Z" fill="#FFFFFF"/>
+<circle cx="246" cy="215" r="11" fill="#FFFFFF"/>
+<path d="M201 250c-20 19-30 41-28 62 2 22 17 38 37 38 23 0 40-19 40-43 0-19-15-38-49-57Z" fill="#ED1C24"/>
+<path d="M376 175c31 32 49 75 49 121 0 80-54 148-128 168 94-5 169-83 169-178 0-49-20-94-52-126l-38 15Z" fill="#ED1C24"/>
 </svg>
