@@ -4,7 +4,7 @@ import { CUSTOMER_MASTER, parseMarinatedOrder, priceOrder } from "@/lib/marinate
 import { runMarinatedOrderRegression } from "@/lib/marinated-order-parser-regression";
 import { createMarinatedDraftOrder } from "@/app/(app)/marinated-orders/actions";
 
-type Params = { raw?: string; customer?: string; error?: string };
+type Params = { raw?: string; customer?: string; error?: string; line_inbox?: string };
 
 function formatDeliveryDate(value: string | null) {
   if (!value) return "ไม่พบวันที่ส่งในข้อความ";
@@ -64,11 +64,12 @@ export default async function MarinatedOrderTestPage({ searchParams }: { searchP
       {customer && !result.needsReview && result.deliveryDateISO && <form action={createMarinatedDraftOrder} className="mt-5 rounded-2xl border-4 border-[#FFD43B] p-4">
         <input type="hidden" name="customer_id" value={customer.id}/>
         <input type="hidden" name="raw_message" value={raw}/>
+        {params.line_inbox && <input type="hidden" name="line_inbox_id" value={params.line_inbox}/>}
         <p className="font-black">ตรวจรายการครบแล้วใช่หรือไม่?</p>
         <p className="mt-1 text-sm font-bold text-black/55">การกดปุ่มนี้จะบันทึกเป็น Draft Order เท่านั้น ยังไม่ตัดสต๊อก ไม่บันทึก Cash Flow และไม่สร้างใบจัด–ส่งสินค้า</p>
         <button className="mt-4 min-h-14 w-full rounded-2xl bg-[#E60012] px-5 text-lg font-black text-white">บันทึกเป็น Draft Order</button>
       </form>}
-      <p className="mt-4 text-sm font-bold text-black/50">ยังไม่เชื่อม LINE Automation และไม่มีผลต่อสต๊อก Cash Flow หรือโรงหมักจนกว่าจะพัฒนาขั้นเชื่อมระบบต่อไป</p>
+      <p className="mt-4 text-sm font-bold text-black/50">LINE Automation จะรับออเดอร์เฉพาะจากกลุ่มที่เชิญ OA และสร้าง Draft เท่านั้น ไม่มีผลต่อสต๊อก Cash Flow หรือโรงหมักจนกว่า Owner จะยืนยัน</p>
     </section>}
   </div>;
 }

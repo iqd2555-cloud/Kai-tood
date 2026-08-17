@@ -1,6 +1,7 @@
 import { handleLineWebhookRequest } from "@/lib/line-webhook";
 import { handleMarinatedChickenGroupRequest } from "@/lib/line-marinated-group";
 import { handleFuelExpenseRequest } from "@/lib/line-fuel-interceptor";
+import { handleLineMarinatedOrderIntakeRequest } from "@/lib/line-marinated-order-intake";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,15 @@ export async function POST(request: Request) {
   const fuelResult = await handleFuelExpenseRequest(request.clone());
   if (fuelResult.handled) {
     return Response.json({ ok: true, code: "ok" }, { status: fuelResult.status ?? 200 });
+  }
+
+  const orderResult = await handleLineMarinatedOrderIntakeRequest(request.clone());
+  if (orderResult.handled) {
+    const status = orderResult.status ?? 200;
+    return Response.json(
+      { ok: status < 400, code: status < 400 ? "ok" : "processing_error" },
+      { status },
+    );
   }
 
   const result = await handleLineWebhookRequest(request);
