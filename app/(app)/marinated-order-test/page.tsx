@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { getCurrentProfile, isOwner } from "@/lib/auth";
 import { CUSTOMER_MASTER, parseMarinatedOrder, priceOrder } from "@/lib/marinated-order-parser";
 import { runMarinatedOrderRegression } from "@/lib/marinated-order-parser-regression";
+import { createMarinatedDraftOrder } from "@/app/(app)/marinated-orders/actions";
 
-type Params = { raw?: string; customer?: string };
+type Params = { raw?: string; customer?: string; error?: string };
 
 function formatDeliveryDate(value: string | null) {
   if (!value) return "ไม่พบวันที่ส่งในข้อความ";
@@ -24,10 +25,12 @@ export default async function MarinatedOrderTestPage({ searchParams }: { searchP
 
   return <div className="space-y-5">
     <section className="rounded-[2rem] bg-[#111] p-5 text-white shadow-xl">
-      <p className="text-sm font-black text-[#E60012]">TEST MODE · ไม่บันทึกสต๊อก/ออเดอร์จริง</p>
-      <h1 className="mt-2 text-3xl font-black">ทดสอบอ่านออเดอร์ไก่หมัก</h1>
-      <p className="mt-2 text-white/70">วางข้อความจริงจาก LINE เพื่อทดสอบการตีความก่อนเชื่อม Automation</p>
+      <p className="text-sm font-black text-[#E60012]">ORDER PARSER · OWNER CONTROL</p>
+      <h1 className="mt-2 text-3xl font-black">รับออเดอร์ไก่หมัก</h1>
+      <p className="mt-2 text-white/70">วางข้อความจาก LINE ตรวจผล แล้วบันทึกเป็น Draft Order เพื่อรอยืนยัน</p>
     </section>
+
+    {params.error && <p className="rounded-2xl bg-red-50 p-4 font-black text-red-800">{params.error}</p>}
 
     <section className="rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between gap-3">
@@ -56,8 +59,16 @@ export default async function MarinatedOrderTestPage({ searchParams }: { searchP
       <div className="mt-4 rounded-2xl bg-[#111] p-4 text-white"><div className="flex justify-between text-xl font-black"><span>รวม</span><span>{result.totalKg} กก.</span></div>{pricing?.pricePerKg && <div className="mt-2 flex justify-between font-bold text-white/80"><span>{pricing.pricePerKg} บาท/กก.</span><span>{pricing.total?.toLocaleString("th-TH")} บาท</span></div>}</div>
       {customer?.shippingInstruction && <p className="mt-4 rounded-2xl bg-red-50 p-4 font-black text-red-700">ขนส่ง/จุดส่ง: {customer.shippingInstruction}</p>}
       {pricing?.warning && <p className="mt-3 rounded-2xl bg-amber-50 p-4 font-bold text-amber-900">⚠️ {pricing.warning}</p>}
+      {result.errors.map((message, index) => <p key={`error-${index}`} className="mt-3 rounded-2xl bg-red-50 p-4 font-black text-red-800">⛔ {message}</p>)}
       {result.warnings.map((w, i) => <p key={i} className="mt-3 rounded-2xl bg-amber-50 p-4 font-bold text-amber-900">⚠️ {w}</p>)}
-      <p className="mt-4 text-sm font-bold text-black/50">หน้านี้เป็น Sandbox: ไม่มี INSERT/UPDATE ไปยังตารางออเดอร์ สต๊อก Cash Flow หรือโรงหมัก</p>
+      {customer && !result.needsReview && result.deliveryDateISO && <form action={createMarinatedDraftOrder} className="mt-5 rounded-2xl border-4 border-[#FFD43B] p-4">
+        <input type="hidden" name="customer_id" value={customer.id}/>
+        <input type="hidden" name="raw_message" value={raw}/>
+        <p className="font-black">ตรวจรายการครบแล้วใช่หรือไม่?</p>
+        <p className="mt-1 text-sm font-bold text-black/55">การกดปุ่มนี้จะบันทึกเป็น Draft Order เท่านั้น ยังไม่ตัดสต๊อก ไม่บันทึก Cash Flow และไม่สร้างใบจัด–ส่งสินค้า</p>
+        <button className="mt-4 min-h-14 w-full rounded-2xl bg-[#E60012] px-5 text-lg font-black text-white">บันทึกเป็น Draft Order</button>
+      </form>}
+      <p className="mt-4 text-sm font-bold text-black/50">ยังไม่เชื่อม LINE Automation และไม่มีผลต่อสต๊อก Cash Flow หรือโรงหมักจนกว่าจะพัฒนาขั้นเชื่อมระบบต่อไป</p>
     </section>}
   </div>;
 }

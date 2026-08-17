@@ -43,6 +43,7 @@ export type ParseResult = {
   items: ParsedItem[];
   totalKg: number;
   deliveryDateISO: string | null;
+  errors: string[];
   warnings: string[];
   needsReview: boolean;
 };
@@ -89,6 +90,7 @@ function parseThaiDeliveryDate(text: string): string | null {
 export function parseMarinatedOrder(raw: string, customer?: CustomerMaster): ParseResult {
   const text = normalize(raw);
   const items: ParsedItem[] = [];
+  const errors: string[] = [];
   const warnings: string[] = [];
   const usedRanges: Array<[number, number]> = [];
 
@@ -106,7 +108,7 @@ export function parseMarinatedOrder(raw: string, customer?: CustomerMaster): Par
       const kg = Number(match[1]);
       if (!Number.isFinite(kg) || kg <= 0) continue;
       if (entry.product === "drumstick" && !customer?.allowDrumstick) {
-        warnings.push("พบรายการน่อง แต่ลูกค้ารายนี้ไม่ได้รับสิทธิ์สั่งน่อง");
+        errors.push("พบรายการน่อง แต่ลูกค้ารายนี้ไม่ได้รับสิทธิ์สั่งน่อง");
         continue;
       }
       items.push({ product: entry.product, name: entry.name, kg, source: match[0] });
@@ -127,7 +129,7 @@ export function parseMarinatedOrder(raw: string, customer?: CustomerMaster): Par
       items.push({ product: "original", name: MARINATED_PRODUCTS.original.name, kg, source: match[0].trim() });
       usedRanges.push([start, end]);
     } else {
-      warnings.push("พบคำว่า ‘ไก่’ พร้อมจำนวน แต่ยังไม่ทราบลูกค้า จึงไม่ตีความอัตโนมัติ");
+      errors.push("พบคำว่า ‘ไก่’ พร้อมจำนวน แต่ยังไม่ทราบลูกค้า จึงไม่ตีความอัตโนมัติ");
     }
   }
 
@@ -141,6 +143,13 @@ export function parseMarinatedOrder(raw: string, customer?: CustomerMaster): Par
   const totalKg = finalItems.reduce((sum, item) => sum + item.kg, 0);
   const deliveryDateISO = parseThaiDeliveryDate(text);
 
+  if (!deliveryDateISO) {
+    errors.push("ไม่พบวันที่จัดส่ง จึงยังบันทึกเป็น Draft Order ไม่ได้");
+  }
+  if (finalItems.length === 0) {
+    errors.push("ไม่พบรายการสินค้าที่สามารถบันทึกเป็นออเดอร์ได้");
+  }
+
   if (totalKg > 0 && totalKg < FREE_SHIPPING_MIN_KG && !customer?.ownDelivery) {
     warnings.push(`ยอดรวม ${totalKg} กก. ต่ำกว่าเกณฑ์ส่งฟรี ${FREE_SHIPPING_MIN_KG} กก.`);
   }
@@ -153,8 +162,9 @@ export function parseMarinatedOrder(raw: string, customer?: CustomerMaster): Par
     items: finalItems,
     totalKg,
     deliveryDateISO,
+    errors,
     warnings,
-    needsReview: warnings.length > 0 || finalItems.length === 0,
+    needsReview: errors.length > 0,
   };
 }
 
