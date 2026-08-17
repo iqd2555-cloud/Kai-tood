@@ -77,8 +77,8 @@ export default async function MarinatedOrderDetailPage({
       .returns<HistoryItem[]>(),
   ]);
 
-  if (!orderResult.data) notFound();
-  const order = orderResult.data;
+  const order = orderResult.data as OrderDetail | null;
+  if (!order) notFound();
   const history = historyResult.data ?? [];
   const nextAction = NEXT_ACTION[order.status];
 
