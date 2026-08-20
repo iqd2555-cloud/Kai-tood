@@ -17,7 +17,7 @@ function sumReports(reports: DailyReport[], field: keyof Pick<DailyReport, "tota
 
 export default async function DashboardPage() {
   const profile = await getCurrentProfile();
-  if (isOwner(profile)) redirect("/owner-overview");
+  if (isOwner(profile)) redirect("/ceo-today");
   if (isMarinationOnlyStaff(profile)) redirect("/marination");
   const supabase = await createSupabaseServerClient();
   if (!supabase) redirect("/login?setup=supabase");

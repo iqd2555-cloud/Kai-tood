@@ -203,6 +203,7 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
   revalidatePath("/orders");
   revalidatePath("/reports");
   revalidatePath("/owner-dashboard");
+  revalidatePath("/ceo-today");
   revalidatePath("/cash-flow");
   if (ceoRefreshFailed) {
     return {
