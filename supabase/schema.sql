@@ -32,6 +32,15 @@ create table public.daily_reports (
   cash_sales numeric not null default 0 check (cash_sales >= 0),
   transfer_sales numeric not null default 0 check (transfer_sales >= 0),
   total_sales numeric generated always as (cash_sales + transfer_sales) stored,
+  packs_sold integer check (packs_sold is null or packs_sold >= 0),
+  packs_sold_source text check (
+    packs_sold_source is null
+    or packs_sold_source in ('manual_report', 'pos_import', 'verified_adjustment')
+  ),
+  constraint daily_reports_packs_source_consistency_check check (
+    (packs_sold is null and packs_sold_source is null)
+    or packs_sold is not null
+  ),
   opening_original_chicken numeric not null default 0 check (opening_original_chicken >= 0),
   opening_spicy_chicken numeric not null default 0 check (opening_spicy_chicken >= 0),
   opening_ground_chicken numeric not null default 0 check (opening_ground_chicken >= 0),

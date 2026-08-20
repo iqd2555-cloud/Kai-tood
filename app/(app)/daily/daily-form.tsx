@@ -376,6 +376,28 @@ export function DailyForm({
               onChange={handleTransferSalesChange}
             />
           </label>
+          <label className="block sm:col-span-2">
+            <span className="mb-2 block text-base font-black text-black">
+              จำนวนห่อขายจริง
+            </span>
+            <input
+              className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-xl font-bold shadow-sm"
+              type="number"
+              inputMode="numeric"
+              min="0"
+              step="1"
+              name="packs_sold"
+              defaultValue={existingReport?.packs_sold ?? ""}
+              required
+              aria-describedby="packs-sold-help"
+            />
+            <span
+              id="packs-sold-help"
+              className="mt-2 block text-sm font-bold text-black/50"
+            >
+              กรอกจำนวนห่อที่ขายจริง ห้ามประมาณจากยอดขายหรือจำนวนบรรจุภัณฑ์
+            </span>
+          </label>
         </div>
         <div className="mt-4 rounded-3xl bg-[#E60012] p-5 text-center text-white">
           <div className="text-sm font-black opacity-70">ยอดรวมอัตโนมัติ</div>
