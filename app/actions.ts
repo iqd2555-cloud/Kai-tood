@@ -19,6 +19,12 @@ const dailyReportSchema = z.object({
   branch_name: z.string().optional().default(""),
   cash_sales: z.coerce.number().min(0),
   transfer_sales: z.coerce.number().min(0),
+  packs_sold: z
+    .string()
+    .trim()
+    .min(1, "กรุณากรอกจำนวนห่อขายจริง")
+    .regex(/^\d+$/, "จำนวนห่อต้องเป็นจำนวนเต็มตั้งแต่ 0 ขึ้นไป")
+    .transform(Number),
   opening_original_chicken: z.coerce.number().min(0),
   opening_spicy_chicken: z.coerce.number().min(0),
   opening_ground_chicken: z.coerce.number().min(0),
@@ -142,6 +148,7 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
       received_chicken: totalReceivedChicken,
       remaining_chicken: payload.remaining_original_chicken,
       branch_name: canonicalBranchName,
+      packs_sold_source: "manual_report",
       requested_items: allRequestedItems,
       order_other_items: otherItems.success ? otherItems.data.filter((item) => item.name.trim() && item.amount > 0) : [],
       submitted_by: profile.id,
@@ -162,9 +169,32 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
     return { ok: false, message: error.message };
   }
 
+  let ceoRefreshFailed = false;
+
   if (savedReport?.id) {
     const cashFlowResult = await syncSalesReportToCashFlow(savedReport.id, supabase, profile.id);
     if (!cashFlowResult.ok) return { ok: false, message: `บันทึกยอดขายสำเร็จ แต่ซิงก์ Cash Flow ไม่สำเร็จ: ${cashFlowResult.message}` };
+
+    const admin = createSupabaseAdminClient();
+    if (!admin) {
+      console.error("saveDailyReport_ceo_refresh_admin_unavailable", {
+        reportId: savedReport.id,
+        reportDate: savedReport.report_date,
+      });
+      ceoRefreshFailed = true;
+    } else {
+      const { error: ceoRefreshError } = await admin.rpc("refresh_ceo_daily", {
+        p_business_date: savedReport.report_date,
+      });
+      if (ceoRefreshError) {
+        console.error("saveDailyReport_ceo_refresh_failed", {
+          reportId: savedReport.id,
+          reportDate: savedReport.report_date,
+          error: ceoRefreshError,
+        });
+        ceoRefreshFailed = true;
+      }
+    }
   }
 
   revalidatePath("/dashboard");
@@ -174,6 +204,12 @@ export async function saveDailyReport(_: unknown, formData: FormData) {
   revalidatePath("/reports");
   revalidatePath("/owner-dashboard");
   revalidatePath("/cash-flow");
+  if (ceoRefreshFailed) {
+    return {
+      ok: false,
+      message: "บันทึกรายงานสำเร็จ แต่ยังอัปเดต CEO Snapshot ไม่สำเร็จ",
+    };
+  }
   return { ok: true, message: "บันทึกข้อมูลเรียบร้อย" };
 }
 

@@ -28,6 +28,12 @@ export type DailyReport = {
   cash_sales: number;
   transfer_sales: number;
   total_sales: number;
+  packs_sold: number | null;
+  packs_sold_source:
+    | "manual_report"
+    | "pos_import"
+    | "verified_adjustment"
+    | null;
   opening_original_chicken: number;
   opening_spicy_chicken: number;
   opening_ground_chicken: number;
