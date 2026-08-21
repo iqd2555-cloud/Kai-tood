@@ -378,6 +378,23 @@ function normalizeCashFlowDate(value: unknown, eventAt: string) {
   return parsedCashFlowDate(value) ?? thailandDate(eventAt);
 }
 
+const MAX_RECEIPT_DATE_DISTANCE_DAYS = 31;
+
+export function normalizeReceiptDate(value: unknown, eventAt: string) {
+  const eventDate = thailandDate(eventAt);
+  const parsedDate = parsedCashFlowDate(value);
+  if (!parsedDate) return eventDate;
+
+  const parsedTime = Date.parse(`${parsedDate}T00:00:00.000Z`);
+  const eventTime = Date.parse(`${eventDate}T00:00:00.000Z`);
+  const distanceDays = Math.abs(parsedTime - eventTime) / 86_400_000;
+
+  // Receipts normally arrive near the accounting date. A larger gap is much
+  // more likely to be an OCR month/year error (for example Jan instead of Aug)
+  // than an intentional backdated entry, so use the LINE-received date.
+  return distanceDays > MAX_RECEIPT_DATE_DISTANCE_DAYS ? eventDate : parsedDate;
+}
+
 function isPaidPurchaseDocument(analysis: ReceiptAnalysis) {
   return analysis.documentType === "invoice_receipt";
 }
@@ -645,7 +662,7 @@ export async function analyzeReceiptImage(
         content: [
           {
             type: "text",
-            text: `อ่านเอกสารทางการเงินภาษาไทย แยก merchant, transactionDate, amount, paymentMethod, category, confidence, documentType, memo, recipientReference, senderName, recipientName, senderReference และ transactionReference. สำหรับสลิปโอนเงิน/จ่ายบิล: merchant และ recipientName ต้องเป็นชื่อผู้รับใต้คำว่า "ไปยัง"; senderName ต้องเป็นชื่อผู้โอนใต้คำว่า "จาก"; คัดลอกเลขบัญชีผู้รับลง recipientReference เลขบัญชีผู้โอนลง senderReference และเลขที่รายการ/รหัสอ้างอิงลง transactionReference โดยเก็บส่วนที่อ่านได้แม้มี x หรือ * ปิดบัง. ถ้ามี "โอนเงินสำเร็จ" หรือ "จ่ายบิลสำเร็จ" ให้ paymentMethod เป็น "โอนเงิน". คัดลอก "บันทึกช่วยจำ" ลง memo และใช้ memo เป็นหลักในการเลือกหมวดค่าใช้จ่าย เช่น ค่าแรง/ค่าจ้างต้องเป็น "ค่าแรง". สำหรับใบเสร็จซื้อไก่ เนื้อไก่ หนังไก่ หรือเครื่องในไก่ให้ category เป็นไก่สด. สลิปโอนเงินสำเร็จที่ผู้รับคือ บจก. เหนียวไก่เยอะโคตร อินสไปร์ เป็นรายรับเสมอ; ผู้โอนชื่อ ณัชชรีย์ หรือบัญชีผู้โอนลงท้าย 990-1 ให้เป็นรายรับขายไก่สด ส่วนผู้โอนอื่นให้เป็นรายรับขายไก่หมัก และต้องอ่านชื่อผู้โอนให้ครบที่สุด. หากไม่เห็นวันที่ให้ใช้ ${thailandDate(eventAt)} และตั้ง confidence ต่ำกว่า ${RECEIPT_CONFIDENCE_THRESHOLD}`,
+            text: `อ่านเอกสารทางการเงินภาษาไทย แยก merchant, transactionDate, amount, paymentMethod, category, confidence, documentType, memo, recipientReference, senderName, recipientName, senderReference และ transactionReference. สำหรับสลิปโอนเงิน/จ่ายบิล: merchant และ recipientName ต้องเป็นชื่อผู้รับใต้คำว่า "ไปยัง"; senderName ต้องเป็นชื่อผู้โอนใต้คำว่า "จาก"; คัดลอกเลขบัญชีผู้รับลง recipientReference เลขบัญชีผู้โอนลง senderReference และเลขที่รายการ/รหัสอ้างอิงลง transactionReference โดยเก็บส่วนที่อ่านได้แม้มี x หรือ * ปิดบัง. ถ้ามี "โอนเงินสำเร็จ" หรือ "จ่ายบิลสำเร็จ" ให้ paymentMethod เป็น "โอนเงิน". คัดลอก "บันทึกช่วยจำ" ลง memo และใช้ memo เป็นหลักในการเลือกหมวดค่าใช้จ่าย เช่น ค่าแรง/ค่าจ้างต้องเป็น "ค่าแรง". สำหรับใบเสร็จซื้อไก่ เนื้อไก่ หนังไก่ หรือเครื่องในไก่ให้ category เป็นไก่สด. สลิปโอนเงินสำเร็จที่ผู้รับคือ บจก. เหนียวไก่เยอะโคตร อินสไปร์ เป็นรายรับเสมอ; ผู้โอนชื่อ ณัชชรีย์ หรือบัญชีผู้โอนลงท้าย 990-1 ให้เป็นรายรับขายไก่สด ส่วนผู้โอนอื่นให้เป็นรายรับขายไก่หมัก และต้องอ่านชื่อผู้โอนให้ครบที่สุด. วันที่รับเอกสารทาง LINE คือ ${thailandDate(eventAt)}; ตรวจเดือนและปีอย่างระมัดระวัง. หากไม่เห็นวันที่ให้ใช้วันที่รับเอกสารและตั้ง confidence ต่ำกว่า ${RECEIPT_CONFIDENCE_THRESHOLD}`,
           },
           {
             type: "image_url",
@@ -670,7 +687,7 @@ export async function analyzeReceiptImage(
   const merchant = String(parsed.merchant ?? "").trim();
   const paymentMethod = String(parsed.paymentMethod ?? "").trim();
   const parsedTransactionDate = parsedCashFlowDate(parsed.transactionDate);
-  const transactionDate = normalizeCashFlowDate(parsed.transactionDate, eventAt);
+  const transactionDate = normalizeReceiptDate(parsed.transactionDate, eventAt);
   const memo = String(parsed.memo ?? "").trim();
   const recipientReference = String(parsed.recipientReference ?? "").trim();
   const senderName = String(parsed.senderName ?? "").trim();
