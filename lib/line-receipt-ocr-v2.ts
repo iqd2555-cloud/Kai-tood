@@ -54,15 +54,6 @@ function clamp(value: unknown) {
   return Number.isFinite(number) ? Math.max(0, Math.min(1, number)) : 0;
 }
 
-function baselineInvoiceIsOperationallyComplete(baseline: Awaited<ReturnType<typeof analyzeReceiptImage>>) {
-  return baseline.documentType === "invoice_receipt"
-    && baseline.amount > 0
-    && isIsoDate(baseline.transactionDate)
-    && baseline.merchant !== "ไม่ทราบชื่อร้าน"
-    && baseline.category !== "misc_expense"
-    && EXPENSE_CATEGORIES.has(baseline.category);
-}
-
 function amountConflict(first: number, second: number) {
   if (!(first > 0 && second > 0)) return false;
   const difference = Math.abs(first - second);
@@ -192,18 +183,6 @@ export async function analyzeReceiptImageV2(
   fetchFn: typeof fetch = fetch,
 ) {
   const baseline = await analyzeReceiptImage(image, eventAt, fetchFn);
-
-  // The old flow treated an otherwise-complete invoice as incomplete when the
-  // document did not print a payment method. For purchase documents this field
-  // is optional; the accounting-critical fields are vendor/date/amount/category.
-  if (baselineInvoiceIsOperationallyComplete(baseline)) {
-    return {
-      ...baseline,
-      confidence: Math.max(baseline.confidence, 0.95),
-      paymentMethod: baseline.paymentMethod || "ไม่ระบุ",
-    };
-  }
-
   if (baseline.confidence >= AUTO_SAVE_CONFIDENCE) return baseline;
 
   let strong: StrongExtraction;
