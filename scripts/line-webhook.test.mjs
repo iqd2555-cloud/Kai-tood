@@ -257,6 +257,44 @@ assert.equal(verifyLineSignature(body, null, secret), false, "missing signature 
   assert.equal(requestBody.messages[0].content[1].image_url.detail, "high", "receipt OCR requests high image detail");
 }
 
+{
+  const fetchFn = async () => Response.json({
+    choices: [{
+      finish_reason: "stop",
+      message: {
+        content: JSON.stringify({
+          merchant: "KVS FRESH PRODUCTS CO., LTD.",
+          transactionDate: "2026-01-21",
+          amount: 9180,
+          paymentMethod: "ไม่ระบุ",
+          category: "ไก่สด",
+          confidence: 0.99,
+          documentType: "invoice_receipt",
+          memo: "ซื้อไก่สด",
+          recipientReference: "",
+          senderName: "",
+          recipientName: "",
+          senderReference: "",
+          transactionReference: "",
+        }),
+      },
+    }],
+  });
+  const analysis = await withEnv(
+    { OPENAI_API_KEY: "test-openai-key" },
+    () => analyzeReceiptImage(
+      { contentType: "image/jpeg", data: Buffer.from("fake-kvs-receipt") },
+      "2026-08-21T05:00:00.000Z",
+      fetchFn,
+    ),
+  );
+
+  assert.equal(analysis.transactionDate, "2026-08-21", "an implausibly old OCR date falls back to the Thailand LINE-received date");
+  assert.equal(analysis.amount, 9180);
+  assert.equal(analysis.category, "chicken_purchase");
+  assert.ok(analysis.confidence >= 0.9, "a complete paid invoice remains eligible for automatic Cash Flow recording");
+}
+
 for (const [index, example] of companyIncomeExamples.entries()) {
   const transactionReference = example.transactionReference ?? `income-slip-reference-${index + 1}`;
   const expectedCategory = example.expectedCategory ?? "marinated_chicken_sales";
