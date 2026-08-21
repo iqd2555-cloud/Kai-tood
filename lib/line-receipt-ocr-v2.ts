@@ -1,4 +1,4 @@
-import { analyzeReceiptImage } from "./line-webhook";
+import { analyzeReceiptImage, normalizeReceiptDate } from "./line-webhook";
 
 const AUTO_SAVE_CONFIDENCE = 0.9;
 const REVIEW_CONFIDENCE = 0.84;
@@ -208,7 +208,7 @@ export async function analyzeReceiptImageV2(
 
   const amount = amountConfidence >= 0.9 && strongAmount > 0 ? strongAmount : baseline.amount;
   const transactionDate = dateConfidence >= 0.85 && isIsoDate(strong.transactionDate)
-    ? strong.transactionDate
+    ? normalizeReceiptDate(strong.transactionDate, eventAt)
     : baseline.transactionDate;
   const merchant = merchantConfidence >= 0.85 && strong.merchant.trim()
     ? strong.merchant.trim()
