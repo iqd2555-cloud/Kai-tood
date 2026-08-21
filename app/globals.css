@@ -63,3 +63,12 @@ input,select,textarea { font-family: var(--font-body); line-height: 1.65; }
 @keyframes cta-pulse { 0%,100%{box-shadow:0 10px 22px rgba(244,123,0,.18);opacity:.95;transform:scale(1)} 50%{box-shadow:0 12px 28px rgba(246,196,0,.32);opacity:1;transform:scale(1.025)} }
 .cta-pulse { animation: cta-pulse 2.8s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { html{scroll-behavior:auto}.cta-pulse{animation:none} }
+
+/* Keep white Cash Flow sync controls readable inside the dark header, including Android/WebView date/select rendering. */
+section[class~="bg-[#111]"] input[type="date"],
+section[class~="bg-[#111]"] select,
+section[class~="bg-[#111]"] select option {
+  color: #171717;
+  -webkit-text-fill-color: #171717;
+  color-scheme: light;
+}
