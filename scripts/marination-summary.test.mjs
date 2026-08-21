@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { buildMarinationSummaries, calculateMarinationClosingBalanceOnDate, calculateMarinationOpeningBalance, calculateMarinationSystemBalance } from "../lib/marination.ts";
+import { buildMarinationSummaries, calculateMarinationAverageDailyOutflow, calculateMarinationClosingBalanceOnDate, calculateMarinationOpeningBalance, calculateMarinationStockCoverage, calculateMarinationSystemBalance } from "../lib/marination.ts";
 import { buildMarinationCalculationAudit } from "../lib/marination/stock-audit.ts";
 
 const parts = [
@@ -50,7 +50,7 @@ assert.equal(blScrapAudit.receivedKg, 100);
 assert.equal(blScrapAudit.usedKg, 80);
 assert.equal(blScrapAudit.systemRemainingKg, 70);
 assert.equal(blScrapAudit.adjustmentKg, 0);
-assert.equal(blScrapAudit.formulaText, "50 + 100 - 80 + 0 = 70");
+assert.equal(blScrapAudit.formulaText, "50 + 100 - 80 - 0 + 0 = 70");
 assert.equal(blScrap.adjustmentKg, 0);
 assert.equal(blScrapAudit.totalReceiveBeforeDate, 200);
 assert.equal(blScrapAudit.totalUseBeforeDate, 90);
@@ -72,7 +72,7 @@ assert.equal(outOfEntryOrderAudit.receivedKg, 100);
 assert.equal(outOfEntryOrderAudit.usedKg, 80);
 assert.equal(outOfEntryOrderAudit.adjustmentKg, 0);
 assert.equal(outOfEntryOrderAudit.systemRemainingKg, 70);
-assert.equal(outOfEntryOrderAudit.formulaText, "50 + 100 - 80 + 0 = 70");
+assert.equal(outOfEntryOrderAudit.formulaText, "50 + 100 - 80 - 0 + 0 = 70");
 
 const adjustmentClosesAtExactTarget = [
   movement("target-opening", "2026-07-10", "bl-scrap", "received", 100),
@@ -124,6 +124,26 @@ assert.equal(totals.systemBalance, 130);
 assert.equal(sumOpeningByPart(movements.filter((item) => item.movement_date < "2026-07-02")), 235);
 assert.equal(sumClosingByPart(movements, "2026-07-01"), totals.opening, "2026-07-02 opening must equal 2026-07-01 system closing after received, used, and adjustments");
 assert.equal(sumSystemBalanceByPart(movements), totals.systemBalance);
+
+const outflowMovements = [
+  movement("outflow-used-1", "2026-07-01", "bl-scrap", "used", 80),
+  movement("outflow-sale-1", "2026-07-01", "skin", "fresh_sale", 20),
+  movement("outflow-used-2", "2026-07-02", "bl-scrap", "used", 60),
+  movement("outflow-received", "2026-07-02", "bl-scrap", "received", 500),
+];
+assert.equal(
+  calculateMarinationAverageDailyOutflow(outflowMovements, "2026-07-01", "2026-07-07"),
+  80,
+  "average outflow must combine marination usage and fresh chicken sales, while excluding receipts",
+);
+assert.deepEqual(calculateMarinationStockCoverage(320, 90), {
+  days: 320 / 90,
+  label: "ควรเตรียมสั่งซื้อ",
+  status: "prepare",
+});
+assert.equal(calculateMarinationStockCoverage(89, 90).status, "critical");
+assert.equal(calculateMarinationStockCoverage(180, 90).status, "urgent");
+assert.equal(calculateMarinationStockCoverage(540, 90).status, "normal");
 
 const stockResetMovements = [
   movement("old-receive", "2026-07-01", "bl-scrap", "received", 30, "ข้อมูลเก่าก่อน reset ต้องไม่ถูกนำมาคิด"),

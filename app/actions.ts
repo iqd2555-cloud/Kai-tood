@@ -23,7 +23,7 @@ const dailyReportSchema = z.object({
     .string()
     .trim()
     .min(1, "กรุณากรอกจำนวนห่อขายจริง")
-    .regex(/^\d+$/, "จำนวนห่อต้องเป็นจำนวนเต็มตั้งแต่ 0 ขึ้นไป")
+    .regex(/^[1-9]\d*$/, "จำนวนห่อต้องเป็นจำนวนเต็มมากกว่า 0")
     .transform(Number),
   opening_original_chicken: z.coerce.number().min(0),
   opening_spicy_chicken: z.coerce.number().min(0),

@@ -84,6 +84,17 @@ assert.equal(summary.cashIn, 11000);
 assert.equal(summary.cashOut, 1500);
 assert.equal(summary.cashVariance, null, "missing cash variance must stay unknown, not zero");
 assert.equal(summary.branches[1].branchCode, "BR002");
+
+const invalidZeroPacks = buildCeoTodaySummary(
+  [{ ...base, packs_sold: 0, total_sales: 1000 }],
+  null,
+);
+assert.ok(invalidZeroPacks);
+assert.equal(invalidZeroPacks.packsReportedBranches, 0);
+assert.equal(invalidZeroPacks.branchesAwaitingPacks, 1);
+assert.equal(invalidZeroPacks.chickenYield, null);
+assert.equal(invalidZeroPacks.branches[0].packsSold, null);
+
 assert.equal(buildCeoTodaySummary([], null), null);
 
 console.log("ceo-today summary tests passed");

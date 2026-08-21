@@ -170,3 +170,44 @@ export function calculateMarinationClosingBalanceOnDate(movements: LedgerMovemen
 export function calculateMarinationSystemBalance(movements: LedgerMovement[], stockResetDate: string | null = null) {
   return replayMarinationLedger(movements, 0, stockResetDate).balance;
 }
+
+export function calculateMarinationAverageDailyOutflow(
+  movements: MarinationStockMovement[],
+  fromDate: string,
+  toDate: string,
+) {
+  const outflowByDate = new Map<string, number>();
+
+  for (const movement of movements) {
+    if (
+      movement.is_voided ||
+      movement.movement_date < fromDate ||
+      movement.movement_date > toDate ||
+      !["used", "fresh_sale"].includes(movement.movement_type)
+    ) continue;
+
+    outflowByDate.set(
+      movement.movement_date,
+      (outflowByDate.get(movement.movement_date) ?? 0) + Number(movement.quantity_kg ?? 0),
+    );
+  }
+
+  const activeDays = [...outflowByDate.values()].filter((quantityKg) => quantityKg > 0);
+  return activeDays.length
+    ? activeDays.reduce((total, quantityKg) => total + quantityKg, 0) / activeDays.length
+    : 0;
+}
+
+export type MarinationStockCoverageStatus = "normal" | "prepare" | "urgent" | "critical" | "unknown";
+
+export function calculateMarinationStockCoverage(stockKg: number, averageDailyOutflowKg: number) {
+  if (averageDailyOutflowKg <= 0) {
+    return { days: null, label: "รอข้อมูลการใช้", status: "unknown" as MarinationStockCoverageStatus };
+  }
+
+  const days = Math.max(0, stockKg) / averageDailyOutflowKg;
+  if (days < 1) return { days, label: "วิกฤต — ต้องสั่งทันที", status: "critical" as MarinationStockCoverageStatus };
+  if (days < 3) return { days, label: "ต้องเร่งสั่งซื้อ", status: "urgent" as MarinationStockCoverageStatus };
+  if (days <= 5) return { days, label: "ควรเตรียมสั่งซื้อ", status: "prepare" as MarinationStockCoverageStatus };
+  return { days, label: "สต๊อกเพียงพอ", status: "normal" as MarinationStockCoverageStatus };
+}
