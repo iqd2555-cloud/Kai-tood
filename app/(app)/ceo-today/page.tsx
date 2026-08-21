@@ -9,6 +9,14 @@ import {
 } from "@/lib/ceo-today";
 import { formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib/format";
 import { createKpiSupabaseAdminClient } from "@/lib/kpi-supabase";
+import {
+  buildMarinationSummaries,
+  calculateMarinationAverageDailyOutflow,
+  calculateMarinationStockCoverage,
+  type ChickenPart,
+  type MarinationStockMovement,
+  type MarinationStockReset,
+} from "@/lib/marination";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +55,13 @@ function severityClasses(severity: string) {
   if (severity === "critical") return "border-red-300 bg-red-50 text-red-950";
   if (severity === "high") return "border-orange-300 bg-orange-50 text-orange-950";
   return "border-amber-300 bg-amber-50 text-amber-950";
+}
+
+function stockStatusClasses(status: ReturnType<typeof calculateMarinationStockCoverage>["status"]) {
+  if (status === "critical" || status === "urgent") return "border-red-300 bg-red-50 text-red-950";
+  if (status === "prepare") return "border-amber-300 bg-amber-50 text-amber-950";
+  if (status === "normal") return "border-emerald-300 bg-emerald-50 text-emerald-950";
+  return "border-zinc-200 bg-zinc-50 text-zinc-700";
 }
 
 type LiveAttendanceRow = {
@@ -104,6 +119,10 @@ export default async function CeoTodayPage() {
   if (!latest?.business_date) return <EmptyState message="ยังไม่มี Daily Business Snapshot ให้แสดง" />;
 
   const businessDate = latest.business_date;
+  const today = todayISO();
+  const sevenDaysAgo = new Date(`${today}T00:00:00+07:00`);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+  const sevenDaysAgoISO = sevenDaysAgo.toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
   const kpi = createKpiSupabaseAdminClient();
   const liveAttendancePromise = kpi
     ? kpi
@@ -117,7 +136,7 @@ export default async function CeoTodayPage() {
     ? kpi.rpc("owner_people_daily_summary", { p_work_date: businessDate })
     : Promise.resolve({ data: null, error: null });
 
-  const [snapshotsResult, alertsResult, peopleResult, liveAttendanceResult, livePeopleSummaryResult] = await Promise.all([
+  const [snapshotsResult, alertsResult, peopleResult, liveAttendanceResult, livePeopleSummaryResult, partsResult, movementsResult, resetsResult] = await Promise.all([
     admin
       .from("daily_business_snapshot")
       .select(
@@ -144,6 +163,30 @@ export default async function CeoTodayPage() {
       .maybeSingle<CeoCompanyPeopleRow>(),
     liveAttendancePromise,
     livePeopleSummaryPromise,
+    admin
+      .from("chicken_parts")
+      .select("id,name,sort_order,is_active")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .returns<ChickenPart[]>(),
+    admin
+      .from("marination_stock_movements")
+      .select("id,movement_date,chicken_part_id,movement_type,quantity_kg,note,created_by,created_at,updated_at,is_voided,voided_at,voided_by,void_reason")
+      .eq("is_voided", false)
+      .lte("movement_date", today)
+      .order("movement_date", { ascending: true })
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .returns<MarinationStockMovement[]>(),
+    admin
+      .from("marination_stock_resets")
+      .select("id,reset_date,branch_id,note,created_at,created_by,is_active")
+      .eq("is_active", true)
+      .lte("reset_date", today)
+      .order("reset_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .returns<MarinationStockReset[]>(),
   ]);
 
   if (snapshotsResult.error) console.error("ceo_today_snapshots_failed", snapshotsResult.error);
@@ -151,6 +194,9 @@ export default async function CeoTodayPage() {
   if (peopleResult.error) console.error("ceo_today_people_failed", peopleResult.error);
   if (liveAttendanceResult.error) console.error("ceo_today_live_attendance_failed", liveAttendanceResult.error);
   if (livePeopleSummaryResult.error) console.error("ceo_today_live_people_summary_failed", livePeopleSummaryResult.error);
+  if (partsResult.error) console.error("ceo_today_marination_parts_failed", partsResult.error);
+  if (movementsResult.error) console.error("ceo_today_marination_movements_failed", movementsResult.error);
+  if (resetsResult.error) console.error("ceo_today_marination_resets_failed", resetsResult.error);
 
   const snapshots = snapshotsResult.data ?? [];
   const alerts = alertsResult.data ?? [];
@@ -176,7 +222,22 @@ export default async function CeoTodayPage() {
   const summary = buildCeoTodaySummary(snapshots, people);
   if (!summary) return <EmptyState message="พบวันที่ล่าสุด แต่ยังไม่มีข้อมูลสาขาใน Snapshot" />;
 
-  const isCurrentDay = businessDate === todayISO();
+  const marinationMovements = movementsResult.data ?? [];
+  const marinationStockKg = buildMarinationSummaries(
+    partsResult.data ?? [],
+    marinationMovements,
+    today,
+    resetsResult.data?.[0]?.reset_date ?? null,
+  ).totals.systemBalance;
+  const averageDailyOutflowKg = calculateMarinationAverageDailyOutflow(
+    marinationMovements,
+    sevenDaysAgoISO,
+    today,
+  );
+  const stockCoverage = calculateMarinationStockCoverage(marinationStockKg, averageDailyOutflowKg);
+  const hasMarinationData = !partsResult.error && !movementsResult.error && (partsResult.data?.length ?? 0) > 0;
+
+  const isCurrentDay = businessDate === today;
   const actionCount = alerts.length;
   const branchNames = new Map(summary.branches.map((branch) => [branch.branchId, branch.branchName]));
 
@@ -287,8 +348,29 @@ export default async function CeoTodayPage() {
         ) : null}
       </section>
 
+      <section aria-labelledby="fresh-stock-heading" className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <p className="text-sm font-black text-amber-700">โรงหมัก • ข้อมูลถึง {formatThaiDate(today)}</p>
+            <h2 id="fresh-stock-heading" className="text-2xl font-black">3. สต๊อกไก่สด</h2>
+          </div>
+          <Link href="/marination" className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-black">
+            ดูรายละเอียดโรงหมัก
+          </Link>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <MetricCard label="สต๊อกไก่สดรวม" value={hasMarinationData ? kg(marinationStockKg) : "รอข้อมูล"} helper="ยอดคงเหลือตามระบบทุกชิ้นส่วน" />
+          <MetricCard label="ใช้ออกเฉลี่ย" value={hasMarinationData && averageDailyOutflowKg > 0 ? `${numberFormatter.format(averageDailyOutflowKg)} กก./วัน` : "รอข้อมูล"} helper="เฉลี่ย 7 วันล่าสุด • ใช้หมัก + ขายสด" />
+          <MetricCard label="คาดว่าใช้ได้อีก" value={hasMarinationData && stockCoverage.days !== null ? `${numberFormatter.format(stockCoverage.days)} วัน` : "รอข้อมูล"} />
+          <div className={`rounded-2xl border p-4 shadow-sm ${stockStatusClasses(hasMarinationData ? stockCoverage.status : "unknown")}`}>
+            <p className="text-sm font-bold opacity-60">สถานะ</p>
+            <p className="mt-1 text-2xl font-black leading-tight">{hasMarinationData ? stockCoverage.label : "รอข้อมูล"}</p>
+          </div>
+        </div>
+      </section>
+
       <section aria-labelledby="people-heading" className="space-y-3">
-        <h2 id="people-heading" className="text-2xl font-black">3. พนักงาน</h2>
+        <h2 id="people-heading" className="text-2xl font-black">4. พนักงาน</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard label="มาทำงาน" value={count(summary.staffPresent)} />
           <MetricCard label="ขาดงาน" value={count(summary.staffAbsent)} valueClass={summary.staffAbsent ? "text-red-700" : "text-black"} />
@@ -298,7 +380,7 @@ export default async function CeoTodayPage() {
       </section>
 
       <section aria-labelledby="money-heading" className="space-y-3">
-        <h2 id="money-heading" className="text-2xl font-black">4. เงิน</h2>
+        <h2 id="money-heading" className="text-2xl font-black">5. เงิน</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <MetricCard label="Cash In" value={moneyFormatter.format(summary.cashIn)} helper="เฉพาะรายการที่ผูกสาขา" />
           <MetricCard label="Cash Out" value={moneyFormatter.format(summary.cashOut)} helper="เฉพาะรายการที่ผูกสาขา" />
@@ -309,7 +391,7 @@ export default async function CeoTodayPage() {
       </section>
 
       <section aria-labelledby="branch-heading" className="space-y-3">
-        <h2 id="branch-heading" className="text-2xl font-black">5. แยกตามสาขา</h2>
+        <h2 id="branch-heading" className="text-2xl font-black">6. แยกตามสาขา</h2>
         <div className="grid gap-3 lg:grid-cols-2">
           {summary.branches.map((branch) => (
             <article key={branch.branchId} className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
