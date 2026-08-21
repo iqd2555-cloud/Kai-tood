@@ -2,6 +2,7 @@ import { analyzeReceiptImage } from "./line-webhook";
 
 const AUTO_SAVE_CONFIDENCE = 0.9;
 const REVIEW_CONFIDENCE = 0.84;
+const COST_SOURCE_CATEGORIES = new Set(["chicken_purchase", "ingredient_purchase", "seasoning_cost"]);
 const EXPENSE_CATEGORIES = new Set([
   "rent_payment",
   "internet_payment",
@@ -16,6 +17,17 @@ const EXPENSE_CATEGORIES = new Set([
 
 type ImageInput = { contentType: string; data: Buffer };
 
+type PurchaseItemExtraction = {
+  rawName: string;
+  quantity: number;
+  unit: string;
+  packageSize: number;
+  packageUnit: string;
+  unitPrice: number;
+  lineTotal: number;
+  confidence: number;
+};
+
 type StrongExtraction = {
   merchant: string;
   transactionDate: string;
@@ -24,12 +36,14 @@ type StrongExtraction = {
   paymentMethod: string;
   category: string;
   documentType: "bank_transfer_slip" | "invoice_receipt" | "other";
+  sourceDocumentKind: "receipt" | "tax_invoice" | "invoice" | "delivery_note" | "other";
   memo: string;
   recipientReference: string;
   senderName: string;
   recipientName: string;
   senderReference: string;
   transactionReference: string;
+  items: PurchaseItemExtraction[];
   fieldConfidence: {
     merchant: number;
     transactionDate: number;
@@ -60,6 +74,21 @@ function amountConflict(first: number, second: number) {
   return difference > Math.max(1, Math.min(first, second) * 0.01);
 }
 
+function cleanItems(items: PurchaseItemExtraction[] | undefined) {
+  return (items ?? [])
+    .map((item) => ({
+      rawName: String(item.rawName ?? "").trim(),
+      quantity: Math.max(0, Number(item.quantity) || 0),
+      unit: String(item.unit ?? "").trim(),
+      packageSize: Math.max(0, Number(item.packageSize) || 0),
+      packageUnit: String(item.packageUnit ?? "").trim(),
+      unitPrice: Math.max(0, Number(item.unitPrice) || 0),
+      lineTotal: Math.max(0, Number(item.lineTotal) || 0),
+      confidence: clamp(item.confidence),
+    }))
+    .filter((item) => item.rawName.length > 0);
+}
+
 async function strongReceiptExtraction(
   image: ImageInput,
   fetchFn: typeof fetch,
@@ -75,18 +104,18 @@ async function strongReceiptExtraction(
     },
     body: JSON.stringify({
       model: clean(process.env.OPENAI_RECEIPT_MODEL_V2) || "gpt-5.6-terra",
-      max_completion_tokens: 700,
+      max_completion_tokens: 1400,
       response_format: {
         type: "json_schema",
         json_schema: {
-          name: "thai_financial_document_extraction_v2",
+          name: "thai_financial_document_extraction_v3",
           strict: true,
           schema: {
             type: "object",
             properties: {
               merchant: { type: "string" },
               transactionDate: { type: "string", description: "YYYY-MM-DD; ถ้าไม่เห็นจริงให้เป็นข้อความว่าง" },
-              amount: { type: "number", description: "ยอดที่ต้องชำระจริง/ยอดสุทธิ/ยอดรวมทั้งสิ้น ไม่ใช่ subtotal หรือ VAT" },
+              amount: { type: "number", description: "ยอดที่ต้องชำระจริง/ยอดสุทธิ/ยอดรวมทั้งสิ้น ไม่ใช่ subtotal หรือ VAT; ถ้าเอกสารไม่มีราคาให้เป็น 0" },
               amountLabel: { type: "string", description: "คำกำกับยอดที่เลือก เช่น ยอดสุทธิ, Grand Total, รวมทั้งสิ้น" },
               paymentMethod: { type: "string", description: "เงินสด, โอนเงิน, บัตร หรือ ไม่ระบุ" },
               category: {
@@ -100,16 +129,35 @@ async function strongReceiptExtraction(
                   "labor_cost",
                   "ice_cost",
                   "transport",
-                  "misc_expense",
-                ],
+                  "misc_expense"
+                ]
               },
               documentType: { type: "string", enum: ["bank_transfer_slip", "invoice_receipt", "other"] },
+              sourceDocumentKind: { type: "string", enum: ["receipt", "tax_invoice", "invoice", "delivery_note", "other"] },
               memo: { type: "string" },
               recipientReference: { type: "string" },
               senderName: { type: "string" },
               recipientName: { type: "string" },
               senderReference: { type: "string" },
               transactionReference: { type: "string" },
+              items: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    rawName: { type: "string", description: "ชื่อสินค้าตามบิล เช่น เศษ BL, ซอสฝาเขียว, น้ำตาล" },
+                    quantity: { type: "number", description: "จำนวนตามบิล เช่น 30 กก. ให้ quantity=30; 6 ขวดให้ quantity=6" },
+                    unit: { type: "string", description: "หน่วยจำนวน เช่น กก., กรัม, ลิตร, มล., ขวด, ถุง, ลัง" },
+                    packageSize: { type: "number", description: "ขนาดต่อหน่วยบรรจุ เช่น ขวด 4.5 ลิตรให้ 4.5; ถ้าไม่เห็นให้ 0" },
+                    packageUnit: { type: "string", description: "หน่วยของ packageSize เช่น ลิตร, มล., กก., กรัม; ถ้าไม่เห็นให้ว่าง" },
+                    unitPrice: { type: "number", description: "ราคาต่อหน่วยที่พิมพ์บนบิล ถ้าไม่เห็นให้ 0 ห้ามคำนวณเดา" },
+                    lineTotal: { type: "number", description: "ยอดรวมของบรรทัดสินค้านั้น ถ้าไม่เห็นให้ 0 ห้ามคำนวณเดา" },
+                    confidence: { type: "number", minimum: 0, maximum: 1 }
+                  },
+                  required: ["rawName", "quantity", "unit", "packageSize", "packageUnit", "unitPrice", "lineTotal", "confidence"],
+                  additionalProperties: false
+                }
+              },
               fieldConfidence: {
                 type: "object",
                 properties: {
@@ -117,11 +165,11 @@ async function strongReceiptExtraction(
                   transactionDate: { type: "number", minimum: 0, maximum: 1 },
                   amount: { type: "number", minimum: 0, maximum: 1 },
                   paymentMethod: { type: "number", minimum: 0, maximum: 1 },
-                  category: { type: "number", minimum: 0, maximum: 1 },
+                  category: { type: "number", minimum: 0, maximum: 1 }
                 },
                 required: ["merchant", "transactionDate", "amount", "paymentMethod", "category"],
-                additionalProperties: false,
-              },
+                additionalProperties: false
+              }
             },
             required: [
               "merchant",
@@ -131,49 +179,47 @@ async function strongReceiptExtraction(
               "paymentMethod",
               "category",
               "documentType",
+              "sourceDocumentKind",
               "memo",
               "recipientReference",
               "senderName",
               "recipientName",
               "senderReference",
               "transactionReference",
-              "fieldConfidence",
+              "items",
+              "fieldConfidence"
             ],
-            additionalProperties: false,
-          },
-        },
+            additionalProperties: false
+          }
+        }
       },
       messages: [{
         role: "user",
         content: [
           {
             type: "text",
-            text: "อ่านภาพเอกสารการเงินภาษาไทยอย่างละเอียดระดับบัญชี โดยเน้นยอดเงินจริงเป็นอันดับแรก ตรวจคำว่า ยอดสุทธิ, ยอดชำระ, รวมทั้งสิ้น, Grand Total, Total และตรวจความสัมพันธ์ subtotal + VAT = total เมื่อมีข้อมูล อย่าเลือกยอด VAT หรือยอดก่อนภาษีแทนยอดสุทธิ สำหรับใบเสร็จ/ใบกำกับภาษี/ใบแจ้งหนี้ที่ไม่มีวิธีชำระเงิน ให้ paymentMethod เป็น ไม่ระบุ แต่ห้ามลดความมั่นใจของยอดเงิน วันที่ ชื่อผู้ขาย และหมวดเพราะเหตุนี้ สำหรับสลิปธนาคารให้แยกผู้โอนกับผู้รับและเลขอ้างอิงให้ชัด ให้คะแนน fieldConfidence แยกแต่ละช่องตามสิ่งที่เห็นจริงในภาพ ถ้ามีหลายยอดและยังตัดสินยอดสุดท้ายไม่ได้ ให้ confidence ของ amount ต่ำกว่า 0.85",
+            text: "อ่านภาพใบเสร็จรับเงิน ใบกำกับภาษี ใบแจ้งหนี้ ใบส่งสินค้า หรือสลิปธนาคารภาษาไทยอย่างละเอียดระดับบัญชี โดยเน้นข้อมูลจากภาพจริง ห้ามเดา. สำหรับเอกสารซื้อวัตถุดิบ/เครื่องปรุง ให้ดึงรายการสินค้าในตารางทุกบรรทัดลง items เพื่อใช้คำนวณต้นทุนปัจจุบัน เช่น เศษไก่ BL, เศษไก่ BB, หนังไก่, ซอสถั่วเหลือง, ซอสฝาเขียว, น้ำตาล, เกลือ, รสดี, แป้งข้าวเจ้า, แป้งทอดกรอบ. อ่านจำนวน หน่วย ขนาดบรรจุ ราคาต่อหน่วย และยอดรวมบรรทัดเท่าที่เห็นจริง ถ้าไม่เห็นราคาให้ 0 ไม่คำนวณเอง. ถ้าเป็นขวด/ถุง/ลังและเห็นขนาดต่อบรรจุ ให้ใส่ packageSize กับ packageUnit. เน้นยอดเงินจริง โดยตรวจคำว่า ยอดสุทธิ, ยอดชำระ, รวมทั้งสิ้น, Grand Total, Total และตรวจ subtotal + VAT = total เมื่อมีข้อมูล. ใบเสร็จ/ใบกำกับภาษี/ใบแจ้งหนี้ที่ไม่มีวิธีชำระเงินให้ paymentMethod เป็น ไม่ระบุ โดยไม่ลดความมั่นใจของยอด วันที่ ผู้ขาย และรายการสินค้าเพราะเหตุนี้. ใบส่งสินค้าที่ไม่มีราคาให้ sourceDocumentKind=delivery_note และ amount=0. สำหรับสลิปธนาคารให้แยกผู้โอนผู้รับและเลขอ้างอิง. ให้ confidence รายรายการตามความชัดจริง ถ้ามีหลายยอดและยังตัดสินยอดสุดท้ายไม่ได้ ให้ fieldConfidence.amount ต่ำกว่า 0.85"
           },
           {
             type: "image_url",
             image_url: {
               url: `data:${image.contentType};base64,${image.data.toString("base64")}`,
-              detail: "high",
-            },
-          },
-        ],
-      }],
-    }),
+              detail: "high"
+            }
+          }
+        ]
+      }]
+    })
   });
 
-  if (!response.ok) {
-    throw new Error(`Receipt OCR v2 failed with status ${response.status}`);
-  }
-
+  if (!response.ok) throw new Error(`Receipt OCR v3 failed with status ${response.status}`);
   const body = await response.json() as {
     choices?: Array<{ finish_reason?: string; message?: { content?: string; refusal?: string | null } }>;
   };
   const choice = body.choices?.[0];
   if (choice?.finish_reason !== "stop" || choice.message?.refusal) {
-    throw new Error(`Receipt OCR v2 returned an incomplete response: ${choice?.finish_reason ?? "missing"}`);
+    throw new Error(`Receipt OCR v3 returned an incomplete response: ${choice?.finish_reason ?? "missing"}`);
   }
-
   return JSON.parse(choice.message?.content ?? "{}") as StrongExtraction;
 }
 
@@ -183,27 +229,34 @@ export async function analyzeReceiptImageV2(
   fetchFn: typeof fetch = fetch,
 ) {
   const baseline = await analyzeReceiptImage(image, eventAt, fetchFn);
-  if (baseline.confidence >= AUTO_SAVE_CONFIDENCE) return baseline;
+  const isCostSource = COST_SOURCE_CATEGORIES.has(baseline.category);
+  if (baseline.confidence >= AUTO_SAVE_CONFIDENCE && !isCostSource) return baseline;
 
   let strong: StrongExtraction;
   try {
     strong = await strongReceiptExtraction(image, fetchFn);
   } catch {
-    // Never make the existing OCR less reliable because a second pass failed.
     return baseline;
   }
 
+  const items = cleanItems(strong.items);
   const amountConfidence = clamp(strong.fieldConfidence?.amount);
   const dateConfidence = clamp(strong.fieldConfidence?.transactionDate);
   const merchantConfidence = clamp(strong.fieldConfidence?.merchant);
   const categoryConfidence = clamp(strong.fieldConfidence?.category);
   const paymentConfidence = clamp(strong.fieldConfidence?.paymentMethod);
-
   const strongAmount = Number(strong.amount);
   const conflict = amountConflict(baseline.amount, strongAmount);
+
   if (conflict && amountConfidence >= 0.85) {
-    // Conflicting monetary totals are the one case where automation must stop.
-    return { ...baseline, confidence: Math.min(baseline.confidence, REVIEW_CONFIDENCE) };
+    return {
+      ...baseline,
+      confidence: Math.min(baseline.confidence, REVIEW_CONFIDENCE),
+      sourceDocumentKind: strong.sourceDocumentKind,
+      purchaseItems: items,
+      costingEligible: false,
+      costingReviewReason: "ยอดรวมเอกสารจากการอ่านสองรอบไม่ตรงกัน"
+    };
   }
 
   const amount = amountConfidence >= 0.9 && strongAmount > 0 ? strongAmount : baseline.amount;
@@ -220,12 +273,11 @@ export async function analyzeReceiptImageV2(
   const paymentMethod = paymentConfidence >= 0.8 && strong.paymentMethod.trim()
     ? strong.paymentMethod.trim()
     : baseline.paymentMethod;
-
   const criticalConfidence = Math.min(
     amountConfidence || baseline.confidence,
     dateConfidence || baseline.confidence,
     merchantConfidence || baseline.confidence,
-    categoryConfidence || baseline.confidence,
+    categoryConfidence || baseline.confidence
   );
 
   const invoiceComplete = documentType === "invoice_receipt"
@@ -234,7 +286,6 @@ export async function analyzeReceiptImageV2(
     && merchant !== "ไม่ทราบชื่อร้าน"
     && EXPENSE_CATEGORIES.has(category)
     && criticalConfidence >= 0.88;
-
   const transferComplete = documentType === "bank_transfer_slip"
     && amount > 0
     && isIsoDate(transactionDate)
@@ -243,10 +294,16 @@ export async function analyzeReceiptImageV2(
     && amountConfidence >= 0.9
     && dateConfidence >= 0.85
     && merchantConfidence >= 0.85;
-
   const confidence = invoiceComplete || transferComplete
     ? Math.max(baseline.confidence, Math.min(0.97, criticalConfidence + 0.05))
     : Math.max(baseline.confidence, Math.min(REVIEW_CONFIDENCE, criticalConfidence));
+
+  const costCategory = COST_SOURCE_CATEGORIES.has(category);
+  const costingEligible = costCategory
+    && isIsoDate(transactionDate)
+    && merchant !== "ไม่ทราบชื่อร้าน"
+    && items.length > 0
+    && !conflict;
 
   return {
     ...baseline,
@@ -263,5 +320,9 @@ export async function analyzeReceiptImageV2(
     recipientName: strong.recipientName?.trim() || baseline.recipientName,
     senderReference: strong.senderReference?.trim() || baseline.senderReference,
     transactionReference: strong.transactionReference?.trim() || baseline.transactionReference,
+    sourceDocumentKind: strong.sourceDocumentKind,
+    purchaseItems: items,
+    costingEligible,
+    costingReviewReason: costingEligible ? "" : "ข้อมูลรายการซื้อยังไม่ครบสำหรับปรับต้นทุนอัตโนมัติ"
   };
 }
