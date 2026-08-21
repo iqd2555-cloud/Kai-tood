@@ -384,7 +384,7 @@ export function DailyForm({
               className="focus-ring min-h-14 w-full rounded-2xl border-2 border-black/10 bg-white px-4 text-xl font-bold shadow-sm"
               type="number"
               inputMode="numeric"
-              min="0"
+              min="1"
               step="1"
               name="packs_sold"
               defaultValue={existingReport?.packs_sold ?? ""}

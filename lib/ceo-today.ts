@@ -149,7 +149,9 @@ export function buildCeoTodaySummary(
   const totalSales = sum((row) => row.total_sales);
   const yesterdaySales = sum((row) => row.yesterday_sales);
   const averageSales30d = sum((row) => row.average_sales_30d);
-  const rowsWithPacks = snapshots.filter((row) => row.packs_sold !== null);
+  const hasUsablePacks = (row: CeoSnapshotRow) =>
+    row.packs_sold !== null && !(toNumber(row.total_sales) > 0 && row.packs_sold <= 0);
+  const rowsWithPacks = snapshots.filter(hasUsablePacks);
   const packsSold = rowsWithPacks.reduce((total, row) => total + Number(row.packs_sold ?? 0), 0);
   const chickenKgForReportedPacks = rowsWithPacks.reduce(
     (total, row) => total + toNumber(row.chicken_products_total_kg),
@@ -179,7 +181,7 @@ export function buildCeoTodaySummary(
       salesVs30dPct: nullableNumber(row.average_sales_30d)
         ? percentage(toNumber(row.total_sales), toNumber(row.average_sales_30d))
         : null,
-      packsSold: row.packs_sold,
+      packsSold: hasUsablePacks(row) ? row.packs_sold : null,
       chickenKg: toNumber(row.chicken_products_total_kg),
       chickenYield: nullableNumber(row.chicken_yield_packs_per_kg),
       riceKg: toNumber(row.sticky_rice_used_kg),
@@ -227,7 +229,7 @@ export function buildCeoTodaySummary(
     complaintCount: sum((row) => row.complaint_count),
     openAlertCount: sum((row) => row.open_alert_count),
     criticalAlertCount: sum((row) => row.critical_alert_count),
-    branchesAwaitingPacks: snapshots.filter((row) => row.packs_sold === null).length,
+    branchesAwaitingPacks: snapshots.filter((row) => !hasUsablePacks(row)).length,
     branchesMissingRice: snapshots.filter((row) => toNumber(row.sticky_rice_used_kg) <= 0).length,
     branches,
   };

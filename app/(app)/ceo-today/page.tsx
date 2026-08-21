@@ -8,6 +8,7 @@ import {
   type CeoSnapshotRow,
 } from "@/lib/ceo-today";
 import { formatThaiDate, moneyFormatter, numberFormatter, todayISO } from "@/lib/format";
+import { createKpiSupabaseAdminClient } from "@/lib/kpi-supabase";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +48,21 @@ function severityClasses(severity: string) {
   if (severity === "high") return "border-orange-300 bg-orange-50 text-orange-950";
   return "border-amber-300 bg-amber-50 text-amber-950";
 }
+
+type LiveAttendanceRow = {
+  staff_id: string;
+  check_in_at: string | null;
+  updated_at: string;
+};
+
+type LivePeopleSummary = {
+  late_count?: number;
+  absent_count?: number;
+  leave_count?: number;
+  weekly_off_count?: number;
+  kpi_expected_count?: number;
+  kpi_incomplete_count?: number;
+};
 
 function MetricCard({ label, value, helper, valueClass = "text-black" }: { label: string; value: string; helper?: string; valueClass?: string }) {
   return (
@@ -88,7 +104,20 @@ export default async function CeoTodayPage() {
   if (!latest?.business_date) return <EmptyState message="ยังไม่มี Daily Business Snapshot ให้แสดง" />;
 
   const businessDate = latest.business_date;
-  const [snapshotsResult, alertsResult, peopleResult] = await Promise.all([
+  const kpi = createKpiSupabaseAdminClient();
+  const liveAttendancePromise = kpi
+    ? kpi
+        .from("attendance_logs")
+        .select("staff_id,check_in_at,updated_at")
+        .eq("work_date", businessDate)
+        .not("check_in_at", "is", null)
+        .returns<LiveAttendanceRow[]>()
+    : Promise.resolve({ data: null, error: null });
+  const livePeopleSummaryPromise = kpi
+    ? kpi.rpc("owner_people_daily_summary", { p_work_date: businessDate })
+    : Promise.resolve({ data: null, error: null });
+
+  const [snapshotsResult, alertsResult, peopleResult, liveAttendanceResult, livePeopleSummaryResult] = await Promise.all([
     admin
       .from("daily_business_snapshot")
       .select(
@@ -113,15 +142,38 @@ export default async function CeoTodayPage() {
       .order("synced_at", { ascending: false })
       .limit(1)
       .maybeSingle<CeoCompanyPeopleRow>(),
+    liveAttendancePromise,
+    livePeopleSummaryPromise,
   ]);
 
   if (snapshotsResult.error) console.error("ceo_today_snapshots_failed", snapshotsResult.error);
   if (alertsResult.error) console.error("ceo_today_alerts_failed", alertsResult.error);
   if (peopleResult.error) console.error("ceo_today_people_failed", peopleResult.error);
+  if (liveAttendanceResult.error) console.error("ceo_today_live_attendance_failed", liveAttendanceResult.error);
+  if (livePeopleSummaryResult.error) console.error("ceo_today_live_people_summary_failed", livePeopleSummaryResult.error);
 
   const snapshots = snapshotsResult.data ?? [];
   const alerts = alertsResult.data ?? [];
-  const summary = buildCeoTodaySummary(snapshots, peopleResult.data ?? null);
+  const liveAttendance = (liveAttendanceResult.data ?? []) as LiveAttendanceRow[];
+  const livePeopleSummary = (livePeopleSummaryResult.data ?? null) as LivePeopleSummary | null;
+  const liveStaffIds = new Set(liveAttendance.map((row) => row.staff_id));
+  const livePeople: CeoCompanyPeopleRow | null = liveStaffIds.size > 0
+    ? {
+        present_staff_count: liveStaffIds.size,
+        absent_staff_count: livePeopleSummary?.absent_count ?? null,
+        late_staff_count: livePeopleSummary?.late_count ?? null,
+        approved_leave_count: livePeopleSummary?.leave_count ?? null,
+        weekly_off_count: livePeopleSummary?.weekly_off_count ?? null,
+        attendance_is_final: false,
+        kpi_expected_count: livePeopleSummary?.kpi_expected_count ?? null,
+        kpi_complete_count: null,
+        kpi_incomplete_count: livePeopleSummary?.kpi_incomplete_count ?? null,
+        kpi_is_final: false,
+        synced_at: liveAttendance.map((row) => row.updated_at).sort().at(-1) ?? null,
+      }
+    : null;
+  const people = livePeople ?? peopleResult.data ?? null;
+  const summary = buildCeoTodaySummary(snapshots, people);
   if (!summary) return <EmptyState message="พบวันที่ล่าสุด แต่ยังไม่มีข้อมูลสาขาใน Snapshot" />;
 
   const isCurrentDay = businessDate === todayISO();
@@ -282,7 +334,7 @@ export default async function CeoTodayPage() {
       </section>
 
       <footer className="rounded-2xl bg-zinc-100 px-5 py-4 text-sm font-semibold text-zinc-600">
-        Snapshot คำนวณล่าสุด {dateTimeFormatter.format(new Date(summary.calculatedAt))} • หน้า CEO Today อ่านจากฐานข้อมูลกลางโดยตรง
+        Snapshot คำนวณล่าสุด {dateTimeFormatter.format(new Date(summary.calculatedAt))} • ข้อมูลพนักงานวันนี้อ่านสดจากระบบเช็กอิน และใช้ฐานกลางเป็นข้อมูลสำรอง
       </footer>
     </div>
   );
