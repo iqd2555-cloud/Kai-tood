@@ -1,4 +1,5 @@
 import { handleLineWebhookRequest } from "@/lib/line-webhook";
+import { analyzeReceiptImageV2 } from "@/lib/line-receipt-ocr-v2";
 import { handleMarinatedChickenGroupRequest } from "@/lib/line-marinated-group";
 import { handleFuelExpenseRequest } from "@/lib/line-fuel-interceptor";
 import { handleLineMarinatedOrderIntakeRequest } from "@/lib/line-marinated-order-intake";
@@ -25,7 +26,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await handleLineWebhookRequest(request);
+  const result = await handleLineWebhookRequest(request, {
+    analyzeReceipt: analyzeReceiptImageV2,
+  });
 
   return Response.json({ ok: result.ok, code: result.code }, { status: result.status });
 }
