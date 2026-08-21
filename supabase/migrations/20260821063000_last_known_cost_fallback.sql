@@ -57,7 +57,9 @@ left join public.ingredient_latest_verified_cost v on v.ingredient_id=i.id
 left join public.ingredient_fallback_costs f on f.ingredient_id=i.id
 where i.is_active=true;
 
-create or replace view public.product_live_cost as
+-- Drop/recreate because the previous view already exists with a fixed column order.
+drop view if exists public.product_live_cost;
+create view public.product_live_cost as
 with component_costs as (
   select
     r.id as recipe_id,
@@ -87,13 +89,13 @@ select
   is_active,
   count(*) as component_count,
   count(*) filter (where effective_unit_cost_base is null) as missing_cost_count,
-  count(*) filter (where cost_source='last_known') as fallback_component_count,
   case when count(*) filter (where effective_unit_cost_base is null)=0
        then sum(component_cost) else null end as batch_cost,
   case when count(*) filter (where effective_unit_cost_base is null)=0
        then sum(component_cost)/output_quantity else null end as cost_per_base_unit,
   min(source_date) filter (where effective_unit_cost_base is not null) as oldest_price_date,
-  max(source_date) filter (where effective_unit_cost_base is not null) as newest_price_date
+  max(source_date) filter (where effective_unit_cost_base is not null) as newest_price_date,
+  count(*) filter (where cost_source='last_known') as fallback_component_count
 from component_costs
 group by recipe_id,recipe_code,recipe_name,output_quantity,output_unit,is_active;
 
