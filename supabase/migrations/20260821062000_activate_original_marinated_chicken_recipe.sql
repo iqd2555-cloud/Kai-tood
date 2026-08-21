@@ -2,6 +2,10 @@
 -- Chicken purchase prices come from photo bills, then +2 THB/kg outside-bill delivery cost is applied as landed cost.
 -- Recipe: 50 kg raw chicken -> 62.65 kg marinated output.
 
+-- Drop dependent views first because the latest-cost view gains landed-cost columns.
+drop view if exists public.product_live_cost;
+drop view if exists public.ingredient_latest_verified_cost;
+
 alter table public.cost_ingredients
   add column if not exists landed_extra_cost_per_base numeric not null default 0;
 
@@ -26,8 +30,7 @@ set landed_extra_cost_per_base=0.002,
     updated_at=now()
 where category='chicken';
 
--- Rebuild latest-cost view with landed/effective cost separated from bill price.
-create or replace view public.ingredient_latest_verified_cost as
+create view public.ingredient_latest_verified_cost as
 select distinct on (i.id)
   i.id as ingredient_id,
   i.code,
@@ -57,7 +60,6 @@ left join public.purchase_document_items p
 where i.is_active=true
 order by i.id,p.source_date desc nulls last,p.created_at desc nulls last;
 
--- Seed/activate the owner's verified current original recipe.
 insert into public.product_recipes(code,name,output_quantity,output_unit,effective_from,is_active,note)
 values (
   'marinated_chicken_ready_to_fry',
@@ -77,7 +79,6 @@ set name=excluded.name,
     note=excluded.note,
     updated_at=now();
 
--- Replace recipe components atomically from the verified formula.
 delete from public.product_recipe_components
 where recipe_id=(select id from public.product_recipes where code='marinated_chicken_ready_to_fry');
 
@@ -99,8 +100,7 @@ cross join (values
 join public.cost_ingredients i on i.code=x.code
 where r.code='marinated_chicken_ready_to_fry';
 
--- Product live cost uses effective landed cost, not raw invoice price.
-create or replace view public.product_live_cost as
+create view public.product_live_cost as
 with component_costs as (
   select
     r.id as recipe_id,
